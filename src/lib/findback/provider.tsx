@@ -191,6 +191,8 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
 
   const friendlyError = (raw: string) => {
     const m = raw.toLowerCase();
+    if (/request blocked|dapp could be malicious|blocked this request/i.test(raw))
+      return "Phantom đã chặn nhầm giao dịch dù Devnet preflight thành công. Không chọn “Proceed anyway”; domain SafeReturn cần được Phantom duyệt lại.";
     if (/user rejected|rejected the request|cancel/i.test(raw))
       return "Bạn đã hủy ký trong Phantom. Bấm lại nếu muốn tiếp tục.";
     if (/blockhash|expired|block height/i.test(m))
