@@ -17,7 +17,8 @@ export function Navbar() {
     pathname?.startsWith("/login") ||
     pathname?.startsWith("/signup") ||
     pathname?.startsWith("/auth") ||
-    pathname?.startsWith("/setup");
+    pathname?.startsWith("/setup") ||
+    pathname?.startsWith("/t/");
 
   if (hide) return null;
 

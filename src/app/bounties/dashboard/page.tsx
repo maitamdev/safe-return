@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { ArrowSquareOut, Plus, Tray } from "@phosphor-icons/react";
+import { ArrowSquareOut, Plus, QrCode, Tray } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { FIND_SYMBOL } from "@/lib/findback/config";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
@@ -23,7 +23,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Hoạt động của tôi</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Quản lý tin do ví hiện tại tạo và theo dõi các claim đã gửi.</p>
         </div>
-        <Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} />Tạo tin mới</Link>
+        <div className="flex flex-wrap gap-2"><Link href="/bounties/tags" className="app-button-secondary shrink-0"><QrCode size={17} />SafeTag QR</Link><Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} />Tạo tin mới</Link></div>
       </div>
 
       {!connected && <div className="app-card mt-8 p-6"><h2 className="text-lg font-bold">Kết nối ví để xem dữ liệu cá nhân</h2><p className="mt-2 mb-4 text-sm text-ink-soft">Tài khoản email xác thực người dùng. Địa chỉ Phantom xác định bounty và claim on-chain.</p><ConnectWalletButton size="md" /></div>}

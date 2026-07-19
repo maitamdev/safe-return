@@ -1,6 +1,7 @@
 "use client";
 
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   ArrowLeft,
@@ -74,6 +75,7 @@ const guideSteps = [
 ] as const;
 
 export function FirstVisitGuide() {
+  const pathname = usePathname();
   const [ready, setReady] = useState(false);
   const [open, setOpen] = useState(false);
   const [stepIndex, setStepIndex] = useState(0);
@@ -153,7 +155,7 @@ export function FirstVisitGuide() {
     };
   }, [open, rememberAndClose]);
 
-  if (!ready) return null;
+  if (!ready || pathname?.startsWith("/t/")) return null;
 
   const step = guideSteps[stepIndex];
   const StepIcon = step.icon;
