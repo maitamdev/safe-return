@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { NetworkBadge } from "@/components/wallet/NetworkBadge";
+import { TokenBalances } from "@/components/wallet/TokenBalances";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useFindBack } from "@/lib/findback/provider";
 import { cn } from "@/lib/cn";
@@ -73,8 +74,9 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2">
-            <div className="hidden sm:block">
-              <NetworkBadge />
+            <div className="hidden items-center gap-1.5 sm:flex">
+              <NetworkBadge showBalance={false} />
+              <TokenBalances dark />
             </div>
             <UserMenu dark />
             <ConnectWalletButton dark />

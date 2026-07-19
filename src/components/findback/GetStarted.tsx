@@ -9,10 +9,39 @@ import {
   Warning,
   Copy,
   ArrowRight,
+  ArrowSquareOut,
 } from "@phosphor-icons/react";
-import { FIND_MINT, FIND_SYMBOL } from "@/lib/findback/config";
+import {
+  FIND_MINT,
+  FIND_SYMBOL,
+  explorerAddressUrl,
+  explorerTxUrl,
+} from "@/lib/findback/config";
 import Link from "next/link";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
+import { TokenBalances } from "@/components/wallet/TokenBalances";
+
+type FundResult = {
+  ok?: boolean;
+  error?: string;
+  message?: string;
+  find?: {
+    amount?: number;
+    skipped?: boolean;
+    note?: string;
+    signature?: string;
+    explorerUrl?: string;
+    mint?: string;
+  };
+  sol?: {
+    before?: number;
+    after?: number;
+    claimed?: boolean;
+    signature?: string | null;
+    explorerUrl?: string | null;
+    note?: string;
+  };
+};
 
 /**
  * Vietnamese onboarding — what confused users actually need.
@@ -23,6 +52,8 @@ export function GetStarted() {
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
+  const [txUrl, setTxUrl] = useState<string | null>(null);
+  const [walletUrl, setWalletUrl] = useState<string | null>(null);
 
   const address = publicKey?.toBase58() ?? "";
 
@@ -39,6 +70,8 @@ export function GetStarted() {
   const fund = async () => {
     setErr(null);
     setMsg(null);
+    setTxUrl(null);
+    setWalletUrl(null);
     if (!address) {
       setErr("Bấm «Kết nối ví» trước (nút trắng bên dưới).");
       return;
@@ -50,24 +83,27 @@ export function GetStarted() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, amount: 100 }),
       });
-      const j = (await r.json()) as {
-        ok?: boolean;
-        error?: string;
-        message?: string;
-        find?: { amount?: number; skipped?: boolean; note?: string };
-      };
+      const j = (await r.json()) as FundResult;
       if (!r.ok || !j.ok) {
         throw new Error(j.error || "Nạp thất bại");
       }
+
+      setWalletUrl(explorerAddressUrl(address));
+
       if (j.find && "skipped" in j.find && j.find.skipped) {
         setMsg(
-          `${j.message || ""} ${j.find.note || ""} — Import mint FIND trong Phantom rồi thử lại / chạy local.`
+          `${j.message || ""} ${j.find.note || ""} — Cần key deployer trên server.`
         );
       } else {
+        const sig = j.find?.signature;
+        if (sig) {
+          setTxUrl(j.find?.explorerUrl || explorerTxUrl(sig));
+        }
         setMsg(
-          j.message ||
-            `Đã nạp ${FIND_SYMBOL}. Mở Phantom → refresh. Import token nếu chưa thấy.`
+          `Đã gửi ${j.find?.amount ?? 100} ${FIND_SYMBOL} test. Bấm link Explorer bên dưới để kiểm tra (cluster = Devnet). Phantom có thể chưa hiện token — import mint.`
         );
+        // refresh balance pills
+        window.dispatchEvent(new Event("findback:funded"));
       }
     } catch (e) {
       setErr(e instanceof Error ? e.message : String(e));
@@ -79,17 +115,31 @@ export function GetStarted() {
   return (
     <div className="mb-8 overflow-hidden rounded-3xl border border-[#9945FF]/35 bg-gradient-to-br from-[#9945FF]/15 via-black/40 to-[#14F195]/10">
       <div className="border-b border-white/10 px-5 py-4 md:px-6">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#14F195]">
-          Bắt đầu tại đây (3 bước)
-        </p>
-        <h2 className="mt-1 font-display text-xl font-bold md:text-2xl">
-          Dùng app không cần hiểu blockchain
-        </h2>
-        <p className="mt-1 max-w-2xl text-sm text-white/55">
-          Tiền trên đây là <strong className="text-white/80">test Devnet</strong>{" "}
-          — 0 đồng thật. Phantom có thể hiện cảnh báo đỏ vì site mới: bấm{" "}
-          <strong className="text-amber-200">«Vẫn tiếp tục»</strong>.
-        </p>
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#14F195]">
+              Bắt đầu tại đây (3 bước)
+            </p>
+            <h2 className="mt-1 font-display text-xl font-bold md:text-2xl">
+              Dùng app không cần hiểu blockchain
+            </h2>
+            <p className="mt-1 max-w-2xl text-sm text-white/55">
+              Tiền trên đây là{" "}
+              <strong className="text-white/80">test Devnet</strong> — 0 đồng
+              thật. Sau khi nạp, xem số dư{" "}
+              <strong className="text-[#14F195]">SOL + FIND</strong> góc trên /
+              link Explorer.
+            </p>
+          </div>
+          {connected && (
+            <div className="rounded-2xl border border-white/10 bg-black/30 px-3 py-2">
+              <p className="mb-1 text-[9px] font-bold uppercase tracking-wider text-white/40">
+                Số dư ví (Devnet)
+              </p>
+              <TokenBalances dark />
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="grid gap-0 md:grid-cols-3">
@@ -151,8 +201,8 @@ export function GetStarted() {
         </Step>
       </div>
 
-      {(msg || err) && (
-        <div className="border-t border-white/10 px-5 py-3 md:px-6">
+      {(msg || err || txUrl || walletUrl) && (
+        <div className="space-y-2 border-t border-white/10 px-5 py-4 md:px-6">
           {msg && (
             <p className="flex gap-2 text-xs text-[#14F195]">
               <CheckCircle size={14} className="mt-0.5 shrink-0" weight="fill" />
@@ -165,6 +215,50 @@ export function GetStarted() {
               {err}
             </p>
           )}
+
+          {(txUrl || walletUrl) && (
+            <div className="flex flex-wrap gap-2 pt-1">
+              {txUrl && (
+                <a
+                  href={txUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-white px-3 py-1.5 text-[11px] font-bold text-black hover:bg-white/90"
+                >
+                  Xem giao dịch trên Explorer <ArrowSquareOut size={12} />
+                </a>
+              )}
+              {walletUrl && (
+                <a
+                  href={`${walletUrl}/tokens`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-white/10"
+                >
+                  Xem token trong ví <ArrowSquareOut size={12} />
+                </a>
+              )}
+            </div>
+          )}
+
+          <div className="rounded-2xl border border-white/10 bg-black/25 p-3 text-[11px] leading-relaxed text-white/55">
+            <p className="font-bold text-white/80">Cách kiểm tra (3 chỗ):</p>
+            <ol className="mt-1.5 list-decimal space-y-1 pl-4">
+              <li>
+                Trong app: số dư <strong className="text-white">FIND</strong> góc
+                trên / box «Số dư ví» (tăng ~100).
+              </li>
+              <li>
+                Bấm <strong className="text-white">Xem giao dịch trên Explorer</strong>{" "}
+                — góc trên Explorer phải ghi <strong>Devnet</strong>, status Success.
+              </li>
+              <li>
+                Phantom (Devnet): Manage token list → Import → dán mint{" "}
+                <code className="text-[#14F195]">{FIND_MINT.slice(0, 8)}…</code>{" "}
+                (nút copy ở bước 2). Phantom Mainnet sẽ không thấy token test.
+              </li>
+            </ol>
+          </div>
         </div>
       )}
     </div>
