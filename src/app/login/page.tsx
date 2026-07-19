@@ -50,34 +50,22 @@ function LoginForm() {
         hai việc khác nhau.
       </p>
 
-      {!configured && (
+      {configured ? (
+        <div className="mt-5 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-100">
+          Supabase đã kết nối. Chưa chạy SQL bảng?{" "}
+          <Link href="/setup" className="font-bold underline">
+            Mở /setup (1 phút)
+          </Link>
+        </div>
+      ) : (
         <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-relaxed text-amber-100">
-          <p className="font-bold">Chưa có Supabase</p>
-          <ol className="mt-2 list-decimal space-y-1 pl-4 text-amber-100/90">
-            <li>
-              Tạo project free:{" "}
-              <a
-                className="underline"
-                href="https://supabase.com/dashboard"
-                target="_blank"
-                rel="noreferrer"
-              >
-                supabase.com/dashboard
-              </a>
-            </li>
-            <li>Project Settings → API → copy URL + anon key</li>
-            <li>
-              Dán vào <code className="text-white">.env.local</code> rồi restart{" "}
-              <code>npm run dev</code>
-            </li>
-            <li>
-              SQL Editor → chạy file <code>supabase/schema.sql</code>
-            </li>
-            <li>
-              Authentication → Providers → Email → tắt &quot;Confirm email&quot;
-              (tiện demo hackathon)
-            </li>
-          </ol>
+          <p className="font-bold">Chưa có Supabase env</p>
+          <p className="mt-2">
+            Thêm{" "}
+            <code className="text-white">NEXT_PUBLIC_SUPABASE_URL</code> +{" "}
+            <code className="text-white">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> rồi
+            restart.
+          </p>
         </div>
       )}
 

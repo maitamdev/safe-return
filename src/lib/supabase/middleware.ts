@@ -38,7 +38,8 @@ export async function updateSession(request: NextRequest) {
   const isAuthPage =
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
-    path.startsWith("/auth");
+    path.startsWith("/auth") ||
+    path.startsWith("/setup");
 
   if (isProtected && !user) {
     const redirect = request.nextUrl.clone();

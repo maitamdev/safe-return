@@ -35,11 +35,16 @@ export async function syncBountyToSupabase(
     updated_at: new Date().toISOString(),
   };
 
-  const { error } = await supabase.from("bounties").upsert(row, {
-    onConflict: "id",
-  });
-  if (error) {
-    console.warn("[findback/db] upsert skipped:", error.message);
+  try {
+    const { error } = await supabase.from("bounties").upsert(row, {
+      onConflict: "id",
+    });
+    if (error) {
+      // Table missing until user runs schema.sql — not fatal
+      console.warn("[findback/db] upsert skipped:", error.message);
+    }
+  } catch (e) {
+    console.warn("[findback/db] upsert error", e);
   }
 }
 
@@ -47,34 +52,39 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
   const supabase = createClient();
   if (!supabase) return [];
 
-  const { data, error } = await supabase
-    .from("bounties")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(100);
+  try {
+    const { data, error } = await supabase
+      .from("bounties")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(100);
 
-  if (error || !data) {
-    if (error) console.warn("[findback/db] select:", error.message);
+    if (error || !data) {
+      if (error) console.warn("[findback/db] select:", error.message);
+      return [];
+    }
+
+    return data.map((row) => ({
+      id: row.id as string,
+      title: row.title as string,
+      description: (row.description as string) || "",
+      category: (row.category as string) || "Other",
+      location: (row.location as string) || "",
+      rewardUi: Number(row.reward_ui) || 0,
+      deadlineUnix: Number(row.deadline_unix) || 0,
+      ownerWallet: (row.owner_wallet as string) || undefined,
+      imageDataUrl: null,
+      createdAt: row.created_at
+        ? new Date(row.created_at as string).getTime()
+        : Date.now(),
+      aiReport: (row.ai_report as BountyMeta["aiReport"]) ?? null,
+      claim: (row.claim as BountyMeta["claim"]) ?? null,
+      lastTx: (row.last_tx as string) || null,
+      lastTxUrl: (row.last_tx_url as string) || null,
+      seed: false,
+    }));
+  } catch (e) {
+    console.warn("[findback/db] select error", e);
     return [];
   }
-
-  return data.map((row) => ({
-    id: row.id as string,
-    title: row.title as string,
-    description: (row.description as string) || "",
-    category: (row.category as string) || "Other",
-    location: (row.location as string) || "",
-    rewardUi: Number(row.reward_ui) || 0,
-    deadlineUnix: Number(row.deadline_unix) || 0,
-    ownerWallet: (row.owner_wallet as string) || undefined,
-    imageDataUrl: null,
-    createdAt: row.created_at
-      ? new Date(row.created_at as string).getTime()
-      : Date.now(),
-    aiReport: (row.ai_report as BountyMeta["aiReport"]) ?? null,
-    claim: (row.claim as BountyMeta["claim"]) ?? null,
-    lastTx: (row.last_tx as string) || null,
-    lastTxUrl: (row.last_tx_url as string) || null,
-    seed: false,
-  }));
 }

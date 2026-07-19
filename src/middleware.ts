@@ -7,10 +7,6 @@ export async function middleware(request: NextRequest) {
 
 export const config = {
   matcher: [
-    /*
-     * Match app routes that need session refresh / auth gate.
-     * Skip static assets.
-     */
-    "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
+    "/((?!_next/static|_next/image|favicon.ico|setup|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
 };

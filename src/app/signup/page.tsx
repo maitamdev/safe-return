@@ -32,7 +32,10 @@ export default function SignupPage() {
     try {
       const note = await signUp(email, password, name);
       if (note) {
-        setInfo(note);
+        setInfo(
+          note +
+            " → Supabase Dashboard: Auth → Providers → Email → tắt Confirm email, rồi đăng nhập lại. Hoặc mở email xác nhận."
+        );
       } else {
         router.replace("/bounties");
         router.refresh();
