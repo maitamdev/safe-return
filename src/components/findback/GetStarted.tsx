@@ -153,10 +153,39 @@ export function GetStarted() {
               <ConnectWalletButton dark size="md" />
             </div>
           ) : (
-            <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#14F195]">
-              <CheckCircle size={14} weight="fill" /> Đã nối ·{" "}
-              {address.slice(0, 4)}…{address.slice(-4)}
-            </p>
+            <div className="mt-3 space-y-2">
+              <p className="inline-flex items-center gap-1.5 text-xs font-semibold text-[#14F195]">
+                <CheckCircle size={14} weight="fill" /> Đã nối ·{" "}
+                {address.slice(0, 4)}…{address.slice(-4)}
+              </p>
+              <button
+                type="button"
+                onClick={async () => {
+                  try {
+                    await navigator.clipboard.writeText(address);
+                    setCopied(true);
+                    setTimeout(() => setCopied(false), 1500);
+                  } catch {
+                    /* ignore */
+                  }
+                }}
+                className="flex w-full items-start gap-1.5 rounded-xl border border-white/10 bg-black/30 px-2.5 py-2 text-left font-mono text-[10px] leading-snug text-white/70 hover:border-[#14F195]/40 hover:text-white"
+                title="Copy địa chỉ đúng (từ Phantom) — đừng gõ tay"
+              >
+                <Copy size={12} className="mt-0.5 shrink-0" />
+                <span className="break-all">
+                  {copied ? "Đã copy địa chỉ ví!" : address}
+                </span>
+              </button>
+              <a
+                href={explorerTokensUrl(address)}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 text-[11px] font-bold text-[#14F195] hover:underline"
+              >
+                Mở Explorer đúng link <ArrowSquareOut size={12} />
+              </a>
+            </div>
           )}
         </Step>
 
