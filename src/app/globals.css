@@ -1,46 +1,36 @@
 @import "tailwindcss";
 
 :root {
-  --bg: #f7f8f7;
-  --bg-elevated: #ffffff;
-  --bg-deep: #0f1714;
-  --ink: #111827;
-  --ink-soft: #4b5563;
-  --ink-muted: #9ca3af;
-  --line: #e5e7eb;
-  --line-strong: #d1d5db;
-  --forest: #0f766e;
-  --forest-deep: #115e59;
-  --mint: #ccfbf1;
-  --mint-soft: #f0fdfa;
-  --gold: #b45309;
-  --gold-soft: #fef3c7;
-  --coral: #dc2626;
-  --solana: #9945ff;
-  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08);
-  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
-  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
-  --radius-shell: 1rem;
-  --radius-core: 0.875rem;
+  --page: #f5f8f6;
+  --surface: #ffffff;
+  --surface-raised: #edf3ef;
+  --surface-soft: #e4eee8;
+  --text: #13201c;
+  --text-muted: #5d6d67;
+  --line: #d7e2dc;
+  --line-strong: #b9cbc1;
+  --accent: #08784a;
+  --accent-strong: #06613d;
+  --accent-soft: #e4f4eb;
+  --focus: #0a8f59;
 }
 
 @theme inline {
-  --color-bg: var(--bg);
-  --color-bg-elevated: var(--bg-elevated);
-  --color-bg-deep: var(--bg-deep);
-  --color-ink: var(--ink);
-  --color-ink-soft: var(--ink-soft);
-  --color-ink-muted: var(--ink-muted);
+  --color-bg: var(--page);
+  --color-bg-elevated: var(--surface);
+  --color-bg-deep: var(--surface-raised);
+  --color-ink: var(--text);
+  --color-ink-soft: var(--text-muted);
+  --color-ink-muted: #71817a;
   --color-line: var(--line);
   --color-line-strong: var(--line-strong);
-  --color-forest: var(--forest);
-  --color-forest-deep: var(--forest-deep);
-  --color-mint: var(--mint);
-  --color-mint-soft: var(--mint-soft);
-  --color-gold: var(--gold);
-  --color-gold-soft: var(--gold-soft);
-  --color-coral: var(--coral);
-  --color-solana: var(--solana);
+  --color-forest: var(--accent);
+  --color-forest-deep: var(--accent-strong);
+  --color-mint: #ccebd9;
+  --color-mint-soft: #edf8f1;
+  --color-gold: #b76305;
+  --color-gold-soft: #fff2d8;
+  --color-coral: #be3548;
   --font-sans: var(--font-sans);
   --font-display: var(--font-sans);
   --font-mono: var(--font-mono);
@@ -52,114 +42,228 @@
 
 html {
   scroll-behavior: smooth;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  text-rendering: optimizeLegibility;
+  color-scheme: light;
 }
 
 body {
-  background: #06080f;
-  color: var(--ink);
-  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
-  font-feature-settings: "ss01" on, "cv11" on;
-  line-height: 1.55;
   min-height: 100dvh;
   overflow-x: hidden;
-  letter-spacing: -0.01em;
+  background:
+    radial-gradient(circle at 85% -10%, rgb(8 120 74 / 0.07), transparent 28rem),
+    var(--page);
+  color: var(--text);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+  line-height: 1.55;
+  text-rendering: optimizeLegibility;
 }
 
 ::selection {
-  background: var(--mint);
-  color: var(--forest-deep);
+  background: #b8e4ca;
+  color: #063c27;
 }
 
-/* Keep class for existing markup — same family, weight hierarchy only */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 3px;
+}
+
+button,
+a,
+input,
+select,
+textarea {
+  -webkit-tap-highlight-color: transparent;
+}
+
+button:not(:disabled),
+a {
+  cursor: pointer;
+}
+
 .font-display {
   font-family: var(--font-sans), system-ui, sans-serif;
-  letter-spacing: -0.025em;
+  letter-spacing: -0.035em;
 }
 
 .font-mono {
-  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-family: var(--font-mono), ui-monospace, monospace;
   letter-spacing: 0;
 }
 
-/* Flat product card — replaces old double-bezel mock frames */
-.double-bezel {
-  border-radius: var(--radius-shell);
-  background: transparent;
-  border: none;
-  padding: 0;
+.app-card {
+  border: 1px solid var(--line);
+  border-radius: 1rem;
+  background: var(--surface);
+  box-shadow: 0 14px 42px rgb(27 55 43 / 0.055);
+}
+
+.app-input {
+  width: 100%;
+  border: 1px solid var(--line-strong);
+  border-radius: 0.75rem;
+  background: #ffffff;
+  color: var(--text);
+  padding: 0.75rem 0.875rem;
+  font-size: 0.875rem;
+  box-shadow: inset 0 1px 2px rgb(20 42 32 / 0.035);
+  transition: border-color 160ms ease, box-shadow 160ms ease,
+    background-color 160ms ease;
+}
+
+.app-input::placeholder {
+  color: #7a8882;
+}
+
+.app-input:hover {
+  border-color: #91aa9d;
+}
+
+.app-input:focus {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 3px rgb(8 120 74 / 0.13);
+  outline: none;
+}
+
+.app-button-primary,
+.app-button-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  border-radius: 0.75rem;
+  padding: 0.65rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 700;
+  white-space: nowrap;
+  transition: background-color 160ms ease, border-color 160ms ease,
+    color 160ms ease, box-shadow 160ms ease, transform 80ms ease;
+}
+
+.app-button-primary {
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+  box-shadow: 0 8px 20px rgb(8 120 74 / 0.18);
+}
+
+.app-button-primary:hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  box-shadow: 0 10px 24px rgb(8 120 74 / 0.24);
+}
+
+.app-button-secondary {
+  border: 1px solid var(--line-strong);
+  background: #ffffff;
+  color: var(--text);
+}
+
+.app-button-secondary:hover {
+  border-color: #779487;
+  background: var(--surface-raised);
+}
+
+.app-button-primary:active,
+.app-button-secondary:active {
+  transform: translateY(1px);
+}
+
+.app-button-primary:disabled,
+.app-button-secondary:disabled {
+  cursor: not-allowed;
+  opacity: 0.52;
   box-shadow: none;
 }
 
-.double-bezel-inner {
-  border-radius: var(--radius-core);
-  background: var(--bg-elevated);
+.surface-muted {
   border: 1px solid var(--line);
-  box-shadow: var(--shadow-card);
+  border-radius: 0.875rem;
+  background: var(--surface-raised);
 }
 
-.field {
-  width: 100%;
-  border-radius: 0.625rem;
-  border: 1px solid var(--line-strong);
-  background: #fff;
-  padding: 0.65rem 0.85rem;
-  font-size: 0.875rem;
-  color: var(--ink);
-  outline: none;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+.skeleton {
+  border-radius: 0.75rem;
+  background: #e1eae5;
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
 }
 
-.field:focus {
-  border-color: var(--forest);
-  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
-}
-
-.field::placeholder {
-  color: var(--ink-muted);
-}
-
-.mesh-hero {
-  background: var(--bg);
-}
-
-.grid-fine {
-  display: none;
-}
-
-.text-balance {
-  text-wrap: balance;
-}
-
-.scrollbar-thin::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-
-.scrollbar-thin::-webkit-scrollbar-thumb {
-  background: rgba(15, 118, 110, 0.25);
-  border-radius: 999px;
-}
-
-.pulse-ring::before {
-  display: none;
+@keyframes skeleton-pulse {
+  50% {
+    opacity: 0.52;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
   html {
     scroll-behavior: auto;
   }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
-/* Solana wallet-adapter modal — keep above app chrome */
 .wallet-adapter-modal-wrapper {
   z-index: 10000 !important;
 }
+
 .wallet-adapter-modal {
   z-index: 10001 !important;
 }
+
 .wallet-adapter-button {
   font-family: inherit;
+}
+
+.wallet-adapter-modal-overlay {
+  background: rgb(18 35 28 / 0.48) !important;
+  backdrop-filter: blur(4px);
+}
+
+.wallet-adapter-modal-wrapper {
+  border: 1px solid var(--line) !important;
+  border-radius: 1rem !important;
+  background: #ffffff !important;
+  box-shadow: 0 28px 80px rgb(24 50 38 / 0.24) !important;
+  color: var(--text) !important;
+  font-family: inherit !important;
+}
+
+.wallet-adapter-modal-title {
+  color: var(--text) !important;
+  font-family: inherit !important;
+  font-weight: 700 !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button {
+  color: var(--text) !important;
+  font-family: inherit !important;
+}
+
+.wallet-adapter-modal-list .wallet-adapter-button:not([disabled]):hover {
+  background: var(--surface-raised) !important;
+}
+
+.wallet-adapter-modal-button-close {
+  background: var(--surface-raised) !important;
+}
+
+.wallet-adapter-modal-button-close svg,
+.wallet-adapter-modal-list-more svg {
+  fill: var(--text-muted) !important;
+}
+
+.wallet-adapter-modal-button-close:hover svg {
+  fill: var(--text) !important;
+}
+
+.wallet-adapter-modal-list-more {
+  color: var(--text) !important;
+  font-family: inherit !important;
 }
