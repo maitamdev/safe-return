@@ -34,7 +34,7 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isProtected =
-    path.startsWith("/bounties") || path.startsWith("/app");
+    path.startsWith("/bounties");
   const isAuthPage =
     path.startsWith("/login") ||
     path.startsWith("/signup") ||
