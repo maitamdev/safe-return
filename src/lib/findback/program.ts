@@ -198,8 +198,12 @@ async function sendIx(
   );
   if (simulation.value.err) {
     const logs = simulation.value.logs?.slice(-8).join(" | ") || "Không có log RPC";
+    const simulationError = JSON.stringify(
+      simulation.value.err,
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value)
+    );
     throw new Error(
-      `${label}: mô phỏng Devnet thất bại (${JSON.stringify(simulation.value.err)}). ${logs}`
+      `${label}: mô phỏng Devnet thất bại (${simulationError}). ${logs}`
     );
   }
 

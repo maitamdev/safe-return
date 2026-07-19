@@ -67,7 +67,9 @@ export async function POST(req: Request) {
       if (deleteError) throw new Error(deleteError.message);
     }
 
-    return Response.json({ ok: true, status, onchain });
+    // `OnChainBounty` contains bigint balances, which Response.json cannot
+    // serialize. The client only needs the authoritative status here.
+    return Response.json({ ok: true, status });
   } catch (error) {
     return apiErrorResponse(error);
   }
