@@ -1,143 +1,19 @@
-# FindBack AI — Làm theo từng bước (tiếng Việt)
+# Hướng dẫn demo SafeReturn
 
-Bạn **không cần** hiểu blockchain. Chỉ làm đúng thứ tự dưới đây.
+## Chuẩn bị
 
----
+- Chạy `supabase/schema.sql` trong Supabase.
+- Cấu hình các biến trong `.env.example`.
+- Bật Devnet trong Phantom và dùng ví thử nghiệm.
 
-## 0) Đăng nhập (bắt buộc) — Supabase
+## Kịch bản demo
 
-Người dùng **phải có tài khoản** (email + mật khẩu) mới vào `/bounties`.  
-Ví Phantom **không thay** đăng nhập — Phantom chỉ để **ký giao dịch** tiền thưởng.
+1. Đăng nhập, kết nối và xác minh ví owner.
+2. Nhận FIND/SOL Devnet từ mục chuẩn bị ví.
+3. Tạo tin; ký hai giao dịch `create_bounty` và `fund_bounty`.
+4. Dùng tài khoản và ví finder khác để gửi claim.
+5. Quan sát AI report và chữ ký arbiter trên Explorer.
+6. Quay lại owner để chấp nhận/từ chối; hoặc mở tranh chấp.
+7. Với ví arbiter, mở `/bounties/arbitration` để trả FIND cho finder hoặc hoàn owner.
 
-### Setup Supabase (1 lần — bạn / team)
-
-1. Vào https://supabase.com/dashboard → **New project** (free)  
-2. **Project Settings → API**  
-   - copy **Project URL**  
-   - copy **anon public** key  
-3. Dán vào `d:\HACKATHON\safereturn\.env.local`:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ....
-```
-
-4. Supabase → **SQL Editor** → New → dán hết file `supabase/schema.sql` → **Run**  
-5. **Authentication → Providers → Email**  
-   - Tắt **Confirm email** (tiện demo hackathon, vào app ngay)  
-6. Restart:
-
-```powershell
-cd d:\HACKATHON\safereturn
-npm run dev
-```
-
-7. Production (Vercel): Settings → Environment Variables → thêm 2 biến trên → Redeploy  
-
-### User flow
-
-1. Mở `/login` hoặc `/signup`  
-2. Đăng ký email + mật khẩu  
-3. Đăng nhập → vào `/bounties`  
-4. (Sau đó) Kết nối Phantom + nhận FIND  
-
----
-
-## App mở ở đâu?
-
-**Production:** https://safereturn-delta.vercel.app/login  
-
-Hoặc máy bạn:
-
-```powershell
-cd d:\HACKATHON\safereturn
-npm install
-npm run dev
-```
-
-→ http://localhost:3000/login
-
----
-
-## Phantom báo đỏ «Yêu cầu đã bị chặn»?
-
-**Không phải app hỏng.** Phantom chặn site mới / domain Vercel.
-
-1. Bấm **«Vẫn tiếp tục (không an toàn)»**  
-2. Rồi **Connect**  
-
-Chỉ làm vậy với site **của bạn** (`safereturn-delta.vercel.app` hoặc `localhost`).
-
----
-
-## 3 bước dùng app
-
-### Bước 1 — Phantom Devnet
-
-1. Cài https://phantom.app/download  
-2. Phantom → ⚙️ Settings → **Developer Settings**  
-3. Bật **Testnet Mode** → chọn **Devnet**  
-4. Trên web FindBack → **Kết nối ví**
-
-### Bước 2 — Nhận FIND (tiền ảo)
-
-Trên trang `/bounties` có khung **«Bắt đầu tại đây»**:
-
-1. Bấm **Nhận 100 FIND**  
-2. Phantom → Manage token list → **Import** mint:
-
-```
-9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy
-```
-
-3. Refresh Phantom — thấy FIND  
-
-> FIND = token **test** Devnet, **0đ thật**, không phải USDC.
-
-Thiếu SOL (phí gas): https://faucet.solana.com → Devnet → dán địa chỉ ví.
-
-### Bước 3 — Demo thật
-
-1. **Tạo bounty** (không bấm card «Mẫu»)  
-2. Phantom **Approve** 2 lần (create + fund)  
-3. (Tuỳ) ví khác → mở bounty → **Gửi claim**  
-4. Xem điểm AI  
-5. Owner → **Owner Approve & Release**  
-6. Bấm link **Explorer** — đó là giao dịch thật  
-
----
-
-## Card «Mẫu (chưa on-chain)» là gì?
-
-Chỉ để **xem giao diện**.  
-**Không** khóa tiền, **không** claim on-chain được.  
-
-Muốn tx thật → luôn **Tạo bounty**.
-
----
-
-## Lỗi thường gặp
-
-| Bạn thấy | Làm gì |
-|----------|--------|
-| Phantom chặn đỏ | «Vẫn tiếp tục» |
-| Thiếu FIND / insufficient | Nhận 100 FIND + import mint |
-| Simulation failed | Đang Devnet? Đã fund bounty? |
-| Seed / mẫu | Tạo bounty mới |
-| AI Demo mode | Bình thường nếu chưa có OPENAI_API_KEY |
-
----
-
-## Câu slide
-
-> FindBack AI dùng AI để xác minh claim và Solana escrow để trao thưởng minh bạch.
-
----
-
-## Link kỹ thuật
-
-| | |
-|--|--|
-| App | https://safereturn-delta.vercel.app/bounties |
-| Program | https://explorer.solana.com/address/3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna?cluster=devnet |
-| FIND mint | `9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy` |
+Không bỏ qua cảnh báo của Phantom, không chia sẻ seed phrase và không dùng Mainnet cho bản demo.
