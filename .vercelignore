@@ -1,0 +1,10 @@
+node_modules
+.next
+.git
+target
+test-ledger
+*.log
+.env*.local
+.env.local
+**/*-keypair.json
+**/id.json
