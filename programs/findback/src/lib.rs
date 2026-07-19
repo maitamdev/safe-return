@@ -75,6 +75,9 @@ pub mod findback {
         );
         require!(amount > 0, FbError::ZeroReward);
         require_keys_eq!(b.mint, ctx.accounts.mint.key(), FbError::InvalidMint);
+        let remaining = remaining_funding(b.reward_amount, b.amount_funded)
+            .ok_or(FbError::MathOverflow)?;
+        require!(amount <= remaining, FbError::FundingExceedsReward);
 
         let cpi = CpiContext::new(
             ctx.accounts.token_program.to_account_info(),
@@ -177,7 +180,7 @@ pub mod findback {
         require!(
             matches!(
                 b.status,
-                BountyStatus::AiReviewed | BountyStatus::ClaimSubmitted | BountyStatus::Disputed
+                BountyStatus::AiReviewed | BountyStatus::ClaimSubmitted
             ),
             FbError::InvalidStatus
         );
@@ -490,11 +493,12 @@ pub struct SubmitClaim<'info> {
 
 #[derive(Accounts)]
 pub struct RecordAiReview<'info> {
-    pub reporter: Signer<'info>,
+    pub arbiter: Signer<'info>,
     #[account(
         mut,
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
-        bump = bounty.bump
+        bump = bounty.bump,
+        has_one = arbiter
     )]
     pub bounty: Account<'info, Bounty>,
 }
@@ -734,4 +738,27 @@ pub enum FbError {
     NotExpired,
     #[msg("Nothing to refund")]
     NothingToRefund,
+    #[msg("Funding would exceed the bounty reward")]
+    FundingExceedsReward,
+}
+
+fn remaining_funding(reward_amount: u64, amount_funded: u64) -> Option<u64> {
+    reward_amount.checked_sub(amount_funded)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::remaining_funding;
+
+    #[test]
+    fn remaining_funding_handles_partial_and_complete_escrow() {
+        assert_eq!(remaining_funding(100, 0), Some(100));
+        assert_eq!(remaining_funding(100, 40), Some(60));
+        assert_eq!(remaining_funding(100, 100), Some(0));
+    }
+
+    #[test]
+    fn remaining_funding_rejects_corrupt_overfunded_state() {
+        assert_eq!(remaining_funding(100, 101), None);
+    }
 }
