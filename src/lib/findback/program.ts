@@ -30,6 +30,8 @@ export const PROGRAM_PK = new PublicKey(FINDBACK_PROGRAM_ID);
 export const BOUNTY_SEED = Buffer.from("bounty");
 export const VAULT_SEED = Buffer.from("vault");
 export const CLAIM_V2_SEED = Buffer.from("claim_v2");
+export const REPUTATION_SEED = Buffer.from("reputation");
+export const RETURN_ATTESTATION_SEED = Buffer.from("return_attestation");
 
 /** sha256("global:<name>")[0..8] */
 export const IX = {
@@ -49,10 +51,17 @@ export const IX = {
   reject_claim_v2: Buffer.from([178, 62, 173, 231, 192, 12, 42, 112]),
   open_dispute_v2: Buffer.from([61, 105, 238, 185, 222, 78, 48, 138]),
   resolve_dispute_v2: Buffer.from([35, 255, 241, 246, 120, 1, 194, 73]),
+  attest_settlement: Buffer.from([139, 194, 42, 227, 36, 121, 240, 227]),
 } as const;
 
 const CLAIM_V2_DISCRIMINATOR = Buffer.from([91, 3, 14, 101, 67, 160, 222, 63]);
 const CLAIM_V2_ACCOUNT_SIZE = 253;
+const REPUTATION_DISCRIMINATOR = Buffer.from([
+  55, 148, 90, 71, 68, 183, 193, 28,
+]);
+const RETURN_ATTESTATION_DISCRIMINATOR = Buffer.from([
+  186, 34, 108, 39, 171, 28, 141, 60,
+]);
 
 export type WalletLike = {
   publicKey: PublicKey;
@@ -110,12 +119,7 @@ export type OnChainBounty = {
 };
 
 export type ClaimV2StatusName =
-  | "Submitted"
-  | "AiReviewed"
-  | "Rejected"
-  | "Disputed"
-  | "Settled"
-  | "Unknown";
+  "Submitted" | "AiReviewed" | "Rejected" | "Disputed" | "Settled" | "Unknown";
 
 const CLAIM_V2_STATUS_MAP: ClaimV2StatusName[] = [
   "Submitted",
@@ -141,6 +145,26 @@ export type OnChainClaimV2 = {
   updatedAt: number;
 };
 
+export type OnChainReputation = {
+  address: string;
+  wallet: string;
+  successfulReturns: number;
+  rewardsEarned: bigint;
+  rewardsPaid: bigint;
+  lastActivity: number;
+};
+
+export type OnChainReturnAttestation = {
+  address: string;
+  bounty: string;
+  claim: string;
+  owner: string;
+  finder: string;
+  rewardAmount: bigint;
+  aiScore: number;
+  settledAt: number;
+};
+
 export function getConnection(commitment: Commitment = "confirmed") {
   return new Connection(SOLANA_RPC, commitment);
 }
@@ -160,26 +184,73 @@ export function requireArbiter(): PublicKey {
 export function bountyPda(bountyId: string): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [BOUNTY_SEED, Buffer.from(bountyId)],
-    PROGRAM_PK
+    PROGRAM_PK,
   );
 }
 
 export function vaultAuthorityPda(bountyId: string): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
     [VAULT_SEED, Buffer.from(bountyId)],
-    PROGRAM_PK
+    PROGRAM_PK,
   );
 }
 
 export function claimV2Pda(
   bountyId: string,
-  finder: PublicKey
+  finder: PublicKey,
 ): [PublicKey, number] {
   const [bounty] = bountyPda(bountyId);
   return PublicKey.findProgramAddressSync(
     [CLAIM_V2_SEED, bounty.toBuffer(), finder.toBuffer()],
-    PROGRAM_PK
+    PROGRAM_PK,
   );
+}
+
+export function reputationPda(wallet: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [REPUTATION_SEED, wallet.toBuffer()],
+    PROGRAM_PK,
+  );
+}
+
+export function returnAttestationPda(
+  bountyId: string,
+  finder: PublicKey,
+): [PublicKey, number] {
+  const [bounty] = bountyPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  return PublicKey.findProgramAddressSync(
+    [RETURN_ATTESTATION_SEED, bounty.toBuffer(), claim.toBuffer()],
+    PROGRAM_PK,
+  );
+}
+
+function attestSettlementInstruction(args: {
+  payer: PublicKey;
+  owner: PublicKey;
+  finder: PublicKey;
+  bountyId: string;
+}): TransactionInstruction {
+  const [bounty] = bountyPda(args.bountyId);
+  const [claim] = claimV2Pda(args.bountyId, args.finder);
+  const [attestation] = returnAttestationPda(args.bountyId, args.finder);
+  const [ownerReputation] = reputationPda(args.owner);
+  const [finderReputation] = reputationPda(args.finder);
+  return new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: args.payer, isSigner: true, isWritable: true },
+      { pubkey: args.owner, isSigner: false, isWritable: false },
+      { pubkey: args.finder, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: claim, isSigner: false, isWritable: false },
+      { pubkey: attestation, isSigner: false, isWritable: true },
+      { pubkey: ownerReputation, isSigner: false, isWritable: true },
+      { pubkey: finderReputation, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from(IX.attest_settlement),
+  });
 }
 
 function encodeString(s: string): Buffer {
@@ -211,7 +282,7 @@ function encodeBytes32(h: Uint8Array | Buffer): Buffer {
 async function sendIx(
   wallet: WalletLike,
   ixs: TransactionInstruction[],
-  label: string
+  label: string,
 ): Promise<{ signature: string; url: string }> {
   const connection = getConnection();
   const { blockhash, lastValidBlockHeight } =
@@ -226,7 +297,7 @@ async function sendIx(
   const message = tx.compileMessage();
   if (message.header.numRequiredSignatures !== 1) {
     throw new Error(
-      `${label}: giao dịch phải chỉ có một ví ký, nhưng đang yêu cầu ${message.header.numRequiredSignatures} chữ ký.`
+      `${label}: giao dịch phải chỉ có một ví ký, nhưng đang yêu cầu ${message.header.numRequiredSignatures} chữ ký.`,
     );
   }
 
@@ -236,7 +307,7 @@ async function sendIx(
   }).length;
   if (wireSize > 1232) {
     throw new Error(
-      `${label}: giao dịch dài ${wireSize} byte, vượt giới hạn 1232 byte của Solana.`
+      `${label}: giao dịch dài ${wireSize} byte, vượt giới hạn 1232 byte của Solana.`,
     );
   }
 
@@ -248,16 +319,17 @@ async function sendIx(
     {
       commitment: "confirmed",
       sigVerify: false,
-    }
+    },
   );
   if (simulation.value.err) {
-    const logs = simulation.value.logs?.slice(-8).join(" | ") || "Không có log RPC";
+    const logs =
+      simulation.value.logs?.slice(-8).join(" | ") || "Không có log RPC";
     const simulationError = JSON.stringify(
       simulation.value.err,
-      (_key, value) => (typeof value === "bigint" ? value.toString() : value)
+      (_key, value) => (typeof value === "bigint" ? value.toString() : value),
     );
     throw new Error(
-      `${label}: mô phỏng Devnet thất bại (${simulationError}). ${logs}`
+      `${label}: mô phỏng Devnet thất bại (${simulationError}). ${logs}`,
     );
   }
 
@@ -268,7 +340,7 @@ async function sendIx(
   });
   await connection.confirmTransaction(
     { signature: sig, blockhash, lastValidBlockHeight },
-    "confirmed"
+    "confirmed",
   );
   return { signature: sig, url: explorerTxUrl(sig) };
 }
@@ -277,7 +349,7 @@ async function ensureAtaIx(
   connection: Connection,
   payer: PublicKey,
   owner: PublicKey,
-  mint: PublicKey
+  mint: PublicKey,
 ): Promise<TransactionInstruction | null> {
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
   const info = await connection.getAccountInfo(ata);
@@ -292,7 +364,7 @@ export async function createBountyOnChain(
     rewardUi: number;
     deadlineUnix: number;
     metadataHash: Uint8Array;
-  }
+  },
 ) {
   const mint = requireMint();
   const arbiter = requireArbiter();
@@ -323,7 +395,7 @@ export async function createBountyOnChain(
 export async function fundBountyOnChain(
   wallet: WalletLike,
   bountyId: string,
-  amountUi: number
+  amountUi: number,
 ) {
   const connection = getConnection();
   const mint = requireMint();
@@ -337,15 +409,12 @@ export async function fundBountyOnChain(
     connection,
     wallet.publicKey,
     vaultAuth,
-    mint
+    mint,
   );
   // vault ATA is init_if_needed in program — still ok if missing, program creates
   void maybeVault;
 
-  const data = Buffer.concat([
-    IX.fund_bounty,
-    encodeU64(toAtomic(amountUi)),
-  ]);
+  const data = Buffer.concat([IX.fund_bounty, encodeU64(toAtomic(amountUi))]);
   ixs.push(
     new TransactionInstruction({
       programId: PROGRAM_PK,
@@ -365,7 +434,7 @@ export async function fundBountyOnChain(
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
       data,
-    })
+    }),
   );
   return sendIx(wallet, ixs, "fund_bounty");
 }
@@ -373,13 +442,10 @@ export async function fundBountyOnChain(
 export async function submitClaimOnChain(
   wallet: WalletLike,
   bountyId: string,
-  evidenceHash: Uint8Array
+  evidenceHash: Uint8Array,
 ) {
   const [bounty] = bountyPda(bountyId);
-  const data = Buffer.concat([
-    IX.submit_claim,
-    encodeBytes32(evidenceHash),
-  ]);
+  const data = Buffer.concat([IX.submit_claim, encodeBytes32(evidenceHash)]);
   const ix = new TransactionInstruction({
     programId: PROGRAM_PK,
     keys: [
@@ -394,7 +460,7 @@ export async function submitClaimOnChain(
 export async function submitClaimV2OnChain(
   wallet: WalletLike,
   bountyId: string,
-  evidenceHash: Uint8Array
+  evidenceHash: Uint8Array,
 ) {
   const [bounty] = bountyPda(bountyId);
   const [claim] = claimV2Pda(bountyId, wallet.publicKey);
@@ -420,7 +486,7 @@ export async function recordAiReviewOnChain(
     riskLevel: number;
     decision: number;
     explanationHash: Uint8Array;
-  }
+  },
 ) {
   const [bounty] = bountyPda(bountyId);
   const data = Buffer.concat([
@@ -452,7 +518,7 @@ export async function recordAiReviewV2OnChain(
     inputHash: Uint8Array;
     reportHash: Uint8Array;
     modelHash: Uint8Array;
-  }
+  },
 ) {
   const [bounty] = bountyPda(bountyId);
   const [claim] = claimV2Pda(bountyId, finder);
@@ -465,7 +531,11 @@ export async function recordAiReviewV2OnChain(
     ],
     data: Buffer.concat([
       IX.record_ai_review_v2,
-      Buffer.from([args.score & 0xff, args.riskLevel & 0xff, args.decision & 0xff]),
+      Buffer.from([
+        args.score & 0xff,
+        args.riskLevel & 0xff,
+        args.decision & 0xff,
+      ]),
       encodeBytes32(args.inputHash),
       encodeBytes32(args.reportHash),
       encodeBytes32(args.modelHash),
@@ -477,7 +547,7 @@ export async function recordAiReviewV2OnChain(
 export async function acceptClaimOnChain(
   wallet: WalletLike,
   bountyId: string,
-  finder: PublicKey
+  finder: PublicKey,
 ) {
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
@@ -512,7 +582,7 @@ export async function acceptClaimOnChain(
 export async function acceptClaimV2OnChain(
   wallet: WalletLike,
   bountyId: string,
-  finder: PublicKey
+  finder: PublicKey,
 ) {
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
@@ -532,12 +602,22 @@ export async function acceptClaimV2OnChain(
       { pubkey: vaultAta, isSigner: false, isWritable: true },
       { pubkey: finderAta, isSigner: false, isWritable: true },
       { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
     data: Buffer.from(IX.accept_claim_v2),
   });
-  return sendIx(wallet, [ix], "accept_claim_v2");
+  const attestIx = attestSettlementInstruction({
+    payer: wallet.publicKey,
+    owner: wallet.publicKey,
+    finder,
+    bountyId,
+  });
+  return sendIx(wallet, [ix, attestIx], "accept_claim_v2 + attest_settlement");
 }
 
 export async function rejectClaimOnChain(wallet: WalletLike, bountyId: string) {
@@ -556,7 +636,7 @@ export async function rejectClaimOnChain(wallet: WalletLike, bountyId: string) {
 export async function rejectClaimV2OnChain(
   wallet: WalletLike,
   bountyId: string,
-  finder: PublicKey
+  finder: PublicKey,
 ) {
   const [bounty] = bountyPda(bountyId);
   const [claim] = claimV2Pda(bountyId, finder);
@@ -574,7 +654,7 @@ export async function rejectClaimV2OnChain(
 
 export async function refundAfterExpiryOnChain(
   wallet: WalletLike,
-  bountyId: string
+  bountyId: string,
 ) {
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
@@ -614,7 +694,7 @@ export async function openDisputeOnChain(wallet: WalletLike, bountyId: string) {
 export async function openDisputeV2OnChain(
   wallet: WalletLike,
   bountyId: string,
-  finder: PublicKey
+  finder: PublicKey,
 ) {
   const [bounty] = bountyPda(bountyId);
   const [claim] = claimV2Pda(bountyId, finder);
@@ -630,7 +710,10 @@ export async function openDisputeV2OnChain(
   return sendIx(wallet, [ix], "open_dispute_v2");
 }
 
-export async function cancelBountyOnChain(wallet: WalletLike, bountyId: string) {
+export async function cancelBountyOnChain(
+  wallet: WalletLike,
+  bountyId: string,
+) {
   const [bounty] = bountyPda(bountyId);
   const ix = new TransactionInstruction({
     programId: PROGRAM_PK,
@@ -647,19 +730,23 @@ export async function resolveDisputeOnChain(
   wallet: WalletLike,
   bountyId: string,
   counterparty: PublicKey,
-  releaseToFinder: boolean
+  releaseToFinder: boolean,
 ) {
   const connection = getConnection();
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
   const [vaultAuth] = vaultAuthorityPda(bountyId);
   const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
-  const counterpartyAta = getAssociatedTokenAddressSync(mint, counterparty, true);
+  const counterpartyAta = getAssociatedTokenAddressSync(
+    mint,
+    counterparty,
+    true,
+  );
   const createAta = await ensureAtaIx(
     connection,
     wallet.publicKey,
     counterparty,
-    mint
+    mint,
   );
   const ix = new TransactionInstruction({
     programId: PROGRAM_PK,
@@ -685,7 +772,7 @@ export async function resolveDisputeV2OnChain(
   wallet: WalletLike,
   bountyId: string,
   finder: PublicKey,
-  releaseToFinder: boolean
+  releaseToFinder: boolean,
 ) {
   const connection = getConnection();
   const mint = requireMint();
@@ -694,7 +781,12 @@ export async function resolveDisputeV2OnChain(
   const [vaultAuth] = vaultAuthorityPda(bountyId);
   const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
   const finderAta = getAssociatedTokenAddressSync(mint, finder, true);
-  const createAta = await ensureAtaIx(connection, wallet.publicKey, finder, mint);
+  const createAta = await ensureAtaIx(
+    connection,
+    wallet.publicKey,
+    finder,
+    mint,
+  );
   const ix = new TransactionInstruction({
     programId: PROGRAM_PK,
     keys: [
@@ -713,11 +805,21 @@ export async function resolveDisputeV2OnChain(
       Buffer.from([releaseToFinder ? 1 : 0]),
     ]),
   });
-  return sendIx(
-    wallet,
-    createAta ? [createAta, ix] : [ix],
-    "resolve_dispute_v2"
-  );
+  const ixs = createAta ? [createAta, ix] : [ix];
+  if (releaseToFinder) {
+    const onChainBounty = await fetchBounty(bountyId);
+    if (!onChainBounty)
+      throw new Error("Không đọc được bounty từ Solana Devnet.");
+    ixs.push(
+      attestSettlementInstruction({
+        payer: wallet.publicKey,
+        owner: new PublicKey(onChainBounty.owner),
+        finder,
+        bountyId,
+      }),
+    );
+  }
+  return sendIx(wallet, ixs, "resolve_dispute_v2");
 }
 
 /** Manual Borsh-ish decode of Bounty account (Anchor layout). */
@@ -799,7 +901,9 @@ export function decodeClaimV2Account(data: Buffer): OnChainClaimV2 | null {
     }
     let offset = 8;
     const readPublicKey = () => {
-      const value = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+      const value = new PublicKey(
+        data.subarray(offset, offset + 32),
+      ).toBase58();
       offset += 32;
       return value;
     };
@@ -843,9 +947,110 @@ export function decodeClaimV2Account(data: Buffer): OnChainClaimV2 | null {
   }
 }
 
+export function decodeReputationAccount(
+  data: Buffer,
+): OnChainReputation | null {
+  try {
+    if (
+      data.length < 69 ||
+      !data.subarray(0, 8).equals(REPUTATION_DISCRIMINATOR)
+    ) {
+      return null;
+    }
+    let offset = 8;
+    const wallet = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+    offset += 32;
+    const successfulReturns = data.readUInt32LE(offset);
+    offset += 4;
+    const rewardsEarned = data.readBigUInt64LE(offset);
+    offset += 8;
+    const rewardsPaid = data.readBigUInt64LE(offset);
+    offset += 8;
+    const lastActivity = Number(data.readBigInt64LE(offset));
+    return {
+      address: "",
+      wallet,
+      successfulReturns,
+      rewardsEarned,
+      rewardsPaid,
+      lastActivity,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function decodeReturnAttestationAccount(
+  data: Buffer,
+): OnChainReturnAttestation | null {
+  try {
+    if (
+      data.length < 154 ||
+      !data.subarray(0, 8).equals(RETURN_ATTESTATION_DISCRIMINATOR)
+    ) {
+      return null;
+    }
+    let offset = 8;
+    const readPublicKey = () => {
+      const value = new PublicKey(
+        data.subarray(offset, offset + 32),
+      ).toBase58();
+      offset += 32;
+      return value;
+    };
+    const bounty = readPublicKey();
+    const claim = readPublicKey();
+    const owner = readPublicKey();
+    const finder = readPublicKey();
+    const rewardAmount = data.readBigUInt64LE(offset);
+    offset += 8;
+    const aiScore = data[offset++];
+    const settledAt = Number(data.readBigInt64LE(offset));
+    return {
+      address: "",
+      bounty,
+      claim,
+      owner,
+      finder,
+      rewardAmount,
+      aiScore,
+      settledAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchReputation(
+  wallet: PublicKey,
+): Promise<OnChainReputation | null> {
+  const connection = getConnection();
+  const [pda] = reputationPda(wallet);
+  const info = await connection.getAccountInfo(pda, "confirmed");
+  if (!info?.data) return null;
+  const decoded = decodeReputationAccount(Buffer.from(info.data));
+  if (!decoded) return null;
+  decoded.address = pda.toBase58();
+  return decoded;
+}
+
+export async function fetchReturnAttestation(
+  bountyId: string,
+  finder: PublicKey,
+): Promise<OnChainReturnAttestation | null> {
+  const connection = getConnection();
+  const [pda] = returnAttestationPda(bountyId, finder);
+  const info = await connection.getAccountInfo(pda, "confirmed");
+  if (!info?.data) return null;
+  const decoded = decodeReturnAttestationAccount(Buffer.from(info.data));
+  if (!decoded) return null;
+  decoded.address = pda.toBase58();
+  return decoded;
+}
+
 export async function fetchClaimV2(
   bountyId: string,
-  finder: PublicKey
+  finder: PublicKey,
 ): Promise<OnChainClaimV2 | null> {
   const connection = getConnection();
   const [pda] = claimV2Pda(bountyId, finder);
@@ -858,7 +1063,7 @@ export async function fetchClaimV2(
 }
 
 export async function fetchClaimsV2ForBounty(
-  bountyId: string
+  bountyId: string,
 ): Promise<OnChainClaimV2[]> {
   const connection = getConnection();
   const [bounty] = bountyPda(bountyId);
@@ -878,7 +1083,7 @@ export async function fetchClaimsV2ForBounty(
 }
 
 export async function fetchBounty(
-  bountyId: string
+  bountyId: string,
 ): Promise<OnChainBounty | null> {
   const connection = getConnection();
   const [pda] = bountyPda(bountyId);

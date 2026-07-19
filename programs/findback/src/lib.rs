@@ -15,6 +15,8 @@ declare_id!("3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna");
 pub const BOUNTY_SEED: &[u8] = b"bounty";
 pub const VAULT_SEED: &[u8] = b"vault";
 pub const CLAIM_V2_SEED: &[u8] = b"claim_v2";
+pub const REPUTATION_SEED: &[u8] = b"reputation";
+pub const RETURN_ATTESTATION_SEED: &[u8] = b"return_attestation";
 pub const MAX_ID_LEN: usize = 32;
 
 #[program]
@@ -653,6 +655,76 @@ pub mod findback {
         claim.updated_at = now;
         Ok(())
     }
+
+    /// Creates a permanent, non-transferable proof of a completed return and updates both
+    /// participants' reputation. The attestation PDA makes this permissionless but idempotent:
+    /// anyone may pay its rent, while the settled bounty and claim are the only source of truth.
+    pub fn attest_settlement(ctx: Context<AttestSettlement>) -> Result<()> {
+        let bounty = &ctx.accounts.bounty;
+        let claim = &ctx.accounts.claim;
+        require!(
+            bounty.protocol_version >= 2,
+            FbError::ProtocolVersionMismatch
+        );
+        require!(
+            bounty.status == BountyStatus::Released,
+            FbError::SettlementNotFinal
+        );
+        require!(
+            claim.status == ClaimV2Status::Settled,
+            FbError::SettlementNotFinal
+        );
+        require_keys_eq!(claim.bounty, bounty.key(), FbError::InvalidClaimStatus);
+        require_keys_eq!(
+            bounty.owner,
+            ctx.accounts.owner.key(),
+            FbError::Unauthorized
+        );
+        require_keys_eq!(
+            claim.finder,
+            ctx.accounts.finder.key(),
+            FbError::FinderMismatch
+        );
+        require_keys_eq!(bounty.finder, claim.finder, FbError::FinderMismatch);
+
+        let now = Clock::get()?.unix_timestamp;
+        update_reputation(
+            &mut ctx.accounts.owner_reputation,
+            bounty.owner,
+            bounty.reward_amount,
+            false,
+            now,
+            ctx.bumps.owner_reputation,
+        )?;
+        update_reputation(
+            &mut ctx.accounts.finder_reputation,
+            claim.finder,
+            bounty.reward_amount,
+            true,
+            now,
+            ctx.bumps.finder_reputation,
+        )?;
+
+        let attestation = &mut ctx.accounts.attestation;
+        attestation.bounty = bounty.key();
+        attestation.claim = claim.key();
+        attestation.owner = bounty.owner;
+        attestation.finder = claim.finder;
+        attestation.reward_amount = bounty.reward_amount;
+        attestation.ai_score = claim.ai_score;
+        attestation.settled_at = now;
+        attestation.bump = ctx.bumps.attestation;
+
+        emit!(SettlementAttested {
+            attestation: attestation.key(),
+            bounty: bounty.key(),
+            claim: claim.key(),
+            owner: bounty.owner,
+            finder: claim.finder,
+            reward_amount: bounty.reward_amount,
+        });
+        Ok(())
+    }
 }
 
 #[derive(AnchorSerialize, AnchorDeserialize, Clone, Copy, PartialEq, Eq)]
@@ -758,6 +830,36 @@ pub struct ClaimV2 {
 
 impl ClaimV2 {
     pub const SPACE: usize = 8 + 32 * 6 + 1 * 5 + 8 * 2 + 32;
+}
+
+#[account]
+pub struct Reputation {
+    pub wallet: Pubkey,
+    pub successful_returns: u32,
+    pub rewards_earned: u64,
+    pub rewards_paid: u64,
+    pub last_activity: i64,
+    pub bump: u8,
+}
+
+impl Reputation {
+    pub const SPACE: usize = 8 + 32 + 4 + 8 * 3 + 1 + 32;
+}
+
+#[account]
+pub struct ReturnAttestation {
+    pub bounty: Pubkey,
+    pub claim: Pubkey,
+    pub owner: Pubkey,
+    pub finder: Pubkey,
+    pub reward_amount: u64,
+    pub ai_score: u8,
+    pub settled_at: i64,
+    pub bump: u8,
+}
+
+impl ReturnAttestation {
+    pub const SPACE: usize = 8 + 32 * 4 + 8 + 1 + 8 + 1 + 32;
 }
 
 #[derive(Accounts)]
@@ -1128,6 +1230,54 @@ pub struct ResolveDisputeV2<'info> {
     pub token_program: Program<'info, Token>,
 }
 
+#[derive(Accounts)]
+pub struct AttestSettlement<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: address is constrained to the immutable bounty owner below.
+    #[account(constraint = owner.key() == bounty.owner @ FbError::Unauthorized)]
+    pub owner: UncheckedAccount<'info>,
+    /// CHECK: address is constrained to the immutable settled claim finder below.
+    #[account(constraint = finder.key() == claim.finder @ FbError::FinderMismatch)]
+    pub finder: UncheckedAccount<'info>,
+    #[account(
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), finder.key().as_ref()],
+        bump = claim.bump,
+        has_one = bounty
+    )]
+    pub claim: Account<'info, ClaimV2>,
+    #[account(
+        init,
+        payer = payer,
+        space = ReturnAttestation::SPACE,
+        seeds = [RETURN_ATTESTATION_SEED, bounty.key().as_ref(), claim.key().as_ref()],
+        bump
+    )]
+    pub attestation: Account<'info, ReturnAttestation>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = Reputation::SPACE,
+        seeds = [REPUTATION_SEED, owner.key().as_ref()],
+        bump
+    )]
+    pub owner_reputation: Account<'info, Reputation>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        space = Reputation::SPACE,
+        seeds = [REPUTATION_SEED, finder.key().as_ref()],
+        bump
+    )]
+    pub finder_reputation: Account<'info, Reputation>,
+    pub system_program: Program<'info, System>,
+}
+
 #[event]
 pub struct BountyCreated {
     pub bounty: Pubkey,
@@ -1201,6 +1351,16 @@ pub struct ClaimV2Settled {
     pub finder: Pubkey,
     pub amount: u64,
     pub via_arbitration: bool,
+}
+
+#[event]
+pub struct SettlementAttested {
+    pub attestation: Pubkey,
+    pub bounty: Pubkey,
+    pub claim: Pubkey,
+    pub owner: Pubkey,
+    pub finder: Pubkey,
+    pub reward_amount: u64,
 }
 
 #[event]
@@ -1279,10 +1439,44 @@ pub enum FbError {
     LegacyInstructionDisabled,
     #[msg("Instruction does not match the bounty protocol version")]
     ProtocolVersionMismatch,
+    #[msg("Settlement is not final")]
+    SettlementNotFinal,
 }
 
 fn remaining_funding(reward_amount: u64, amount_funded: u64) -> Option<u64> {
     reward_amount.checked_sub(amount_funded)
+}
+
+fn update_reputation(
+    reputation: &mut Account<Reputation>,
+    wallet: Pubkey,
+    reward_amount: u64,
+    earned: bool,
+    now: i64,
+    bump: u8,
+) -> Result<()> {
+    if reputation.wallet == Pubkey::default() {
+        reputation.wallet = wallet;
+        reputation.bump = bump;
+    }
+    require_keys_eq!(reputation.wallet, wallet, FbError::Unauthorized);
+    reputation.successful_returns = reputation
+        .successful_returns
+        .checked_add(1)
+        .ok_or(FbError::MathOverflow)?;
+    if earned {
+        reputation.rewards_earned = reputation
+            .rewards_earned
+            .checked_add(reward_amount)
+            .ok_or(FbError::MathOverflow)?;
+    } else {
+        reputation.rewards_paid = reputation
+            .rewards_paid
+            .checked_add(reward_amount)
+            .ok_or(FbError::MathOverflow)?;
+    }
+    reputation.last_activity = now;
+    Ok(())
 }
 
 #[cfg(test)]

@@ -583,6 +583,189 @@
       "args": []
     },
     {
+      "name": "attest_settlement",
+      "docs": [
+        "Creates a permanent, non-transferable proof of a completed return and updates both",
+        "participants' reputation. The attestation PDA makes this permissionless but idempotent:",
+        "anyone may pay its rent, while the settled bounty and claim are the only source of truth."
+      ],
+      "discriminator": [
+        139,
+        194,
+        42,
+        227,
+        36,
+        121,
+        240,
+        227
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "owner"
+        },
+        {
+          "name": "finder"
+        },
+        {
+          "name": "bounty",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          },
+          "relations": [
+            "claim"
+          ]
+        },
+        {
+          "name": "claim",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              },
+              {
+                "kind": "account",
+                "path": "finder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "attestation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  116,
+                  117,
+                  114,
+                  110,
+                  95,
+                  97,
+                  116,
+                  116,
+                  101,
+                  115,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "owner_reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "owner"
+              }
+            ]
+          }
+        },
+        {
+          "name": "finder_reputation",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  112,
+                  117,
+                  116,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "finder"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "cancel_bounty",
       "discriminator": [
         79,
@@ -2264,6 +2447,32 @@
         222,
         63
       ]
+    },
+    {
+      "name": "Reputation",
+      "discriminator": [
+        55,
+        148,
+        90,
+        71,
+        68,
+        183,
+        193,
+        28
+      ]
+    },
+    {
+      "name": "ReturnAttestation",
+      "discriminator": [
+        186,
+        34,
+        108,
+        39,
+        171,
+        28,
+        141,
+        60
+      ]
     }
   ],
   "events": [
@@ -2461,6 +2670,19 @@
         236,
         187
       ]
+    },
+    {
+      "name": "SettlementAttested",
+      "discriminator": [
+        239,
+        162,
+        77,
+        172,
+        75,
+        14,
+        204,
+        5
+      ]
     }
   ],
   "errors": [
@@ -2563,6 +2785,11 @@
       "code": 6019,
       "name": "ProtocolVersionMismatch",
       "msg": "Instruction does not match the bounty protocol version"
+    },
+    {
+      "code": 6020,
+      "name": "SettlementNotFinal",
+      "msg": "Settlement is not final"
     }
   ],
   "types": [
@@ -3171,6 +3398,110 @@
           {
             "name": "release_to_finder",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "Reputation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "wallet",
+            "type": "pubkey"
+          },
+          {
+            "name": "successful_returns",
+            "type": "u32"
+          },
+          {
+            "name": "rewards_earned",
+            "type": "u64"
+          },
+          {
+            "name": "rewards_paid",
+            "type": "u64"
+          },
+          {
+            "name": "last_activity",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ReturnAttestation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "finder",
+            "type": "pubkey"
+          },
+          {
+            "name": "reward_amount",
+            "type": "u64"
+          },
+          {
+            "name": "ai_score",
+            "type": "u8"
+          },
+          {
+            "name": "settled_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SettlementAttested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "attestation",
+            "type": "pubkey"
+          },
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "owner",
+            "type": "pubkey"
+          },
+          {
+            "name": "finder",
+            "type": "pubkey"
+          },
+          {
+            "name": "reward_amount",
+            "type": "u64"
           }
         ]
       }
