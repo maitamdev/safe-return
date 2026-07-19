@@ -78,9 +78,7 @@ console.log("Minted 1,000,000 FIND to", ata.address.toBase58());
 
 const envLocal = path.join(root, ".env.local");
 upsertEnv(envLocal, "NEXT_PUBLIC_FIND_MINT", mint.toBase58());
-upsertEnv(envLocal, "NEXT_PUBLIC_MOCK_USDC_MINT", mint.toBase58()); // legacy alias
 upsertEnv(envLocal, "NEXT_PUBLIC_ARBITER", payer.publicKey.toBase58());
-upsertEnv(envLocal, "NEXT_PUBLIC_SAFEPOINT_AUTHORITY", payer.publicKey.toBase58());
 
 const recipients = process.argv.slice(2);
 for (const addr of recipients) {
