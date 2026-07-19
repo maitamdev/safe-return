@@ -2,9 +2,10 @@
 
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useCallback, useEffect, useState } from "react";
-import { SOLANA_CLUSTER, explorerAddressUrl } from "@/lib/solana/config";
+import { SOLANA_CLUSTER, explorerAddressUrl } from "@/lib/findback/config";
+import { Flask } from "@phosphor-icons/react";
 
-/** Devnet/Mainnet pill + optional SOL balance — standard dApp chrome. */
+/** Devnet/Mainnet badge with an optional live SOL balance. */
 export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
@@ -24,10 +25,13 @@ export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) 
   }, [connection, publicKey]);
 
   useEffect(() => {
-    void refresh();
-    if (!publicKey) return;
+    const first = window.setTimeout(() => void refresh(), 0);
+    if (!publicKey) return () => window.clearTimeout(first);
     const id = setInterval(() => void refresh(), 15_000);
-    return () => clearInterval(id);
+    return () => {
+      window.clearTimeout(first);
+      clearInterval(id);
+    };
   }, [publicKey, refresh]);
 
   const isDevnet = SOLANA_CLUSTER === "devnet";
@@ -35,18 +39,14 @@ export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) 
   return (
     <div className="inline-flex items-center gap-1.5">
       <span
-        className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
+        className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold ${
           isDevnet
-            ? "bg-amber-400/15 text-amber-200 ring-1 ring-amber-400/30"
-            : "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30"
+            ? "border-amber-200 bg-amber-50 text-amber-800"
+            : "border-emerald-200 bg-emerald-50 text-emerald-800"
         }`}
-        title={isDevnet ? "Mạng test — SOL miễn phí" : "Mainnet thật"}
+        title={isDevnet ? "Mạng test, SOL miễn phí" : "Mainnet thật"}
       >
-        <span
-          className={`h-1.5 w-1.5 rounded-full ${
-            isDevnet ? "bg-amber-400" : "bg-emerald-400"
-          }`}
-        />
+        <Flask size={13} weight="duotone" />
         {isDevnet ? "DEVNET" : SOLANA_CLUSTER}
       </span>
       {showBalance && publicKey && sol !== null && (
@@ -54,7 +54,7 @@ export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) 
           href={explorerAddressUrl(publicKey.toBase58())}
           target="_blank"
           rel="noreferrer"
-          className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] font-semibold text-white/80 transition hover:border-[#14F195]/40 hover:text-[#14F195]"
+          className="rounded-lg border border-line bg-white px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/40 hover:text-forest"
           title="Xem trên Explorer"
         >
           {sol < 0.001 ? sol.toFixed(4) : sol.toFixed(3)} SOL
