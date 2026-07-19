@@ -17,11 +17,13 @@ export const PROGRAM_ID =
  * Override after running setup.
  */
 export const MOCK_USDC_MINT =
-  process.env.NEXT_PUBLIC_MOCK_USDC_MINT || "";
+  process.env.NEXT_PUBLIC_MOCK_USDC_MINT ||
+  "BGcZtKHFpuNPk9U78vb6oUAt4KFkFhLhu1UomNAZwHRD";
 
 /** SafePoint staff authority pubkey (can lock/release). Defaults to deployer. */
 export const SAFEPOINT_AUTHORITY =
-  process.env.NEXT_PUBLIC_SAFEPOINT_AUTHORITY || "";
+  process.env.NEXT_PUBLIC_SAFEPOINT_AUTHORITY ||
+  "DoNrsajZ2Yo8C1biPb8BiB2z3S5ZwZ9VWuFMwF8R2CUa";
 
 export const USDC_DECIMALS = 6;
 

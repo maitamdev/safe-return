@@ -1,12 +1,20 @@
 "use client";
 
+/**
+ * Standard Solana dApp provider stack
+ * (same pattern as Solana Cookbook / create-solana-dapp):
+ * ConnectionProvider → WalletProvider → WalletModalProvider
+ *
+ * wallets={[]} = Wallet Standard auto-discovery (Phantom, Solflare, …)
+ * without the heavy legacy adapter bundle.
+ */
+
 import { useMemo, useCallback, type ReactNode } from "react";
 import {
   ConnectionProvider,
   WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Buffer } from "buffer";
 import { SOLANA_RPC } from "@/lib/solana/config";
 
@@ -25,15 +33,13 @@ function ensureBrowserPolyfills() {
 ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
-  const endpoint = SOLANA_RPC;
-  // Empty list also works (Wallet Standard auto-detects Phantom).
-  // Keep legacy adapter as explicit fallback for older Phantom builds.
-  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+  const endpoint = useMemo(() => SOLANA_RPC, []);
+  // Wallet Standard: empty list → browser discovers installed wallets
+  const wallets = useMemo(() => [], []);
 
   const onError = useCallback((error: Error) => {
-    // Avoid uncaught adapter noise; UI surfaces message via connect button.
     if (process.env.NODE_ENV === "development") {
-      console.warn("[wallet]", error.message);
+      console.warn("[wallet]", error.name, error.message);
     }
   }, []);
 

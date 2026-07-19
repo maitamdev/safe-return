@@ -20,6 +20,7 @@ import { useApp } from "@/lib/store";
 import { useT } from "@/lib/i18n";
 import { LanguageToggle } from "@/components/ui/LanguageToggle";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
+import { NetworkBadge } from "@/components/wallet/NetworkBadge";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { programMeta } from "@/lib/solana/escrow";
 
@@ -115,10 +116,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </div>
               <div className="mt-3 space-y-2 border-t border-line pt-3">
                 <ConnectWalletButton className="w-full" />
+                <NetworkBadge />
                 <p className="font-mono text-[10px] leading-relaxed text-ink-muted">
-                  Devnet · {chainReady ? "ready" : "…"}
-                  <br />
-                  {programMeta.programId.slice(0, 8)}…
+                  {chainReady ? "on-chain ready" : "config…"} ·{" "}
+                  {programMeta.programId.slice(0, 6)}…
                   {publicKey && (
                     <>
                       <br />
@@ -170,6 +171,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
+              <div className="hidden sm:block">
+                <NetworkBadge />
+              </div>
               <ConnectWalletButton />
               <LanguageToggle size="sm" className="lg:hidden" />
               <Link
