@@ -68,7 +68,7 @@ export function TokenBalances({ dark = false }: { dark?: boolean }) {
     : "rounded-lg border border-line bg-white px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/40 hover:text-forest";
 
   return (
-    <div className="inline-flex flex-wrap items-center gap-1.5">
+    <div className="inline-flex shrink-0 flex-nowrap items-center gap-1.5 whitespace-nowrap">
       {sol !== null && (
         <a
           href={explorerAddressUrl(addr)}

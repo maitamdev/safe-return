@@ -34,7 +34,7 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
   return (
     <div className="min-h-[100dvh] bg-bg text-ink">
       <header className="sticky top-0 z-40 border-b border-line bg-white/94 backdrop-blur-xl">
-        <div className="mx-auto flex h-[4.5rem] max-w-7xl items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-[4.5rem] max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-8">
           <Link href="/bounties" className="flex shrink-0 items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-forest font-bold text-white">SR</span>
             <div className="hidden sm:block">
@@ -43,11 +43,11 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
 
-          <nav className="hidden items-center gap-1 md:flex" aria-label="Điều hướng chính">
+          <nav className="mx-auto hidden shrink-0 items-center gap-1 xl:flex" aria-label="Điều hướng chính">
             {nav.map((item) => {
               const active = item.href === "/bounties" ? pathname === item.href : item.href !== "/" && pathname.startsWith(item.href);
               return (
-                <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex items-center gap-2 rounded-xl px-3 py-2 text-sm font-semibold transition", active ? "bg-mint-soft text-forest" : "text-ink-soft hover:bg-bg-deep hover:text-ink")}>
+                <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex shrink-0 items-center gap-2 whitespace-nowrap rounded-xl px-3 py-2 text-sm font-semibold transition", active ? "bg-mint-soft text-forest" : "text-ink-soft hover:bg-bg-deep hover:text-ink")}>
                   <item.icon size={16} weight={active ? "fill" : "regular"} />
                   {item.label}
                 </Link>
@@ -55,18 +55,20 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="flex min-w-0 items-center gap-2">
-            <div className="hidden items-center gap-2 xl:flex">
+          <div className="ml-auto flex shrink-0 items-center gap-2">
+            <div className="hidden shrink-0 items-center gap-2 2xl:flex">
               <NetworkBadge showBalance={false} />
               <TokenBalances />
             </div>
             <UserMenu />
-            <ConnectWalletButton />
+            <ConnectWalletButton compact />
           </div>
         </div>
-        <div className="flex items-center justify-between gap-3 border-t border-line bg-[#fbfcfb] px-4 py-2 xl:hidden">
-          <NetworkBadge showBalance={false} />
-          <TokenBalances />
+        <div className="border-t border-line bg-[#fbfcfb] 2xl:hidden">
+          <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
+            <NetworkBadge showBalance={false} />
+            <TokenBalances />
+          </div>
         </div>
       </header>
 
@@ -80,9 +82,9 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
         </div>
       )}
 
-      <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 md:py-10 lg:px-8 lg:pb-12">{children}</main>
+      <main className="mx-auto max-w-7xl px-4 py-6 pb-24 sm:px-6 md:py-10 lg:px-8 xl:pb-12">{children}</main>
 
-      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-white/98 px-1 py-1.5 shadow-[0_-8px_30px_rgba(28,52,41,0.08)] backdrop-blur-lg md:hidden" aria-label="Điều hướng di động">
+      <nav className="fixed inset-x-0 bottom-0 z-30 grid grid-cols-5 border-t border-line bg-white/98 px-1 py-1.5 shadow-[0_-8px_30px_rgba(28,52,41,0.08)] backdrop-blur-lg xl:hidden" aria-label="Điều hướng di động">
         {nav.map((item) => {
           const active = item.href === "/bounties" ? pathname === item.href : item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold", active ? "bg-mint-soft text-forest" : "text-ink-muted")}><item.icon size={20} weight={active ? "fill" : "regular"} />{item.label}</Link>;

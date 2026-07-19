@@ -10,10 +10,12 @@ export function ConnectWalletButton({
   className = "",
   size = "sm",
   dark = false,
+  compact = false,
 }: {
   className?: string;
   size?: "sm" | "md";
   dark?: boolean;
+  compact?: boolean;
 }) {
   const {
     publicKey,
@@ -30,6 +32,16 @@ export function ConnectWalletButton({
   const [serviceReady, setServiceReady] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const pad = size === "md" ? "px-4 py-2.5 text-sm" : "px-3 py-2 text-xs";
+  const wrapper = compact
+    ? `relative inline-flex shrink-0 items-center ${className}`
+    : `inline-flex flex-col items-end gap-1.5 ${className}`;
+  const floatingHint = compact
+    ? `absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-xl border px-3 py-2.5 text-left text-xs leading-5 shadow-[0_16px_44px_rgba(29,57,44,0.18)] ${
+        dark
+          ? "border-white/15 bg-[#173a2c] text-white"
+          : "border-line bg-white text-ink-soft"
+      }`
+    : "max-w-72 text-right text-xs";
 
   useEffect(() => {
     if (!connected || !publicKey) return;
@@ -61,6 +73,12 @@ export function ConnectWalletButton({
       cancelled = true;
     };
   }, [connected, publicKey]);
+
+  useEffect(() => {
+    if (!hint) return;
+    const timeout = window.setTimeout(() => setHint(null), 5000);
+    return () => window.clearTimeout(timeout);
+  }, [hint]);
 
   const openWallet = async () => {
     setHint(null);
@@ -145,12 +163,12 @@ export function ConnectWalletButton({
 
     if (!verified) {
       return (
-        <div className={`inline-flex flex-col items-end gap-1.5 ${className}`}>
+        <div className={wrapper}>
           <button
             type="button"
             disabled={verifying || !serviceReady}
             onClick={() => void verifyWallet()}
-            className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:translate-y-px disabled:cursor-wait disabled:opacity-60 ${
+            className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition active:translate-y-px disabled:cursor-wait disabled:opacity-60 ${
               dark
                 ? "bg-amber-300 text-slate-950 hover:bg-amber-200"
                 : "bg-amber-100 text-amber-950 hover:bg-amber-200"
@@ -164,12 +182,12 @@ export function ConnectWalletButton({
             {verifying ? "Đang xác minh" : serviceReady ? `Xác minh ${short}` : "Hệ thống chưa sẵn sàng"}
           </button>
           {!serviceReady && (
-            <p className={`max-w-72 text-right text-xs ${dark ? "text-amber-100" : "text-amber-800"}`}>
+            <p role="status" className={`${floatingHint} ${compact ? "" : dark ? "text-amber-100" : "text-amber-800"}`}>
               Quản trị viên cần hoàn tất secret key và migration Supabase.
             </p>
           )}
           {hint && (
-            <p className={`max-w-72 text-right text-xs ${dark ? "text-amber-100" : "text-amber-800"}`}>
+            <p role="status" className={`${floatingHint} ${compact ? "" : dark ? "text-amber-100" : "text-amber-800"}`}>
               {hint}
             </p>
           )}
@@ -178,11 +196,11 @@ export function ConnectWalletButton({
     }
 
     return (
-      <div className={`inline-flex flex-col items-end gap-1.5 ${className}`}>
+      <div className={wrapper}>
         <button
           type="button"
           onClick={() => void disconnect()}
-          className={`inline-flex items-center justify-center gap-2 rounded-xl border font-semibold transition active:translate-y-px ${
+          className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl border font-semibold transition active:translate-y-px ${
             dark
               ? "border-white/20 bg-white/10 text-white hover:bg-white/15"
               : "border-emerald-200 bg-emerald-50 text-emerald-900 hover:bg-emerald-100"
@@ -194,7 +212,7 @@ export function ConnectWalletButton({
           <SignOut size={14} />
         </button>
         {hint && (
-          <p className={`max-w-72 text-right text-xs ${dark ? "text-emerald-100" : "text-emerald-800"}`}>
+          <p role="status" className={`${floatingHint} ${compact ? "" : dark ? "text-emerald-100" : "text-emerald-800"}`}>
             {hint}
           </p>
         )}
@@ -203,12 +221,12 @@ export function ConnectWalletButton({
   }
 
   return (
-    <div className={`inline-flex flex-col items-end gap-1.5 ${className}`}>
+    <div className={wrapper}>
       <button
         type="button"
         disabled={connecting}
         onClick={() => void openWallet()}
-        className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:translate-y-px disabled:cursor-wait disabled:opacity-60 ${
+        className={`inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-xl font-semibold transition active:translate-y-px disabled:cursor-wait disabled:opacity-60 ${
           dark
             ? "bg-emerald-400 text-slate-950 hover:bg-emerald-300"
             : "bg-emerald-700 text-white hover:bg-emerald-800"
@@ -222,7 +240,7 @@ export function ConnectWalletButton({
         {connecting ? "Đang kết nối" : "Kết nối ví"}
       </button>
       {hint && (
-        <p className={`max-w-64 text-right text-xs ${dark ? "text-amber-200" : "text-amber-800"}`}>
+        <p role="status" className={`${compact ? floatingHint : "max-w-64 text-right text-xs"} ${compact ? "" : dark ? "text-amber-200" : "text-amber-800"}`}>
           {hint}
         </p>
       )}

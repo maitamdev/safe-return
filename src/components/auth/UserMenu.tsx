@@ -56,7 +56,7 @@ export function UserMenu({ dark = false }: { dark?: boolean }) {
     "User";
 
   return (
-    <div className="inline-flex items-center gap-1.5">
+    <div className="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap">
       <span
         className={
           dark
