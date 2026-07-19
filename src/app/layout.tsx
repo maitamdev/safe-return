@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/Navbar";
+import { FirstVisitGuide } from "@/components/onboarding/FirstVisitGuide";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import "./globals.css";
 
@@ -60,6 +61,7 @@ export default function RootLayout({
         <AuthProvider>
           <Navbar />
           {children}
+          <FirstVisitGuide />
         </AuthProvider>
       </body>
     </html>
