@@ -138,12 +138,12 @@ function LoginForm() {
 
 export default function LoginPage() {
   return (
-    <div className="relative flex min-h-dvh flex-1 items-center justify-center bg-[#070b14] px-4 py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(153,69,255,0.2),_transparent_55%)]" />
+    <div className="relative flex min-h-dvh flex-1 items-center justify-center bg-[#06080f] px-4 py-16">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(153,69,255,0.22),_transparent_55%)]" />
       <div className="relative w-full">
         <Suspense
           fallback={
-            <p className="text-center text-white/50">Loading…</p>
+            <p className="text-center text-white/50">Đang tải…</p>
           }
         >
           <LoginForm />

@@ -65,9 +65,10 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...`}
 
   if (loading || !user) {
     return (
-      <div className="flex min-h-[50vh] flex-col items-center justify-center gap-3 text-white/60">
+      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[#06080f] text-white/60">
         <CircleNotch size={28} className="animate-spin text-[#14F195]" />
         <p className="text-sm">Đang kiểm tra đăng nhập…</p>
+        <p className="text-xs text-white/35">Chưa có tài khoản? Đang chuyển sang trang đăng nhập.</p>
       </div>
     );
   }

@@ -58,7 +58,7 @@ html {
 }
 
 body {
-  background: var(--bg);
+  background: #06080f;
   color: var(--ink);
   font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
   font-feature-settings: "ss01" on, "cv11" on;

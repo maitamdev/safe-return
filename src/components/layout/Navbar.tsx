@@ -3,34 +3,31 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { List, X, QrCode } from "@phosphor-icons/react";
-import { Button } from "@/components/ui/Button";
-import { LanguageToggle } from "@/components/ui/LanguageToggle";
+import { List, X } from "@phosphor-icons/react";
 import { cn } from "@/lib/cn";
-import { useT } from "@/lib/i18n";
 
 export function Navbar() {
-  const t = useT();
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const isApp =
+
+  // App / auth shells have their own chrome
+  const hide =
     pathname?.startsWith("/app") ||
     pathname?.startsWith("/bounties") ||
     pathname?.startsWith("/login") ||
     pathname?.startsWith("/signup") ||
-    pathname?.startsWith("/auth");
+    pathname?.startsWith("/auth") ||
+    pathname?.startsWith("/setup");
 
   const links = [
-    { href: "/#problem", label: t("nav.problem") },
-    { href: "/#how", label: t("nav.how") },
-    { href: "/#ai", label: t("nav.ai") },
-    { href: "/login", label: "Đăng nhập" },
-    { href: "/bounties", label: "FindBack AI" },
+    { href: "/#how", label: "Cách dùng" },
+    { href: "/#why", label: "Vì sao tin" },
+    { href: "/bounties", label: "Mở app" },
   ];
 
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 8);
+    const onScroll = () => setScrolled(window.scrollY > 12);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -40,34 +37,39 @@ export function Navbar() {
     setOpen(false);
   }, [pathname]);
 
-  if (isApp) return null;
+  if (hide) return null;
 
   return (
     <>
       <header
         className={cn(
-          "fixed inset-x-0 top-0 z-50 border-b transition-colors duration-200",
+          "fixed inset-x-0 top-0 z-50 border-b transition-all duration-300",
           scrolled
-            ? "border-line bg-white/90 backdrop-blur-md"
-            : "border-transparent bg-white/70 backdrop-blur-sm"
+            ? "border-white/10 bg-[#06080f]/85 backdrop-blur-xl"
+            : "border-transparent bg-transparent"
         )}
       >
-        <nav className="mx-auto flex h-14 max-w-5xl items-center justify-between gap-4 px-5 md:h-16 md:px-8">
+        <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 md:px-8">
           <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-forest text-white">
-              <QrCode size={16} weight="bold" />
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#9945FF] to-[#14F195] text-sm font-bold text-black">
+              FB
             </span>
-            <span className="text-[15px] font-semibold tracking-tight">
-              FindBack AI
-            </span>
+            <div className="leading-none">
+              <span className="text-[15px] font-bold tracking-tight text-white">
+                FindBack AI
+              </span>
+              <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-white/40">
+                Lost & found · Solana
+              </p>
+            </div>
           </Link>
 
-          <div className="hidden items-center gap-0.5 md:flex">
+          <div className="hidden items-center gap-1 md:flex">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
-                className="rounded-md px-3 py-1.5 text-sm text-ink-soft transition-colors hover:bg-black/[0.04] hover:text-ink"
+                className="rounded-full px-3.5 py-1.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
               >
                 {l.label}
               </Link>
@@ -75,15 +77,23 @@ export function Navbar() {
           </div>
 
           <div className="flex items-center gap-2">
-            <LanguageToggle size="sm" />
-            <Button href="/login" size="sm" className="hidden sm:inline-flex">
+            <Link
+              href="/login"
+              className="hidden rounded-full px-3.5 py-2 text-sm font-semibold text-white/70 transition hover:text-white sm:inline-flex"
+            >
               Đăng nhập
-            </Button>
+            </Link>
+            <Link
+              href="/signup"
+              className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-bold text-black transition hover:bg-white/90"
+            >
+              Bắt đầu
+            </Link>
             <button
               type="button"
-              aria-label={t("nav.menu")}
+              aria-label="Menu"
               onClick={() => setOpen((v) => !v)}
-              className="flex h-9 w-9 items-center justify-center rounded-lg bg-black/[0.04] md:hidden"
+              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white md:hidden"
             >
               {open ? <X size={18} /> : <List size={18} />}
             </button>
@@ -92,24 +102,32 @@ export function Navbar() {
       </header>
 
       {open && (
-        <div className="fixed inset-0 z-40 bg-white pt-16 md:hidden">
-          <div className="flex flex-col px-5 py-4">
+        <div className="fixed inset-0 z-40 bg-[#06080f] pt-20 md:hidden">
+          <div className="flex flex-col gap-1 px-5">
             {links.map((l) => (
               <Link
                 key={l.href}
                 href={l.href}
                 onClick={() => setOpen(false)}
-                className="border-b border-line py-4 text-lg font-medium text-ink"
+                className="rounded-2xl px-4 py-4 text-lg font-medium text-white hover:bg-white/5"
               >
                 {l.label}
               </Link>
             ))}
-            <div className="mt-6 space-y-3">
-              <LanguageToggle />
-              <Button href="/login" size="lg" className="w-full" icon>
-                Đăng nhập
-              </Button>
-            </div>
+            <Link
+              href="/login"
+              onClick={() => setOpen(false)}
+              className="mt-4 rounded-2xl border border-white/15 px-4 py-4 text-center font-semibold"
+            >
+              Đăng nhập
+            </Link>
+            <Link
+              href="/signup"
+              onClick={() => setOpen(false)}
+              className="mt-2 rounded-2xl bg-white px-4 py-4 text-center font-bold text-black"
+            >
+              Bắt đầu miễn phí
+            </Link>
           </div>
         </div>
       )}

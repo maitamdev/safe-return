@@ -48,18 +48,17 @@ export default function SignupPage() {
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-1 items-center justify-center bg-[#070b14] px-4 py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(20,241,149,0.12),_transparent_50%)]" />
+    <div className="relative flex min-h-dvh flex-1 items-center justify-center bg-[#06080f] px-4 py-16">
+      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(20,241,149,0.14),_transparent_50%)]" />
       <div className="relative mx-auto w-full max-w-md">
         <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#14F195]">
-          FindBack AI
+          30 giây là xong
         </p>
-        <h1 className="mt-2 font-display text-3xl font-bold text-white">
-          Tạo tài khoản
+        <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
+          Tạo tài khoản miễn phí
         </h1>
         <p className="mt-2 text-sm text-white/55">
-          Đăng ký bằng email. Sau khi vào app mới nối Phantom để khóa thưởng
-          on-chain.
+          Chỉ cần email. Vào app xong mới nối Phantom — không cần hiểu crypto.
         </p>
 
         <form

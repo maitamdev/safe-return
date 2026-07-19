@@ -37,25 +37,25 @@ export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) 
       <span
         className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.12em] ${
           isDevnet
-            ? "bg-amber-100 text-amber-900"
-            : "bg-emerald-100 text-emerald-900"
+            ? "bg-amber-400/15 text-amber-200 ring-1 ring-amber-400/30"
+            : "bg-emerald-400/15 text-emerald-200 ring-1 ring-emerald-400/30"
         }`}
-        title={isDevnet ? "Test network — free SOL" : "Real mainnet"}
+        title={isDevnet ? "Mạng test — SOL miễn phí" : "Mainnet thật"}
       >
         <span
           className={`h-1.5 w-1.5 rounded-full ${
-            isDevnet ? "bg-amber-500" : "bg-emerald-500"
+            isDevnet ? "bg-amber-400" : "bg-emerald-400"
           }`}
         />
-        {SOLANA_CLUSTER}
+        {isDevnet ? "DEVNET" : SOLANA_CLUSTER}
       </span>
       {showBalance && publicKey && sol !== null && (
         <a
           href={explorerAddressUrl(publicKey.toBase58())}
           target="_blank"
           rel="noreferrer"
-          className="rounded-full border border-line bg-white/80 px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/30 hover:text-forest"
-          title="View on Explorer"
+          className="rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] font-semibold text-white/80 transition hover:border-[#14F195]/40 hover:text-[#14F195]"
+          title="Xem trên Explorer"
         >
           {sol < 0.001 ? sol.toFixed(4) : sol.toFixed(3)} SOL
         </a>

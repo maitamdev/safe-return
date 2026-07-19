@@ -79,7 +79,7 @@ export function BountyCard({
             <Coins size={12} /> {b.rewardUi} {FIND_SYMBOL}
           </span>
           <span className="inline-flex items-center gap-1">
-            <Timer size={12} /> {days}d left
+            <Timer size={12} /> còn {days} ngày
           </span>
         </div>
       </div>
