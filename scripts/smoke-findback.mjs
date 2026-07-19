@@ -75,7 +75,7 @@ const payer = loadKp(
 const programId = new PublicKey(
   env("NEXT_PUBLIC_FINDBACK_PROGRAM_ID", "3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna")
 );
-const mint = new PublicKey(env("NEXT_PUBLIC_FIND_MINT") || env("NEXT_PUBLIC_MOCK_USDC_MINT"));
+const mint = new PublicKey(env("NEXT_PUBLIC_FIND_MINT"));
 const connection = new Connection(clusterApiUrl("devnet"), "confirmed");
 
 const bountyId = `SMK${Date.now().toString(36).slice(-6).toUpperCase()}`;
