@@ -13,7 +13,7 @@ import {
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Buffer } from "buffer";
-import { SOLANA_RPC } from "@/lib/solana/config";
+import { SOLANA_RPC } from "@/lib/findback/config";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -31,7 +31,7 @@ ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => SOLANA_RPC, []);
-  // Explicit Phantom — also works with Wallet Standard auto-discovery
+  // Explicit Phantom support also works with Wallet Standard auto-discovery.
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   const onError = useCallback((error: Error) => {
@@ -44,7 +44,7 @@ export function WalletProviders({ children }: { children: ReactNode }) {
         wallets={wallets}
         autoConnect
         onError={onError}
-        localStorageKey="findback-wallet"
+        localStorageKey="safereturn-wallet"
       >
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
