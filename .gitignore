@@ -32,6 +32,13 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+!.env.example
+
+# Solana local secrets
+.program-id
+.deployer-pubkey
+**/id.json
+target/deploy/*-keypair.json
 
 # vercel
 .vercel
@@ -39,3 +46,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# Anchor / Solana build (commit IDL only if needed)
+/target/
+!/target/idl/
+!/target/idl/**
+/test-ledger/
+test-ledger*
+*.log
+*.log.err
+.anchor
+**/*.rs.bk
+**/keypair.json
+**/*-keypair.json

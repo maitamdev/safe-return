@@ -1,26 +1,154 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --bg: #f7f8f7;
+  --bg-elevated: #ffffff;
+  --bg-deep: #0f1714;
+  --ink: #111827;
+  --ink-soft: #4b5563;
+  --ink-muted: #9ca3af;
+  --line: #e5e7eb;
+  --line-strong: #d1d5db;
+  --forest: #0f766e;
+  --forest-deep: #115e59;
+  --mint: #ccfbf1;
+  --mint-soft: #f0fdfa;
+  --gold: #b45309;
+  --gold-soft: #fef3c7;
+  --coral: #dc2626;
+  --solana: #9945ff;
+  --shadow-soft: 0 1px 2px rgba(15, 23, 42, 0.04), 0 8px 24px -12px rgba(15, 23, 42, 0.08);
+  --shadow-card: 0 1px 2px rgba(15, 23, 42, 0.04);
+  --ease-out: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --radius-shell: 1rem;
+  --radius-core: 0.875rem;
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-bg-deep: var(--bg-deep);
+  --color-ink: var(--ink);
+  --color-ink-soft: var(--ink-soft);
+  --color-ink-muted: var(--ink-muted);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-forest: var(--forest);
+  --color-forest-deep: var(--forest-deep);
+  --color-mint: var(--mint);
+  --color-mint-soft: var(--mint-soft);
+  --color-gold: var(--gold);
+  --color-gold-soft: var(--gold-soft);
+  --color-coral: var(--coral);
+  --color-solana: var(--solana);
+  --font-sans: var(--font-sans);
+  --font-display: var(--font-sans);
+  --font-mono: var(--font-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  box-sizing: border-box;
+}
+
+html {
+  scroll-behavior: smooth;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: var(--font-sans), system-ui, -apple-system, "Segoe UI", sans-serif;
+  font-feature-settings: "ss01" on, "cv11" on;
+  line-height: 1.55;
+  min-height: 100dvh;
+  overflow-x: hidden;
+  letter-spacing: -0.01em;
+}
+
+::selection {
+  background: var(--mint);
+  color: var(--forest-deep);
+}
+
+/* Keep class for existing markup — same family, weight hierarchy only */
+.font-display {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  letter-spacing: -0.025em;
+}
+
+.font-mono {
+  font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  letter-spacing: 0;
+}
+
+/* Flat product card — replaces old double-bezel mock frames */
+.double-bezel {
+  border-radius: var(--radius-shell);
+  background: transparent;
+  border: none;
+  padding: 0;
+  box-shadow: none;
+}
+
+.double-bezel-inner {
+  border-radius: var(--radius-core);
+  background: var(--bg-elevated);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow-card);
+}
+
+.field {
+  width: 100%;
+  border-radius: 0.625rem;
+  border: 1px solid var(--line-strong);
+  background: #fff;
+  padding: 0.65rem 0.85rem;
+  font-size: 0.875rem;
+  color: var(--ink);
+  outline: none;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.field:focus {
+  border-color: var(--forest);
+  box-shadow: 0 0 0 3px rgba(15, 118, 110, 0.12);
+}
+
+.field::placeholder {
+  color: var(--ink-muted);
+}
+
+.mesh-hero {
+  background: var(--bg);
+}
+
+.grid-fine {
+  display: none;
+}
+
+.text-balance {
+  text-wrap: balance;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: rgba(15, 118, 110, 0.25);
+  border-radius: 999px;
+}
+
+.pulse-ring::before {
+  display: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
 }

@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SafeReturn
 
-## Getting Started
+Campus lost & found MVP for UniHackFest — AI matching + **Solana escrow (Rust/Anchor)**.
 
-First, run the development server:
+## Stack
+
+- Next.js 16 (App Router)
+- React 19 + Tailwind CSS 4
+- Phosphor Icons + Motion
+- **Real Solana Devnet** escrow (no mock signatures)
+- **Rust / Anchor** program: `programs/safereturn_escrow`
+
+## Run (web)
 
 ```bash
+cd safereturn
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Open [http://localhost:3000](http://localhost:3000).  
+App + Phantom: [http://localhost:3000/app](http://localhost:3000/app).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Solana escrow (Rust) — **live on Devnet**
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Program source: [`programs/safereturn_escrow`](./programs/safereturn_escrow).  
+Full guide: **[`DEVNET.md`](./DEVNET.md)**.
 
-## Learn More
+| | |
+|--|--|
+| Program | [`8aPk563iNTtCP95gZ5EhdWJhTiL1cgKypcDUJikf3H6c`](https://explorer.solana.com/address/8aPk563iNTtCP95gZ5EhdWJhTiL1cgKypcDUJikf3H6c?cluster=devnet) |
+| Mock USDC | [`BGcZtKHFpuNPk9U78vb6oUAt4KFkFhLhu1UomNAZwHRD`](https://explorer.solana.com/address/BGcZtKHFpuNPk9U78vb6oUAt4KFkFhLhu1UomNAZwHRD?cluster=devnet) |
 
-To learn more about Next.js, take a look at the following resources:
+| Instruction | Who | What |
+|-------------|-----|------|
+| `initialize_case` | Owner (Phantom) | Create escrow PDA |
+| `fund_escrow` | Owner | Lock mock USDC in vault |
+| `set_finder` | Owner | Bind finder after AI + secret |
+| `lock_for_handover` | SafePoint | Commit OTP hash |
+| `release_reward` | SafePoint | Pay finder if OTP matches |
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+```powershell
+npm run solana:fund      # free Devnet SOL if needed
+npm run solana:smoke     # real on-chain ix test
+npm run dev              # Connect Phantom on Devnet → /app
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## Routes
 
-## Deploy on Vercel
+| Path | Description |
+|------|-------------|
+| `/` | Marketing landing |
+| `/app` | Dashboard |
+| `/app/items` | Item registry + QR |
+| `/app/items/new` | Register item |
+| `/app/lost` | Owner: report lost |
+| `/app/found` | Finder: report found + AI match |
+| `/app/cases` | Case list |
+| `/app/cases/[id]` | Match, escrow, OTP handover |
+| `/app/safepoint` | Staff desk console |
+| `/app/demo` | Quinn → Mai live walkthrough |
+| `/app/profile` | Wallet, badges, notifications |
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## Demo flow (judges)
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+1. Open **Live Demo** (`/app/demo`) → **Start demo** / **Next step**
+2. Or manual:
+   - Owner: Report lost backpack
+   - Finder: Report found (AI 93% match)
+   - Confirm secret → Fund escrow → SafePoint OTP → Reward released
+
+Use the **Act as** switcher in the sidebar (owner / finder / safepoint).
+
+## Notes
+
+- Default: **live Devnet** (`NEXT_PUBLIC_SOLANA_LIVE=1` in `.env.local`).
+- AI never auto-releases funds — SafePoint + OTP confirmation required on-chain.
+- Phantom must be on **Devnet**. Mock USDC lives on mint above (transfer from deployer ATA).

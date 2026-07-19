@@ -3,12 +3,29 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "dev": "next dev --webpack",
+    "build": "next build --webpack",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "solana:deploy": "node scripts/deploy-devnet.mjs",
+    "solana:setup": "node scripts/setup-devnet.mjs",
+    "solana:fund": "node scripts/fund-devnet-sol.mjs",
+    "solana:smoke": "node scripts/smoke-onchain.mjs",
+    "solana:balance": "solana balance",
+    "solana:address": "solana address"
   },
   "dependencies": {
+    "@phosphor-icons/react": "^2.1.10",
+    "@solana/spl-token": "^0.4.13",
+    "@solana/wallet-adapter-base": "^0.9.27",
+    "@solana/wallet-adapter-phantom": "^0.9.28",
+    "@solana/wallet-adapter-react": "^0.15.39",
+    "@solana/wallet-adapter-react-ui": "^0.9.39",
+    "@solana/web3.js": "^1.98.4",
+    "bs58": "^5.0.0",
+    "buffer": "^6.0.3",
+    "clsx": "^2.1.1",
+    "motion": "^12.42.2",
     "next": "16.2.10",
     "react": "19.2.4",
     "react-dom": "19.2.4"
