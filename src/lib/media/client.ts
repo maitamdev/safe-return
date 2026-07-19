@@ -1,5 +1,20 @@
 import type { MediaPurpose, StoredMedia } from "./types";
 
+export function privateMediaUrl(args: {
+  purpose: MediaPurpose;
+  bountyId: string;
+  claimId?: string;
+  mode?: "image" | "verify";
+}) {
+  const query = new URLSearchParams({
+    purpose: args.purpose,
+    bountyId: args.bountyId,
+  });
+  if (args.claimId) query.set("claimId", args.claimId);
+  if (args.mode === "verify") query.set("mode", "verify");
+  return `/api/media/view?${query.toString()}`;
+}
+
 export async function uploadPrivateMedia(args: {
   purpose: MediaPurpose;
   bountyId: string;

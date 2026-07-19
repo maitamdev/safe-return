@@ -75,6 +75,16 @@ export async function verifyStoredImage(args: {
   purpose: MediaPurpose;
   media: StoredMedia;
 }) {
+  await downloadAndVerifyStoredImage(args);
+}
+
+export async function downloadAndVerifyStoredImage(args: {
+  admin: SupabaseClient;
+  userId: string;
+  bountyId: string;
+  purpose: MediaPurpose;
+  media: StoredMedia;
+}) {
   const expectedPrefix = `${args.userId}/${args.bountyId}/`;
   if (!args.media.storagePath.startsWith(expectedPrefix)) {
     throw new ApiError(403, "Đường dẫn ảnh không thuộc tài khoản và bounty này.");
@@ -89,11 +99,12 @@ export async function verifyStoredImage(args: {
   if (
     sha256 !== args.media.sha256 ||
     bytes.length !== args.media.byteSize ||
-    data.type !== args.media.mimeType ||
+    (data.type !== "" && data.type !== args.media.mimeType) ||
     !hasExpectedSignature(bytes, args.media.mimeType)
   ) {
     throw new ApiError(409, "Nội dung ảnh lưu trữ không khớp commitment.");
   }
+  return bytes;
 }
 
 function hasExpectedSignature(bytes: Buffer, mimeType: ImageDescriptorV2["mimeType"]) {

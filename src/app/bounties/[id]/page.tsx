@@ -10,14 +10,18 @@ import {
   ArrowSquareOut,
   Coins,
   ImageSquare,
+  LockKey,
   MapPin,
   Timer,
+  UserCircle,
 } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { AiReviewPanel } from "@/components/findback/AiPanel";
+import { MediaIntegrityBadge } from "@/components/findback/MediaIntegrityBadge";
 import { statusBadge, statusLabel } from "@/components/findback/BountyCard";
 import { FIND_SYMBOL, explorerAddressUrl, fromAtomic } from "@/lib/findback/config";
 import { bountyPda, getConnection, type OnChainBounty } from "@/lib/findback/program";
+import type { ClaimMeta } from "@/lib/findback/store";
 
 const flow = ["Draft", "Funded", "ClaimSubmitted", "AiReviewed", "Released"];
 
@@ -69,10 +73,16 @@ export default function BountyDetailPage() {
   if (!meta) return <NotFound id={id} />;
 
   const walletAddress = publicKey?.toBase58();
+  const claims = meta.claims?.length ? meta.claims : meta.claim ? [meta.claim] : [];
+  const currentClaim = claims.find((claim) => claim.finderWallet === walletAddress);
   const isOwner = Boolean(walletAddress && (meta.ownerWallet === walletAddress || onchain?.owner === walletAddress));
-  const isFinder = Boolean(walletAddress && (meta.claim?.finderWallet === walletAddress || onchain?.finder === walletAddress));
-  const status = onchain?.status || meta.status || (meta.aiReport ? "AiReviewed" : meta.claim ? "ClaimSubmitted" : "Draft");
-  const canClaim = onchain?.status === "Funded" && !isOwner;
+  const isFinder = Boolean(currentClaim || (walletAddress && onchain?.finder === walletAddress));
+  const chainStatus = onchain?.status || meta.status || "Draft";
+  const status =
+    meta.protocolVersion === 2 && chainStatus === "Funded" && claims.length > 0
+      ? claims.some((claim) => claim.aiReport) ? "AiReviewed" : "ClaimSubmitted"
+      : chainStatus;
+  const canClaim = onchain?.status === "Funded" && !isOwner && !currentClaim;
   const canDecide = isOwner && ["AiReviewed", "ClaimSubmitted"].includes(status);
   const deadline = new Intl.DateTimeFormat("vi-VN", { dateStyle: "long" }).format(new Date(meta.deadlineUnix * 1000));
 
@@ -108,6 +118,7 @@ export default function BountyDetailPage() {
       <div className="mt-6 grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
           {meta.imageDataUrl ? <Image unoptimized src={meta.imageDataUrl} alt={`Ảnh tham chiếu cho ${meta.title}`} width={1200} height={675} className="aspect-[16/9] w-full rounded-2xl border border-line object-cover shadow-[0_18px_46px_rgba(28,56,43,0.08)]" /> : <div className="flex aspect-[16/9] items-center justify-center rounded-2xl border border-line bg-bg-deep text-ink-muted"><div className="text-center"><ImageSquare size={36} className="mx-auto text-forest" /><p className="mt-2 text-sm">Không có ảnh tham chiếu</p></div></div>}
+          {meta.media && <div className="mt-3"><MediaIntegrityBadge purpose="listing" bountyId={id} /></div>}
           <div className="mt-5 flex flex-wrap items-center gap-3"><span className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${statusBadge(status)}`}>{statusLabel(status)}</span><span className="text-sm text-ink-soft">{meta.category}</span></div>
           <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{meta.title}</h1>
           <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-ink-soft">{meta.description}</p>
@@ -151,11 +162,82 @@ export default function BountyDetailPage() {
         </ol>
       </section>
 
-      {meta.claim && <section className="app-card mt-8 p-5 sm:p-6"><h2 className="text-lg font-bold">Claim gần nhất</h2><p className="mt-3 text-sm leading-6 text-ink">{meta.claim.description}</p><dl className="mt-4 grid gap-3 text-xs text-ink-muted sm:grid-cols-2"><div><dt>Địa điểm</dt><dd className="mt-1 text-ink">{meta.claim.location}</dd></div><div><dt>Thời điểm</dt><dd className="mt-1 text-ink">{meta.claim.foundAt}</dd></div></dl>{meta.claim.evidenceHashHex && <p className="mt-4 break-all font-mono text-[11px] text-ink-muted">Hash bằng chứng: {meta.claim.evidenceHashHex}</p>}</section>}
+      {claims.length > 0 && <ClaimsSection bountyId={id} claims={claims} />}
 
       {meta.aiReport && <div className="mt-8"><AiReviewPanel report={meta.aiReport} canDecide={canDecide} busy={busy || txState === "pending"} onAccept={() => void run(() => accept(id))} onReject={() => void run(() => reject(id))} onDispute={() => void run(() => dispute(id))} /></div>}
       {error && <p className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{error}</p>}
     </div>
+  );
+}
+
+function ClaimsSection({ bountyId, claims }: { bountyId: string; claims: ClaimMeta[] }) {
+  return (
+    <section className="mt-10" aria-labelledby="claims-title">
+      <div className="max-w-2xl">
+        <h2 id="claims-title" className="text-2xl font-bold tracking-tight">
+          Bằng chứng từ người tìm thấy
+        </h2>
+        <p className="mt-2 text-sm leading-6 text-ink-soft">
+          Mỗi người gửi có một Claim PDA độc lập. Ảnh riêng tư chỉ mở cho các bên tham gia giao dịch.
+        </p>
+      </div>
+      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+        {claims.map((claim) => {
+          const finder = claim.finderWallet || "Chưa xác định";
+          return (
+            <article key={claim.id || claim.claimPda || `${finder}-${claim.submittedAt}`} className="app-card overflow-hidden">
+              {claim.imageDataUrl && (
+                <Image
+                  unoptimized
+                  src={claim.imageDataUrl}
+                  alt="Ảnh bằng chứng do người tìm thấy gửi"
+                  width={960}
+                  height={640}
+                  className="aspect-[3/2] w-full object-cover"
+                />
+              )}
+              <div className="p-5 sm:p-6">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <span className="inline-flex items-center gap-2 text-xs font-semibold text-ink-soft">
+                    <UserCircle size={17} className="text-forest" aria-hidden />
+                    <span className="font-mono">{finder.length > 18 ? `${finder.slice(0, 8)}…${finder.slice(-6)}` : finder}</span>
+                  </span>
+                  <span className="rounded-lg border border-line bg-bg-deep px-2.5 py-1 text-xs font-bold text-ink-soft">
+                    {claim.aiReport ? "AI đã đánh giá" : "Đang chờ kiểm tra"}
+                  </span>
+                </div>
+                <p className="mt-4 text-sm leading-6 text-ink">{claim.description}</p>
+                <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
+                  <div>
+                    <dt className="text-ink-muted">Địa điểm tìm thấy</dt>
+                    <dd className="mt-1 font-semibold text-ink">{claim.location || "Không cung cấp"}</dd>
+                  </div>
+                  <div>
+                    <dt className="text-ink-muted">Thời điểm</dt>
+                    <dd className="mt-1 font-semibold text-ink">{claim.foundAt || "Không cung cấp"}</dd>
+                  </div>
+                </dl>
+                {claim.media && claim.id && (
+                  <div className="mt-4">
+                    <MediaIntegrityBadge purpose="claim" bountyId={bountyId} claimId={claim.id} />
+                  </div>
+                )}
+                {claim.evidenceHashHex && (
+                  <details className="mt-4 rounded-xl border border-line bg-bg-deep p-3">
+                    <summary className="cursor-pointer text-xs font-semibold text-forest">Xem hash bằng chứng</summary>
+                    <p className="mt-2 break-all font-mono text-[10px] leading-5 text-ink-muted">{claim.evidenceHashHex}</p>
+                  </details>
+                )}
+                <p className="mt-4 inline-flex items-center gap-2 text-xs text-ink-muted">
+                  <LockKey size={15} aria-hidden />
+                  Bằng chứng được kiểm tra lại mỗi lần mở
+                </p>
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 
