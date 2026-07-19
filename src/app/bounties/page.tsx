@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { MagnifyingGlass, Plus, Tray } from "@phosphor-icons/react";
+import { MagnifyingGlass, Plus, Tray, X } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { BountyCard, statusLabel } from "@/components/findback/BountyCard";
 import { GetStarted } from "@/components/findback/GetStarted";
@@ -13,6 +13,7 @@ export default function BrowseBountiesPage() {
   const [category, setCategory] = useState("all");
   const [status, setStatus] = useState("all");
   const [sort, setSort] = useState("newest");
+  const hasActiveFilters = query.trim().length > 0 || category !== "all" || status !== "all";
 
   const categories = useMemo(() => ["all", ...Array.from(new Set(bounties.map((b) => b.category).filter(Boolean)))], [bounties]);
   const statuses = useMemo(
@@ -37,20 +38,29 @@ export default function BrowseBountiesPage() {
       });
   }, [bounties, category, query, sort, status]);
 
+  const resetFilters = () => {
+    setQuery("");
+    setCategory("all");
+    setStatus("all");
+  };
+
   return (
     <div>
-      <GetStarted />
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
-          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Tin thất lạc</h1>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Đồ thất lạc</h1>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">
-            Chỉ hiển thị dữ liệu do người dùng tạo. Trạng thái giao dịch được đối chiếu với Solana Devnet khi mở từng tin.
+            Tìm theo tên đồ hoặc địa điểm. Mở từng tin để xem thông tin, bằng chứng và phần thưởng.
           </p>
         </div>
-        <Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} weight="bold" />Tạo tin mất đồ</Link>
+        <Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} weight="bold" />Đăng tin mất đồ</Link>
       </div>
 
-      <div className="mt-8 grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_13rem_13rem_13rem]">
+      <div className="mt-7">
+        <GetStarted />
+      </div>
+
+      <div className="mt-6 grid gap-3 sm:grid-cols-2 xl:grid-cols-[1fr_13rem_13rem_13rem]">
         <label>
           <span className="sr-only">Tìm tin thất lạc</span>
           <span className="relative block">
@@ -81,9 +91,16 @@ export default function BrowseBountiesPage() {
       </div>
 
       {!loadingBounties && (
-        <p className="mt-4 text-xs font-semibold text-ink-muted" aria-live="polite">
-          Hiển thị {filtered.length} trong {bounties.length} tin
-        </p>
+        <div className="mt-4 flex min-h-8 items-center justify-between gap-4" aria-live="polite">
+          <p className="text-xs font-semibold text-ink-muted">
+            {filtered.length} tin phù hợp
+          </p>
+          {hasActiveFilters && (
+            <button type="button" onClick={resetFilters} className="inline-flex items-center gap-1.5 text-xs font-bold text-forest hover:underline">
+              <X size={14} weight="bold" /> Xóa bộ lọc
+            </button>
+          )}
+        </div>
       )}
 
       {loadingBounties ? (
@@ -95,11 +112,19 @@ export default function BrowseBountiesPage() {
           {filtered.map((bounty) => <BountyCard key={bounty.id} b={bounty} status={bounty.status || (bounty.aiReport ? "AiReviewed" : bounty.claim ? "ClaimSubmitted" : "Draft")} />)}
         </div>
       ) : (
-        <div className="app-card mt-8 flex flex-col items-center px-5 py-14 text-center">
+        <div className="app-card mt-6 flex flex-col items-center px-5 py-12 text-center sm:py-14">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-deep text-forest"><Tray size={30} /></span>
-          <h2 className="mt-4 text-lg font-bold">{bounties.length === 0 ? "Chưa có tin thất lạc" : "Không tìm thấy kết quả"}</h2>
-          <p className="mt-2 max-w-md text-sm leading-6 text-ink-soft">{bounties.length === 0 ? "Danh sách bắt đầu trống vì hệ thống không chèn dữ liệu mẫu. Hãy tạo tin đầu tiên bằng giao dịch Devnet thật." : "Hãy đổi từ khóa hoặc chọn lại loại đồ."}</p>
-          {bounties.length === 0 && <Link href="/bounties/create" className="app-button-primary mt-5"><Plus size={17} />Tạo tin đầu tiên</Link>}
+          <h2 className="mt-4 text-lg font-bold">{hasActiveFilters ? "Không tìm thấy tin phù hợp" : "Chưa có tin thất lạc nào"}</h2>
+          <p className="mt-2 max-w-md text-sm leading-6 text-ink-soft">
+            {hasActiveFilters
+              ? "Thử từ khóa khác hoặc xóa bộ lọc để xem toàn bộ danh sách."
+              : "Nếu bạn vừa làm mất đồ, hãy đăng thông tin để cộng đồng cùng hỗ trợ tìm kiếm."}
+          </p>
+          {hasActiveFilters ? (
+            <button type="button" onClick={resetFilters} className="app-button-secondary mt-5"><X size={17} />Xóa bộ lọc</button>
+          ) : (
+            <Link href="/bounties/create" className="app-button-primary mt-5"><Plus size={17} />Đăng tin mất đồ</Link>
+          )}
         </div>
       )}
     </div>
