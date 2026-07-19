@@ -1,28 +1,27 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, Suspense, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter, useSearchParams } from "next/navigation";
+import { CircleNotch, ShieldCheck } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth/AuthProvider";
-import { CircleNotch } from "@phosphor-icons/react";
-import { Suspense } from "react";
 
 function LoginForm() {
-  const { signIn, configured, loading: authLoading } = useAuth();
+  const { signIn, configured, loading } = useAuth();
   const router = useRouter();
   const params = useSearchParams();
   const next = params.get("next") || "/bounties";
-
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(params.get("error") === "auth" ? "Liên kết xác nhận không hợp lệ hoặc đã hết hạn." : null);
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
     setError(null);
     if (!configured) {
-      setError("Chưa cấu hình Supabase — xem hướng dẫn bên dưới.");
+      setError("Ứng dụng chưa cấu hình Supabase.");
       return;
     }
     setBusy(true);
@@ -30,125 +29,32 @@ function LoginForm() {
       await signIn(email, password);
       router.replace(next.startsWith("/") ? next : "/bounties");
       router.refresh();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Đăng nhập thất bại");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Đăng nhập thất bại.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="mx-auto w-full max-w-md">
-      <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9945FF]">
-        FindBack AI
-      </p>
-      <h1 className="mt-2 font-display text-3xl font-bold text-white">
-        Đăng nhập
-      </h1>
-      <p className="mt-2 text-sm text-white/55">
-        Tài khoản app (email). Ví Phantom kết nối sau để ký giao dịch Solana —
-        hai việc khác nhau.
-      </p>
+    <div className="w-full max-w-md">
+      <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-forest"><ShieldCheck size={20} weight="fill" />SafeReturn</Link>
+      <h1 className="mt-6 text-3xl font-bold tracking-tight">Đăng nhập</h1>
+      <p className="mt-2 text-sm leading-6 text-ink-soft">Tài khoản email bảo vệ dữ liệu ứng dụng. Phantom chỉ được kết nối sau khi vào app để ký giao dịch Devnet.</p>
 
-      {configured ? (
-        <div className="mt-5 rounded-2xl border border-emerald-500/25 bg-emerald-500/10 p-3 text-xs text-emerald-100">
-          Supabase đã kết nối. Chưa chạy SQL bảng?{" "}
-          <Link href="/setup" className="font-bold underline">
-            Mở /setup (1 phút)
-          </Link>
-        </div>
-      ) : (
-        <div className="mt-5 rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs leading-relaxed text-amber-100">
-          <p className="font-bold">Chưa có Supabase env</p>
-          <p className="mt-2">
-            Thêm{" "}
-            <code className="text-white">NEXT_PUBLIC_SUPABASE_URL</code> +{" "}
-            <code className="text-white">NEXT_PUBLIC_SUPABASE_ANON_KEY</code> rồi
-            restart.
-          </p>
-        </div>
-      )}
+      {!configured && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">Thiếu cấu hình Supabase</p><p className="mt-1 leading-6">Thêm biến môi trường theo <Link href="/setup" className="underline">hướng dẫn thiết lập</Link>.</p></div>}
 
-      <form
-        onSubmit={(e) => void onSubmit(e)}
-        className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6"
-      >
-        <label className="block space-y-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-            Email
-          </span>
-          <input
-            type="email"
-            required
-            autoComplete="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-[#9945FF]/50"
-            placeholder="ban@email.com"
-          />
-        </label>
-        <label className="block space-y-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-            Mật khẩu
-          </span>
-          <input
-            type="password"
-            required
-            minLength={6}
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-[#9945FF]/50"
-            placeholder="••••••••"
-          />
-        </label>
-
-        {error && (
-          <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-            {error}
-          </p>
-        )}
-
-        <button
-          type="submit"
-          disabled={busy || authLoading}
-          className="flex w-full items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] py-3 text-sm font-bold text-black disabled:opacity-50"
-        >
-          {busy ? (
-            <CircleNotch size={16} className="animate-spin" />
-          ) : null}
-          {busy ? "Đang đăng nhập…" : "Đăng nhập"}
-        </button>
+      <form onSubmit={(event) => void submit(event)} className="app-card mt-6 space-y-5 p-5 sm:p-6">
+        <label className="block"><span className="text-sm font-bold">Email</span><input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="app-input mt-2" placeholder="ban@example.com" /></label>
+        <label className="block"><span className="text-sm font-bold">Mật khẩu</span><input type="password" required minLength={6} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="app-input mt-2" /></label>
+        {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
+        <button type="submit" disabled={busy || loading || !configured} className="app-button-primary w-full">{busy && <CircleNotch size={17} className="animate-spin" />}{busy ? "Đang đăng nhập" : "Đăng nhập"}</button>
       </form>
-
-      <p className="mt-5 text-center text-sm text-white/50">
-        Chưa có tài khoản?{" "}
-        <Link href="/signup" className="font-semibold text-[#14F195] hover:underline">
-          Đăng ký
-        </Link>
-      </p>
-      <p className="mt-2 text-center text-xs text-white/35">
-        <Link href="/" className="hover:text-white/60">
-          ← Về trang chủ
-        </Link>
-      </p>
+      <p className="mt-6 text-center text-sm text-ink-soft">Chưa có tài khoản? <Link href="/signup" className="font-bold text-forest hover:underline">Đăng ký</Link></p>
     </div>
   );
 }
 
 export default function LoginPage() {
-  return (
-    <div className="relative flex min-h-dvh flex-1 items-center justify-center bg-[#06080f] px-4 py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(153,69,255,0.22),_transparent_55%)]" />
-      <div className="relative w-full">
-        <Suspense
-          fallback={
-            <p className="text-center text-white/50">Đang tải…</p>
-          }
-        >
-          <LoginForm />
-        </Suspense>
-      </div>
-    </div>
-  );
+  return <main className="grid min-h-[100dvh] flex-1 bg-bg lg:grid-cols-[1.05fr_0.95fr]"><div className="relative hidden overflow-hidden lg:block"><Image src="/images/safereturn-hero-map.png" alt="Bản đồ tìm đồ thất lạc của SafeReturn" fill priority sizes="55vw" className="object-cover" /><div className="absolute inset-x-8 bottom-8 rounded-2xl border border-white/80 bg-white/92 p-6 shadow-[0_20px_60px_rgba(26,58,42,0.17)] backdrop-blur-md"><p className="text-lg font-bold text-ink">Giao dịch thật, tài sản thử nghiệm</p><p className="mt-2 text-sm leading-6 text-ink-soft">SOL và FIND chỉ hoạt động trên Devnet, không có giá trị tiền tệ.</p></div></div><div className="flex items-center justify-center px-4 py-12 sm:px-8"><Suspense fallback={<p className="text-sm text-ink-soft">Đang tải biểu mẫu...</p>}><LoginForm /></Suspense></div></main>;
 }
