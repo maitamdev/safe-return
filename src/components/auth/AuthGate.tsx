@@ -1,76 +1,39 @@
 "use client";
 
 import { useEffect } from "react";
+import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { CircleNotch, GearSix } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth/AuthProvider";
-import { CircleNotch } from "@phosphor-icons/react";
 
-/**
- * Client-side gate for /bounties when middleware cannot run
- * (or Supabase just configured). Shows setup if env missing.
- */
 export function AuthGate({ children }: { children: React.ReactNode }) {
   const { user, loading, configured } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
 
   useEffect(() => {
-    if (loading) return;
-    if (!configured) return; // SetupBanner handles this
-    if (!user) {
-      const next = encodeURIComponent(pathname || "/bounties");
-      router.replace(`/login?next=${next}`);
-    }
+    if (loading || !configured || user) return;
+    const next = encodeURIComponent(pathname || "/bounties");
+    router.replace(`/login?next=${next}`);
   }, [user, loading, configured, router, pathname]);
 
   if (!configured) {
     return (
-      <div className="mx-auto max-w-lg px-4 py-16 text-center">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9945FF]">
-          Cần Supabase
-        </p>
-        <h1 className="mt-2 font-display text-2xl font-bold text-white">
-          Chưa cấu hình đăng nhập
-        </h1>
-        <p className="mt-3 text-sm leading-relaxed text-white/60">
-          Tạo project miễn phí tại{" "}
-          <a
-            href="https://supabase.com"
-            target="_blank"
-            rel="noreferrer"
-            className="text-[#14F195] underline"
-          >
-            supabase.com
-          </a>
-          , bật Email Auth, rồi thêm vào{" "}
-          <code className="text-white/80">.env.local</code>:
-        </p>
-        <pre className="mt-4 rounded-2xl border border-white/10 bg-black/40 p-4 text-left font-mono text-[11px] text-[#14F195]">
-{`NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
-NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...`}
-        </pre>
-        <p className="mt-4 text-xs text-white/40">
-          Chạy SQL trong file <code>supabase/schema.sql</code> → SQL Editor.
-          Xem <code>HUONG_DAN.md</code> mục Supabase.
-        </p>
-        <a
-          href="/login"
-          className="mt-6 inline-block rounded-full bg-white px-5 py-2.5 text-sm font-bold text-black"
-        >
-          Mở trang đăng nhập
-        </a>
-      </div>
+      <main className="flex min-h-[100dvh] items-center justify-center bg-bg px-4 py-12 text-ink">
+        <div className="app-card w-full max-w-xl p-6 text-center sm:p-8">
+          <GearSix size={34} className="mx-auto text-forest" />
+          <h1 className="mt-4 text-2xl font-bold">Cần cấu hình đăng nhập</h1>
+          <p className="mt-3 text-sm leading-6 text-ink-soft">Ứng dụng không chạy với tài khoản giả. Hãy cấu hình Supabase URL, anon key và chạy schema trước khi sử dụng.</p>
+          <pre className="mt-5 overflow-x-auto rounded-xl border border-line bg-bg-deep p-4 text-left font-mono text-xs leading-6 text-forest">{`NEXT_PUBLIC_SUPABASE_URL=https://project.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ...`}</pre>
+          <Link href="/setup" className="app-button-primary mt-5">Mở hướng dẫn thiết lập</Link>
+        </div>
+      </main>
     );
   }
 
   if (loading || !user) {
-    return (
-      <div className="flex min-h-dvh flex-col items-center justify-center gap-3 bg-[#06080f] text-white/60">
-        <CircleNotch size={28} className="animate-spin text-[#14F195]" />
-        <p className="text-sm">Đang kiểm tra đăng nhập…</p>
-        <p className="text-xs text-white/35">Chưa có tài khoản? Đang chuyển sang trang đăng nhập.</p>
-      </div>
-    );
+    return <div className="flex min-h-[100dvh] flex-col items-center justify-center gap-3 bg-bg px-4 text-center text-ink"><CircleNotch size={28} className="animate-spin text-forest" /><p className="text-sm font-semibold">Đang kiểm tra phiên đăng nhập</p><p className="text-xs text-ink-muted">Nếu chưa đăng nhập, bạn sẽ được chuyển đến biểu mẫu bảo mật.</p></div>;
   }
 
   return <>{children}</>;
