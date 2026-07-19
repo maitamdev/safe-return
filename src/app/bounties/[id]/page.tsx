@@ -2,337 +2,158 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
+import {
+  ArrowLeft,
+  ArrowSquareOut,
+  Coins,
+  ImageSquare,
+  MapPin,
+  Timer,
+} from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { getBountyMeta } from "@/lib/findback/store";
 import { AiReviewPanel } from "@/components/findback/AiPanel";
-import { statusBadge } from "@/components/findback/BountyCard";
-import {
-  FIND_SYMBOL,
-  explorerAddressUrl,
-  explorerTxUrl,
-  fromAtomic,
-} from "@/lib/findback/config";
+import { statusBadge, statusLabel } from "@/components/findback/BountyCard";
+import { FIND_SYMBOL, explorerAddressUrl, fromAtomic } from "@/lib/findback/config";
 import type { OnChainBounty } from "@/lib/findback/program";
-import {
-  MapPin,
-  Coins,
-  Timer,
-  Link as LinkIcon,
-  ArrowRight,
-} from "@phosphor-icons/react";
+
+const flow = ["Draft", "Funded", "ClaimSubmitted", "AiReviewed", "Released"];
 
 export default function BountyDetailPage() {
   const params = useParams();
   const id = String(params?.id || "");
   const { publicKey } = useWallet();
-  const {
-    bounties,
-    fetchOnChain,
-    accept,
-    reject,
-    dispute,
-    refund,
-    txState,
-    lastTxUrl,
-    programId,
-  } = useFindBack();
-
+  const { bounties, loadingBounties, fetchOnChain, fund, reviewClaim, accept, reject, dispute, refund, cancel, txState, lastTxUrl, programId } = useFindBack();
   const meta = bounties.find((b) => b.id === id) || getBountyMeta(id);
   const [onchain, setOnchain] = useState<OnChainBounty | null>(null);
+  const [chainLoading, setChainLoading] = useState(true);
+  const [chainError, setChainError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
-  const reload = async () => {
+  useEffect(() => {
+    let cancelled = false;
+    const load = () => {
+      fetchOnChain(id)
+        .then((result) => {
+          if (cancelled) return;
+          setOnchain(result);
+          setChainError(result ? null : "Không tìm thấy tài khoản bounty trên Devnet.");
+          setChainLoading(false);
+        })
+        .catch(() => {
+          if (cancelled) return;
+          setChainError("Không thể đọc Solana Devnet lúc này.");
+          setChainLoading(false);
+        });
+    };
+    const first = window.setTimeout(load, 0);
+    const interval = window.setInterval(load, 15_000);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+  }, [fetchOnChain, id]);
+
+  if (loadingBounties) return <DetailSkeleton />;
+  if (!meta) return <NotFound id={id} />;
+
+  const walletAddress = publicKey?.toBase58();
+  const isOwner = Boolean(walletAddress && (meta.ownerWallet === walletAddress || onchain?.owner === walletAddress));
+  const isFinder = Boolean(walletAddress && (meta.claim?.finderWallet === walletAddress || onchain?.finder === walletAddress));
+  const status = onchain?.status || meta.status || (meta.aiReport ? "AiReviewed" : meta.claim ? "ClaimSubmitted" : "Draft");
+  const canClaim = onchain?.status === "Funded" && !isOwner;
+  const canDecide = isOwner && ["AiReviewed", "ClaimSubmitted"].includes(status);
+  const deadline = new Intl.DateTimeFormat("vi-VN", { dateStyle: "long" }).format(new Date(meta.deadlineUnix * 1000));
+
+  const reloadChain = async () => {
+    setChainLoading(true);
     try {
-      const b = await fetchOnChain(id);
-      setOnchain(b);
+      const result = await fetchOnChain(id);
+      setOnchain(result);
+      setChainError(result ? null : "Không tìm thấy tài khoản bounty trên Devnet.");
     } catch {
-      setOnchain(null);
+      setChainError("Không thể đọc Solana Devnet lúc này.");
+    } finally {
+      setChainLoading(false);
     }
   };
 
-  useEffect(() => {
-    void reload();
-    const t = setInterval(() => void reload(), 12_000);
-    return () => clearInterval(t);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
-
-  if (!meta) {
-    return (
-      <p className="text-white/50">
-        Bounty not found.{" "}
-        <Link href="/bounties" className="text-[#14F195] underline">
-          Browse
-        </Link>
-      </p>
-    );
-  }
-
-  const isOwner =
-    publicKey &&
-    (meta.ownerWallet === publicKey.toBase58() ||
-      onchain?.owner === publicKey.toBase58());
-  const leftMs = meta.deadlineUnix * 1000 - Date.now();
-  const expired = leftMs < 0;
-  const status = onchain?.status || (meta.aiReport ? "AiReviewed" : meta.claim ? "ClaimSubmitted" : meta.seed ? "Funded" : "Draft");
-  const canDecide =
-    Boolean(isOwner) &&
-    (status === "AiReviewed" ||
-      status === "ClaimSubmitted" ||
-      status === "Disputed");
-
-  const run = async (fn: () => Promise<void>) => {
-    setErr(null);
+  const run = async (action: () => Promise<void>) => {
+    setError(null);
     setBusy(true);
     try {
-      await fn();
-      await reload();
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+      await action();
+      await reloadChain();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="space-y-8">
-      <div className="grid gap-6 lg:grid-cols-[1.2fr_0.8fr]">
+    <div>
+      <Link href="/bounties" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-forest"><ArrowLeft size={16} />Danh sách tin</Link>
+      <div className="mt-6 grid gap-8 lg:grid-cols-[1.15fr_0.85fr]">
         <div>
-          <div
-            className="h-52 rounded-3xl border border-white/10 bg-gradient-to-br from-[#9945FF]/35 to-[#14F195]/20 md:h-64"
-            style={
-              meta.imageDataUrl
-                ? {
-                    backgroundImage: `url(${meta.imageDataUrl})`,
-                    backgroundSize: "cover",
-                    backgroundPosition: "center",
-                  }
-                : undefined
-            }
-          />
-          <div className="mt-5 flex flex-wrap items-center gap-2">
-            <span
-              className={`rounded-full px-3 py-1 text-[11px] font-bold uppercase ${statusBadge(status)}`}
-            >
-              {status}
-            </span>
-            <span className="text-xs text-white/40">{meta.category}</span>
-          </div>
-          <h1 className="mt-3 font-display text-3xl font-bold md:text-4xl">
-            {meta.title}
-          </h1>
-          <p className="mt-3 text-sm leading-relaxed text-white/65">
-            {meta.description}
-          </p>
-          <div className="mt-4 flex flex-wrap gap-4 text-xs text-white/50">
-            <span className="inline-flex items-center gap-1">
-              <MapPin size={14} /> {meta.location}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Coins size={14} /> {meta.rewardUi} {FIND_SYMBOL}
-            </span>
-            <span className="inline-flex items-center gap-1">
-              <Timer size={14} />{" "}
-              {expired
-                ? "Expired"
-                : `${Math.ceil(leftMs / 86400000)}d ${Math.floor((leftMs % 86400000) / 3600000)}h left`}
-            </span>
-          </div>
+          {meta.imageDataUrl ? <Image unoptimized src={meta.imageDataUrl} alt={`Ảnh tham chiếu cho ${meta.title}`} width={1200} height={675} className="aspect-[16/9] w-full rounded-2xl border border-line object-cover shadow-[0_18px_46px_rgba(28,56,43,0.08)]" /> : <div className="flex aspect-[16/9] items-center justify-center rounded-2xl border border-line bg-bg-deep text-ink-muted"><div className="text-center"><ImageSquare size={36} className="mx-auto text-forest" /><p className="mt-2 text-sm">Không có ảnh tham chiếu</p></div></div>}
+          <div className="mt-5 flex flex-wrap items-center gap-3"><span className={`rounded-lg border px-3 py-1.5 text-xs font-bold ${statusBadge(status)}`}>{statusLabel(status)}</span><span className="text-sm text-ink-soft">{meta.category}</span></div>
+          <h1 className="mt-4 text-3xl font-bold tracking-tight sm:text-4xl">{meta.title}</h1>
+          <p className="mt-4 whitespace-pre-wrap text-sm leading-7 text-ink-soft">{meta.description}</p>
+          <dl className="mt-6 grid gap-3 text-sm text-ink-soft sm:grid-cols-3">
+            <Info icon={MapPin} value={meta.location} />
+            <Info icon={Coins} value={`${meta.rewardUi} ${FIND_SYMBOL}`} />
+            <Info icon={Timer} value={`Hạn ${deadline}`} />
+          </dl>
         </div>
 
-        <div className="space-y-4 rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-white/45">
-            On-chain
-          </h2>
-          <Row
-            k="Escrow"
-            v={
-              onchain
-                ? `${fromAtomic(onchain.amountFunded)} / ${fromAtomic(onchain.rewardAmount)} ${FIND_SYMBOL}`
-                : meta.seed
-                  ? `${meta.rewardUi} ${FIND_SYMBOL} (seed — fund on-chain to go live)`
-                  : "Not created yet"
-            }
-          />
-          <Row
-            k="Program"
-            v={
-              <a
-                className="text-[#14F195] hover:underline"
-                href={explorerAddressUrl(programId)}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {programId.slice(0, 8)}…↗
-              </a>
-            }
-          />
-          {onchain && (
-            <Row
-              k="PDA"
-              v={
-                <a
-                  className="text-[#14F195] hover:underline"
-                  href={explorerAddressUrl(onchain.address)}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  {onchain.address.slice(0, 8)}…↗
-                </a>
-              }
-            />
-          )}
-          {(meta.lastTxUrl || lastTxUrl) && (
-            <Row
-              k="Last tx"
-              v={
-                <a
-                  className="inline-flex items-center gap-1 text-[#14F195] hover:underline"
-                  href={meta.lastTxUrl || lastTxUrl || "#"}
-                  target="_blank"
-                  rel="noreferrer"
-                >
-                  Explorer <LinkIcon size={12} />
-                </a>
-              }
-            />
-          )}
-          {onchain && onchain.aiScore > 0 && (
-            <Row k="AI score (chain)" v={`${onchain.aiScore}/100`} />
-          )}
-
-          <div className="flex flex-col gap-2 pt-2">
-            {meta.seed && !onchain ? (
-              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100">
-                <strong>Đây là bounty mẫu (Seed)</strong> — chỉ để xem giao diện,
-                chưa khóa tiền on-chain. Muốn demo tx thật:{" "}
-                <Link href="/bounties/create" className="underline">
-                  Tạo bounty mới
-                </Link>{" "}
-                sau khi Kết nối ví + Nhận FIND.
-              </div>
-            ) : null}
-            {!meta.seed &&
-            (status === "Funded" ||
-              status === "Draft" ||
-              (!onchain && !meta.seed)) ? (
-              <Link
-                href={`/bounties/${id}/claim`}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 py-3 text-sm font-bold text-black"
-              >
-                Gửi claim tìm thấy <ArrowRight size={16} />
-              </Link>
-            ) : null}
-            {onchain && status === "Funded" ? (
-              <Link
-                href={`/bounties/${id}/claim`}
-                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 py-3 text-sm font-bold text-black"
-              >
-                Gửi claim tìm thấy <ArrowRight size={16} />
-              </Link>
-            ) : null}
-            {isOwner && expired && status !== "Released" && status !== "Refunded" && (
-              <button
-                type="button"
-                disabled={busy || txState === "pending"}
-                onClick={() => void run(() => refund(id))}
-                className="rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm font-semibold text-amber-100 disabled:opacity-50"
-              >
-                Refund after expiry
-              </button>
-            )}
+        <aside className="app-card self-start p-5 sm:p-6">
+          <div className="flex items-center justify-between gap-3"><h2 className="text-lg font-bold">Kiểm tra on-chain</h2><button type="button" onClick={() => void reloadChain()} disabled={chainLoading} className="text-xs font-bold text-forest hover:underline">{chainLoading ? "Đang đọc" : "Làm mới"}</button></div>
+          <dl className="mt-4 divide-y divide-line">
+            <ChainRow label="Trạng thái" value={chainLoading ? "Đang tải" : onchain ? statusLabel(onchain.status) : "Không có dữ liệu"} />
+            <ChainRow label="Escrow" value={onchain ? `${fromAtomic(onchain.amountFunded)} / ${fromAtomic(onchain.rewardAmount)} ${FIND_SYMBOL}` : "Chưa xác minh"} />
+            <ChainRow label="Program" value={<a href={explorerAddressUrl(programId)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-forest hover:underline">{programId.slice(0, 8)}…<ArrowSquareOut size={13} /></a>} />
+            {onchain && <ChainRow label="Bounty PDA" value={<a href={explorerAddressUrl(onchain.address)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-forest hover:underline">{onchain.address.slice(0, 8)}…<ArrowSquareOut size={13} /></a>} />}
+            {onchain && onchain.aiScore > 0 && <ChainRow label="Điểm đã ghi" value={`${onchain.aiScore}/100`} />}
+          </dl>
+          {chainError && <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">{chainError}</p>}
+          {(meta.lastTxUrl || lastTxUrl) && <a href={meta.lastTxUrl || lastTxUrl || "#"} target="_blank" rel="noreferrer" className="app-button-secondary mt-4 w-full">Giao dịch gần nhất <ArrowSquareOut size={16} /></a>}
+          <div className="mt-4 grid gap-2">
+            {isOwner && onchain?.status === "Draft" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => fund(id))} className="app-button-primary w-full">Khóa phần thưởng vào escrow</button>}
+            {isOwner && onchain?.status === "Draft" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => cancel(id))} className="app-button-secondary w-full">Hủy bounty chưa nạp tiền</button>}
+            {canClaim && <Link href={`/bounties/${id}/claim`} className="app-button-primary w-full">Tôi đã tìm thấy đồ</Link>}
+            {isFinder && status === "ClaimSubmitted" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(async () => { await reviewClaim(id); })} className="app-button-primary w-full">Chạy lại đánh giá AI</button>}
+            {(isOwner || isFinder) && ["ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => dispute(id))} className="app-button-secondary w-full">Mở tranh chấp</button>}
+            {isOwner && onchain && ["Funded", "ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => refund(id))} className="app-button-secondary w-full">Yêu cầu hoàn tiền khi hết hạn</button>}
           </div>
-        </div>
+        </aside>
       </div>
 
-      {/* Timeline */}
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-        <h2 className="text-sm font-bold uppercase tracking-wider text-white/45">
-          Timeline
-        </h2>
-        <ol className="mt-4 grid gap-2 sm:grid-cols-5">
-          {[
-            "Draft",
-            "Funded",
-            "ClaimSubmitted",
-            "AiReviewed",
-            "Released",
-          ].map((s) => {
-            const order = [
-              "Draft",
-              "Funded",
-              "ClaimSubmitted",
-              "AiReviewed",
-              "Accepted",
-              "Released",
-            ];
-            const statusRank = order.indexOf(status);
-            const stepRank = order.indexOf(s);
-            const done =
-              statusRank >= 0 && stepRank >= 0 && statusRank >= stepRank;
-            return (
-              <li
-                key={s}
-                className={`rounded-2xl border px-3 py-2 text-center text-[11px] font-semibold ${
-                  done
-                    ? "border-[#14F195]/40 bg-[#14F195]/10 text-[#14F195]"
-                    : "border-white/10 text-white/35"
-                }`}
-              >
-                {s}
-              </li>
-            );
+      <section className="mt-10 border-t border-line pt-8">
+        <h2 className="text-lg font-bold">Tiến trình bounty</h2>
+        <ol className="mt-5 grid gap-2 sm:grid-cols-5">
+          {flow.map((item) => {
+            const currentRank = flow.indexOf(status === "Accepted" ? "Released" : status);
+            const done = currentRank >= flow.indexOf(item);
+            return <li key={item} className={`rounded-xl border px-3 py-3 text-center text-xs font-bold ${done ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-line bg-white text-ink-muted"}`}>{statusLabel(item)}</li>;
           })}
         </ol>
-      </div>
+      </section>
 
-      {meta.claim && (
-        <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-white/45">
-            Latest claim
-          </h2>
-          <p className="mt-2 text-sm text-white/75">{meta.claim.description}</p>
-          <p className="mt-2 text-xs text-white/40">
-            {meta.claim.location} · {meta.claim.foundAt}
-            {meta.claim.finderWallet &&
-              ` · ${meta.claim.finderWallet.slice(0, 4)}…${meta.claim.finderWallet.slice(-4)}`}
-          </p>
-          {meta.claim.evidenceHashHex && (
-            <p className="mt-2 font-mono text-[10px] text-white/35 break-all">
-              evidence_hash {meta.claim.evidenceHashHex.slice(0, 24)}…
-            </p>
-          )}
-        </div>
-      )}
+      {meta.claim && <section className="app-card mt-8 p-5 sm:p-6"><h2 className="text-lg font-bold">Claim gần nhất</h2><p className="mt-3 text-sm leading-6 text-ink">{meta.claim.description}</p><dl className="mt-4 grid gap-3 text-xs text-ink-muted sm:grid-cols-2"><div><dt>Địa điểm</dt><dd className="mt-1 text-ink">{meta.claim.location}</dd></div><div><dt>Thời điểm</dt><dd className="mt-1 text-ink">{meta.claim.foundAt}</dd></div></dl>{meta.claim.evidenceHashHex && <p className="mt-4 break-all font-mono text-[11px] text-ink-muted">Hash bằng chứng: {meta.claim.evidenceHashHex}</p>}</section>}
 
-      {meta.aiReport && (
-        <AiReviewPanel
-          report={meta.aiReport}
-          canDecide={canDecide}
-          busy={busy || txState === "pending"}
-          onAccept={() => void run(() => accept(id))}
-          onReject={() => void run(() => reject(id))}
-          onDispute={() => void run(() => dispute(id))}
-        />
-      )}
-
-      {err && (
-        <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-sm text-rose-200">
-          {err}
-        </p>
-      )}
+      {meta.aiReport && <div className="mt-8"><AiReviewPanel report={meta.aiReport} canDecide={canDecide} busy={busy || txState === "pending"} onAccept={() => void run(() => accept(id))} onReject={() => void run(() => reject(id))} onDispute={() => void run(() => dispute(id))} /></div>}
+      {error && <p className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{error}</p>}
     </div>
   );
 }
 
-function Row({ k, v }: { k: string; v: React.ReactNode }) {
-  return (
-    <div className="flex items-start justify-between gap-3 border-b border-white/5 py-2 text-sm">
-      <span className="text-white/40">{k}</span>
-      <span className="text-right text-white/90">{v}</span>
-    </div>
-  );
-}
+function Info({ icon: Icon, value }: { icon: typeof MapPin; value: string }) { return <div className="flex items-start gap-2 rounded-xl border border-line bg-bg-deep p-3"><Icon size={17} className="mt-0.5 shrink-0 text-forest" /><span>{value}</span></div>; }
+function ChainRow({ label, value }: { label: string; value: React.ReactNode }) { return <div className="flex items-start justify-between gap-4 py-3 text-sm"><dt className="text-ink-muted">{label}</dt><dd className="text-right font-semibold text-ink">{value}</dd></div>; }
+function DetailSkeleton() { return <div className="grid gap-8 lg:grid-cols-2"><div><div className="skeleton aspect-[16/9]" /><div className="skeleton mt-5 h-9 w-2/3" /><div className="skeleton mt-4 h-4 w-full" /></div><div className="app-card space-y-4 p-6"><div className="skeleton h-6 w-1/2" /><div className="skeleton h-12 w-full" /><div className="skeleton h-12 w-full" /></div></div>; }
+function NotFound({ id }: { id: string }) { return <div className="app-card mx-auto max-w-lg p-7 text-center"><h1 className="text-xl font-bold">Không tìm thấy tin</h1><p className="mt-2 text-sm leading-6 text-ink-soft">Metadata cho bounty {id || "này"} không tồn tại trong Supabase hoặc bộ nhớ cục bộ.</p><Link href="/bounties" className="app-button-primary mt-5">Về danh sách</Link></div>; }
