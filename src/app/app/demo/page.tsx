@@ -11,12 +11,9 @@ import { useApp } from "@/lib/store";
 import { StatusPill } from "@/components/app/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n";
-import { WalletOnboarding } from "@/components/wallet/WalletOnboarding";
-import { useWallet } from "@solana/wallet-adapter-react";
 
 export default function DemoPage() {
   const t = useT();
-  const { connected } = useWallet();
   const {
     demoStep,
     runDemoAdvance,
@@ -89,18 +86,6 @@ export default function DemoPage() {
             </span>
           </Button>
         </div>
-      </div>
-
-      {!connected && <WalletOnboarding compact />}
-
-      <div className="rounded-2xl border border-forest/15 bg-mint-soft/50 px-4 py-3 text-sm text-ink-soft">
-        <strong className="text-forest-deep">Cách demo cho giám khảo:</strong>{" "}
-        Connect Phantom (Devnet) → nạp tiền ảo ở trang{" "}
-        <a href="/app/setup" className="font-semibold text-forest underline">
-          Bắt đầu
-        </a>{" "}
-        → bấm <em>Start / Next</em>. Khi app yêu cầu ký tx, Approve trên
-        Phantom. Mọi chữ ký đều lên Explorer (tiền ảo).
       </div>
 
       <div className="grid gap-6 lg:grid-cols-[0.95fr_1.05fr]">

@@ -5,21 +5,23 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { setAppWallet } from "@/lib/wallet-bridge";
 import type { Transaction } from "@solana/web3.js";
 
-/** Syncs Phantom adapter → getAppWallet() used by the app store. */
+/** Syncs wallet adapter → getAppWallet() used by the app store. */
 export function WalletBridge() {
-  const { publicKey, signTransaction, connected } = useWallet();
+  const { publicKey, signTransaction, connected, wallet } = useWallet();
 
   useEffect(() => {
     if (connected && publicKey && signTransaction) {
       setAppWallet({
         publicKey,
-        signTransaction: async <T extends Transaction>(tx: T) =>
-          signTransaction(tx) as Promise<T>,
+        signTransaction: async <T extends Transaction>(tx: T) => {
+          const signed = await signTransaction(tx);
+          return signed as T;
+        },
       });
     } else {
       setAppWallet(null);
     }
-  }, [connected, publicKey, signTransaction]);
+  }, [connected, publicKey, signTransaction, wallet]);
 
   return null;
 }

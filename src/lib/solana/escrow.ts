@@ -97,9 +97,7 @@ export function getEscrowPdaBase58(caseId: string): string {
 
 function requireWallet(wallet: WalletLike | null | undefined): WalletLike {
   if (!wallet?.publicKey) {
-    throw new Error(
-      "Chưa nối ví. Vào /app/setup → Connect Phantom (Devnet) → Nạp tiền ảo miễn phí."
-    );
+    throw new Error("Connect wallet first (Phantom · Devnet).");
   }
   return wallet;
 }

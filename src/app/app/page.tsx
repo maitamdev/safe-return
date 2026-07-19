@@ -14,7 +14,6 @@ import { useApp } from "@/lib/store";
 import { StatusPill } from "@/components/app/StatusPill";
 import { Button } from "@/components/ui/Button";
 import { useT } from "@/lib/i18n";
-import { WalletOnboarding } from "@/components/wallet/WalletOnboarding";
 
 export default function AppHomePage() {
   const t = useT();
@@ -23,13 +22,6 @@ export default function AppHomePage() {
   const lostItems = items.filter((i) => i.status === "LOST");
 
   const actions = [
-    {
-      href: "/app/setup",
-      label: "Bắt đầu (ví + tiền ảo)",
-      desc: "Phantom Devnet · nạp SOL/USDC test miễn phí",
-      icon: CurrencyCircleDollar,
-      tone: "bg-solana text-white",
-    },
     {
       href: "/app/demo",
       label: t("home.a4"),
@@ -72,17 +64,10 @@ export default function AppHomePage() {
           </h1>
           <p className="mt-2 max-w-lg text-sm text-ink-soft">{t("home.sub")}</p>
         </div>
-        <div className="flex flex-wrap gap-2">
-          <Button href="/app/setup" icon>
-            Hướng dẫn + nạp tiền ảo
-          </Button>
-          <Button href="/app/items" variant="secondary" icon>
-            {t("home.viewItems")}
-          </Button>
-        </div>
+        <Button href="/app/items" variant="secondary" icon>
+          {t("home.viewItems")}
+        </Button>
       </div>
-
-      <WalletOnboarding />
 
       <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {[
@@ -103,7 +88,7 @@ export default function AppHomePage() {
         ))}
       </div>
 
-      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5">
+      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
         {actions.map((a) => (
           <Link
             key={a.href}

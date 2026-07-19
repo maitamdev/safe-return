@@ -1,30 +1,37 @@
 "use client";
 
+import { useState } from "react";
 import {
-  Wallet,
   SealCheck,
   Bell,
   Trophy,
   Copy,
+  Check,
 } from "@phosphor-icons/react";
+import { useWallet } from "@solana/wallet-adapter-react";
 import { badges, currentUser } from "@/lib/data";
 import { useApp } from "@/lib/store";
 import { Button } from "@/components/ui/Button";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { useT } from "@/lib/i18n";
 
 const badgeKeys = ["b1", "b2", "b3", "b4", "b5"] as const;
 
 export default function ProfilePage() {
   const t = useT();
-  const {
-    notifications,
-    markNotificationsRead,
-    walletConnected,
-    connectWallet,
-    cases,
-  } = useApp();
+  const { publicKey, connected } = useWallet();
+  const { notifications, markNotificationsRead, cases } = useApp();
+  const [copied, setCopied] = useState(false);
 
   const returned = cases.filter((c) => c.status === "RETURNED").length;
+  const address = publicKey?.toBase58() ?? "";
+
+  async function copyAddr() {
+    if (!address) return;
+    await navigator.clipboard.writeText(address);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  }
 
   return (
     <div className="mx-auto max-w-5xl space-y-8">
@@ -82,29 +89,28 @@ export default function ProfilePage() {
             </dl>
 
             <div className="mt-6 rounded-2xl border border-line bg-white/50 p-4">
-              <div className="flex items-center gap-2 text-sm font-semibold">
-                <Wallet size={16} className="text-solana" />
-                {t("profile.wallet")}
+              <div className="flex items-center justify-between gap-2">
+                <p className="text-sm font-semibold">{t("profile.wallet")}</p>
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                    connected
+                      ? "bg-emerald-100 text-emerald-800"
+                      : "bg-black/5 text-ink-muted"
+                  }`}
+                >
+                  {connected ? "Connected" : "Offline"}
+                </span>
               </div>
               <p className="mt-2 break-all font-mono text-xs text-ink-soft">
-                {walletConnected ? currentUser.wallet : t("app.walletOff")}
+                {connected && address ? address : t("app.walletOff")}
               </p>
-              <div className="mt-3 flex gap-2">
-                {!walletConnected ? (
-                  <Button size="sm" onClick={connectWallet}>
-                    {t("profile.connect")}
-                  </Button>
-                ) : (
-                  <Button
-                    size="sm"
-                    variant="secondary"
-                    onClick={() =>
-                      navigator.clipboard?.writeText(currentUser.wallet)
-                    }
-                  >
+              <div className="mt-3 flex flex-wrap items-center gap-2">
+                <ConnectWalletButton size="md" />
+                {connected && address && (
+                  <Button size="sm" variant="secondary" onClick={() => void copyAddr()}>
                     <span className="inline-flex items-center gap-1.5">
-                      <Copy size={14} />
-                      {t("profile.copy")}
+                      {copied ? <Check size={14} /> : <Copy size={14} />}
+                      {copied ? "Copied" : t("profile.copy")}
                     </span>
                   </Button>
                 )}

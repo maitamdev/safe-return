@@ -152,3 +152,14 @@ body {
     scroll-behavior: auto;
   }
 }
+
+/* Solana wallet-adapter modal — keep above app chrome */
+.wallet-adapter-modal-wrapper {
+  z-index: 10000 !important;
+}
+.wallet-adapter-modal {
+  z-index: 10001 !important;
+}
+.wallet-adapter-button {
+  font-family: inherit;
+}

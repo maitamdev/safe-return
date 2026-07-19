@@ -13,8 +13,6 @@ import {
   QrCode,
   PlayCircle,
   ArrowLeft,
-  RocketLaunch,
-  Lightning,
 } from "@phosphor-icons/react";
 import { cn } from "@/lib/cn";
 import { currentUser } from "@/lib/data";
@@ -30,12 +28,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const { notifications, role, setRole, chainError, clearChainError, chainReady } =
     useApp();
-  const { publicKey, connected } = useWallet();
+  const { publicKey } = useWallet();
   const unread = notifications.filter((n) => n.unread).length;
 
   const nav = [
     { href: "/app", label: t("app.nav.home"), icon: House },
-    { href: "/app/setup", label: "Bắt đầu", icon: RocketLaunch },
     { href: "/app/items", label: t("app.nav.items"), icon: Package },
     { href: "/app/lost", label: t("app.nav.lost"), icon: MagnifyingGlass },
     { href: "/app/found", label: t("app.nav.found"), icon: HandHeart },
@@ -117,22 +114,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 ))}
               </div>
               <div className="mt-3 space-y-2 border-t border-line pt-3">
-                <ConnectWalletButton className="w-full justify-center" />
-                <Link
-                  href="/app/setup"
-                  className="flex w-full items-center justify-center gap-1.5 rounded-full border border-forest/20 bg-white/80 px-3 py-1.5 text-[11px] font-semibold text-forest transition hover:bg-mint"
-                >
-                  <Lightning size={12} weight="fill" />
-                  {connected ? "Nạp tiền ảo" : "Hướng dẫn ví"}
-                </Link>
+                <ConnectWalletButton className="w-full" />
                 <p className="font-mono text-[10px] leading-relaxed text-ink-muted">
-                  Devnet · tiền ảo · {chainReady ? "ready" : "setup pending"}
+                  Devnet · {chainReady ? "ready" : "…"}
                   <br />
-                  prog {programMeta.programId.slice(0, 6)}…
+                  {programMeta.programId.slice(0, 8)}…
                   {publicKey && (
                     <>
                       <br />
-                      you {publicKey.toBase58().slice(0, 4)}…
+                      {publicKey.toBase58().slice(0, 4)}…
                       {publicKey.toBase58().slice(-4)}
                     </>
                   )}
@@ -146,27 +136,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           {chainError && (
             <div className="flex items-start justify-between gap-3 border-b border-coral/30 bg-coral/10 px-4 py-2 text-xs text-coral md:px-6">
               <p className="min-w-0 flex-1 break-words">
-                <strong>Solana:</strong> {chainError}{" "}
-                <Link href="/app/setup" className="font-semibold underline">
-                  → Mở hướng dẫn / nạp tiền ảo
-                </Link>
+                <strong>Solana:</strong> {chainError}
               </p>
               <button
                 type="button"
                 className="shrink-0 font-semibold underline"
                 onClick={clearChainError}
               >
-                đóng
+                dismiss
               </button>
             </div>
           )}
-          <div className="border-b border-forest/10 bg-mint-soft/80 px-4 py-1.5 text-center text-[11px] text-forest-deep md:px-6">
-            Đang dùng <strong>Solana Devnet</strong> — SOL & mock USDC là tiền ảo
-            (0đ).{" "}
-            <Link href="/app/setup" className="font-semibold underline">
-              Cách dùng cho người mới
-            </Link>
-          </div>
+
           <header className="sticky top-0 z-30 flex items-center justify-between gap-3 border-b border-line bg-bg/80 px-4 py-3 backdrop-blur-xl md:px-6">
             <div className="flex items-center gap-3">
               <Link
@@ -189,7 +170,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             </div>
 
             <div className="flex items-center gap-2">
-              <ConnectWalletButton className="hidden sm:inline-flex" />
+              <ConnectWalletButton />
               <LanguageToggle size="sm" className="lg:hidden" />
               <Link
                 href="/app/profile"
@@ -214,7 +195,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <main className="flex-1 px-4 py-6 md:px-6 md:py-8">{children}</main>
 
           <nav className="sticky bottom-0 z-30 grid grid-cols-5 border-t border-line bg-bg-elevated/95 px-1 py-2 backdrop-blur-xl lg:hidden">
-            {nav.slice(0, 5).map((item) => {
+            {[
+              nav[0],
+              nav[1],
+              nav[2],
+              nav[3],
+              nav[7],
+            ].map((item) => {
               const active =
                 item.href === "/app"
                   ? pathname === "/app"

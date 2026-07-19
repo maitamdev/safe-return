@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, type ReactNode } from "react";
+import { useMemo, useCallback, type ReactNode } from "react";
 import {
   ConnectionProvider,
   WalletProvider,
@@ -12,18 +12,39 @@ import { SOLANA_RPC } from "@/lib/solana/config";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
-if (typeof window !== "undefined") {
-  (window as unknown as { Buffer: typeof Buffer }).Buffer =
-    (window as unknown as { Buffer?: typeof Buffer }).Buffer || Buffer;
+function ensureBrowserPolyfills() {
+  if (typeof window === "undefined") return;
+  const w = window as unknown as {
+    Buffer?: typeof Buffer;
+    global?: typeof globalThis;
+  };
+  if (!w.Buffer) w.Buffer = Buffer;
+  if (!w.global) w.global = globalThis;
 }
+
+ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   const endpoint = SOLANA_RPC;
+  // Empty list also works (Wallet Standard auto-detects Phantom).
+  // Keep legacy adapter as explicit fallback for older Phantom builds.
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
+  const onError = useCallback((error: Error) => {
+    // Avoid uncaught adapter noise; UI surfaces message via connect button.
+    if (process.env.NODE_ENV === "development") {
+      console.warn("[wallet]", error.message);
+    }
+  }, []);
+
   return (
-    <ConnectionProvider endpoint={endpoint}>
-      <WalletProvider wallets={wallets} autoConnect>
+    <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed" }}>
+      <WalletProvider
+        wallets={wallets}
+        autoConnect
+        onError={onError}
+        localStorageKey="safereturn-wallet"
+      >
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>
     </ConnectionProvider>
