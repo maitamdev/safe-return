@@ -1,136 +1,76 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { List, X } from "@phosphor-icons/react";
-import { cn } from "@/lib/cn";
+import { Flask, List, ShieldCheck } from "@phosphor-icons/react";
+
+const links = [
+  { href: "/#how", label: "Cách hoạt động" },
+  { href: "/#trust", label: "Tính minh bạch" },
+  { href: "/bounties", label: "Xem tin thất lạc" },
+];
 
 export function Navbar() {
-  const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-
-  // App / auth shells have their own chrome
   const hide =
-    pathname?.startsWith("/app") ||
     pathname?.startsWith("/bounties") ||
     pathname?.startsWith("/login") ||
     pathname?.startsWith("/signup") ||
     pathname?.startsWith("/auth") ||
     pathname?.startsWith("/setup");
 
-  const links = [
-    { href: "/#how", label: "Cách dùng" },
-    { href: "/#why", label: "Vì sao tin" },
-    { href: "/bounties", label: "Mở app" },
-  ];
-
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 12);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-
-  useEffect(() => {
-    setOpen(false);
-  }, [pathname]);
-
   if (hide) return null;
 
   return (
-    <>
-      <header
-        className={cn(
-          "fixed inset-x-0 top-0 z-50 border-b transition-all duration-300",
-          scrolled
-            ? "border-white/10 bg-[#06080f]/85 backdrop-blur-xl"
-            : "border-transparent bg-transparent"
-        )}
-      >
-        <nav className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-5 md:px-8">
-          <Link href="/" className="flex items-center gap-2.5">
-            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-[#9945FF] to-[#14F195] text-sm font-bold text-black">
-              FB
-            </span>
-            <div className="leading-none">
-              <span className="text-[15px] font-bold tracking-tight text-white">
-                FindBack AI
-              </span>
-              <p className="mt-0.5 text-[10px] uppercase tracking-[0.14em] text-white/40">
-                Lost & found · Solana
-              </p>
-            </div>
-          </Link>
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-white/92 backdrop-blur-xl">
+      <nav className="mx-auto flex h-[4.5rem] max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <Link href="/" className="flex items-center gap-2.5" aria-label="SafeReturn trang chủ">
+          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-forest text-white">
+            <ShieldCheck size={20} weight="fill" />
+          </span>
+          <span className="text-lg font-bold tracking-[-0.03em] text-forest">SafeReturn</span>
+        </Link>
 
-          <div className="hidden items-center gap-1 md:flex">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                className="rounded-full px-3.5 py-1.5 text-sm text-white/60 transition hover:bg-white/5 hover:text-white"
-              >
-                {l.label}
-              </Link>
-            ))}
-          </div>
-
-          <div className="flex items-center gap-2">
+        <div className="hidden items-center gap-1 md:flex">
+          {links.map((link) => (
             <Link
-              href="/login"
-              className="hidden rounded-full px-3.5 py-2 text-sm font-semibold text-white/70 transition hover:text-white sm:inline-flex"
+              key={link.href}
+              href={link.href}
+              className="rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft transition hover:bg-bg-deep hover:text-forest"
             >
-              Đăng nhập
+              {link.label}
             </Link>
-            <Link
-              href="/signup"
-              className="inline-flex rounded-full bg-white px-4 py-2 text-sm font-bold text-black transition hover:bg-white/90"
-            >
-              Bắt đầu
-            </Link>
-            <button
-              type="button"
-              aria-label="Menu"
-              onClick={() => setOpen((v) => !v)}
-              className="flex h-10 w-10 items-center justify-center rounded-xl bg-white/10 text-white md:hidden"
-            >
-              {open ? <X size={18} /> : <List size={18} />}
-            </button>
-          </div>
-        </nav>
-      </header>
-
-      {open && (
-        <div className="fixed inset-0 z-40 bg-[#06080f] pt-20 md:hidden">
-          <div className="flex flex-col gap-1 px-5">
-            {links.map((l) => (
-              <Link
-                key={l.href}
-                href={l.href}
-                onClick={() => setOpen(false)}
-                className="rounded-2xl px-4 py-4 text-lg font-medium text-white hover:bg-white/5"
-              >
-                {l.label}
-              </Link>
-            ))}
-            <Link
-              href="/login"
-              onClick={() => setOpen(false)}
-              className="mt-4 rounded-2xl border border-white/15 px-4 py-4 text-center font-semibold"
-            >
-              Đăng nhập
-            </Link>
-            <Link
-              href="/signup"
-              onClick={() => setOpen(false)}
-              className="mt-2 rounded-2xl bg-white px-4 py-4 text-center font-bold text-black"
-            >
-              Bắt đầu miễn phí
-            </Link>
-          </div>
+          ))}
         </div>
-      )}
-    </>
+
+        <div className="flex items-center gap-2">
+          <span className="hidden items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 lg:inline-flex">
+            <Flask size={16} weight="duotone" /> Solana Devnet
+          </span>
+          <Link href="/login" className="hidden px-3 py-2 text-sm font-semibold text-ink-soft hover:text-forest sm:block">
+            Đăng nhập
+          </Link>
+          <Link href="/signup" className="app-button-primary min-h-10 px-4 py-2">
+            Tạo tài khoản
+          </Link>
+          <details className="relative md:hidden">
+            <summary className="flex h-10 w-10 list-none items-center justify-center rounded-xl border border-line-strong bg-white text-ink [&::-webkit-details-marker]:hidden">
+              <List size={20} />
+              <span className="sr-only">Mở menu</span>
+            </summary>
+            <div className="absolute right-0 top-12 w-64 rounded-2xl border border-line bg-white p-2 shadow-[0_24px_60px_rgba(30,54,43,0.18)]">
+              {links.map((link) => (
+                <Link key={link.href} href={link.href} className="block rounded-xl px-4 py-3 text-sm font-semibold text-ink-soft hover:bg-bg-deep hover:text-forest">
+                  {link.label}
+                </Link>
+              ))}
+              <Link href="/login" className="mt-1 block rounded-xl border border-line px-4 py-3 text-center text-sm font-semibold text-ink">
+                Đăng nhập
+              </Link>
+            </div>
+          </details>
+        </div>
+      </nav>
+    </header>
   );
 }
