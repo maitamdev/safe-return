@@ -41,6 +41,11 @@ export function explorerAddressUrl(address: string) {
   return `https://explorer.solana.com/address/${address}?cluster=devnet`;
 }
 
+/** Token balances tab for a wallet (never append /tokens onto a URL that already has ?query) */
+export function explorerTokensUrl(address: string) {
+  return `https://explorer.solana.com/address/${address}/tokens?cluster=devnet`;
+}
+
 export function toAtomic(uiAmount: number): bigint {
   return BigInt(Math.round(uiAmount * 10 ** FIND_DECIMALS));
 }

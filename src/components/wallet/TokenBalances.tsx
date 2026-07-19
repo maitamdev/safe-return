@@ -9,6 +9,7 @@ import {
   FIND_SYMBOL,
   FIND_DECIMALS,
   explorerAddressUrl,
+  explorerTokensUrl,
 } from "@/lib/findback/config";
 
 /** Live SOL + FIND balances with Explorer links (Devnet). */
@@ -78,7 +79,7 @@ export function TokenBalances({ dark = false }: { dark?: boolean }) {
       )}
       {find !== null && (
         <a
-          href={`https://explorer.solana.com/address/${addr}/tokens?cluster=devnet`}
+          href={explorerTokensUrl(addr)}
           target="_blank"
           rel="noreferrer"
           className={pill}

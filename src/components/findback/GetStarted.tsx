@@ -14,7 +14,7 @@ import {
 import {
   FIND_MINT,
   FIND_SYMBOL,
-  explorerAddressUrl,
+  explorerTokensUrl,
   explorerTxUrl,
 } from "@/lib/findback/config";
 import Link from "next/link";
@@ -88,7 +88,7 @@ export function GetStarted() {
         throw new Error(j.error || "Nạp thất bại");
       }
 
-      setWalletUrl(explorerAddressUrl(address));
+      setWalletUrl(explorerTokensUrl(address));
 
       if (j.find && "skipped" in j.find && j.find.skipped) {
         setMsg(
@@ -230,12 +230,12 @@ export function GetStarted() {
               )}
               {walletUrl && (
                 <a
-                  href={`${walletUrl}/tokens`}
+                  href={walletUrl}
                   target="_blank"
                   rel="noreferrer"
                   className="inline-flex items-center gap-1.5 rounded-full border border-white/20 bg-white/5 px-3 py-1.5 text-[11px] font-bold text-white hover:bg-white/10"
                 >
-                  Xem token trong ví <ArrowSquareOut size={12} />
+                  Xem token FIND trong ví <ArrowSquareOut size={12} />
                 </a>
               )}
             </div>
