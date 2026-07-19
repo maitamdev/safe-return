@@ -17,44 +17,69 @@ import os from "node:os";
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
+const DEFAULT_FIND_MINT = "9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy";
+
 function loadDeployer(): Keypair | null {
-  // Vercel / CI: set secret SOLANA_KEYPAIR_JSON='[...]' (never commit)
-  const inline = process.env.SOLANA_KEYPAIR_JSON?.trim();
-  if (inline) {
-    const raw = JSON.parse(inline) as number[];
+  try {
+    const inline = process.env.SOLANA_KEYPAIR_JSON?.trim();
+    if (inline) {
+      const raw = JSON.parse(inline) as number[];
+      return Keypair.fromSecretKey(Uint8Array.from(raw));
+    }
+    const p =
+      process.env.SOLANA_KEYPAIR ||
+      path.join(os.homedir(), ".config", "solana", "id.json");
+    if (!fs.existsSync(p)) return null;
+    const raw = JSON.parse(fs.readFileSync(p, "utf8")) as number[];
     return Keypair.fromSecretKey(Uint8Array.from(raw));
+  } catch {
+    return null;
   }
-  const p =
-    process.env.SOLANA_KEYPAIR ||
-    path.join(os.homedir(), ".config", "solana", "id.json");
-  if (!fs.existsSync(p)) return null;
-  const raw = JSON.parse(fs.readFileSync(p, "utf8")) as number[];
-  return Keypair.fromSecretKey(Uint8Array.from(raw));
 }
 
-async function claimDevnetSol(address: string, amount = 2) {
-  const r = await fetch("https://j.tools/api/devnet-faucet/claim", {
-    method: "POST",
-    headers: { "content-type": "application/json" },
-    body: JSON.stringify({ recipientAddress: address, amount }),
-  });
-  const j = (await r.json()) as {
-    success?: boolean;
-    transactionSignature?: string;
-    explorerUrl?: string;
-    message?: string;
-    code?: string;
-  };
-  return { ok: r.ok && !!j.success, status: r.status, ...j };
+function findMintStr() {
+  return (
+    process.env.NEXT_PUBLIC_FIND_MINT ||
+    process.env.NEXT_PUBLIC_MOCK_USDC_MINT ||
+    DEFAULT_FIND_MINT
+  );
+}
+
+async function claimDevnetSol(address: string, amount = 1) {
+  try {
+    const r = await fetch("https://j.tools/api/devnet-faucet/claim", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ recipientAddress: address, amount }),
+    });
+    const j = (await r.json()) as {
+      success?: boolean;
+      transactionSignature?: string;
+      explorerUrl?: string;
+      message?: string;
+      code?: string;
+    };
+    return { ok: r.ok && !!j.success, status: r.status, ...j };
+  } catch (e) {
+    return {
+      ok: false,
+      status: 0,
+      message: e instanceof Error ? e.message : "faucet error",
+    };
+  }
 }
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as { address?: string; usdc?: number };
+    const body = (await req.json()) as {
+      address?: string;
+      amount?: number;
+      usdc?: number;
+    };
     const address = body.address?.trim();
     if (!address) {
       return NextResponse.json(
-        { ok: false, error: "Thiếu địa chỉ ví Phantom." },
+        { ok: false, error: "Thiếu địa chỉ ví. Hãy Connect Phantom trước." },
         { status: 400 }
       );
     }
@@ -69,54 +94,43 @@ export async function POST(req: Request) {
       );
     }
 
-    const mintStr = process.env.NEXT_PUBLIC_MOCK_USDC_MINT;
-    if (!mintStr) {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: "Chưa có MOCK_USDC_MINT. Chạy: npm run solana:setup",
-        },
-        { status: 500 }
-      );
-    }
-
-    const rpc =
-      process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("devnet");
+    const mintStr = findMintStr();
+    const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("devnet");
     const connection = new Connection(rpc, "confirmed");
     const before = await connection.getBalance(recipient);
 
-    // 1) Free Devnet SOL (test money — not real)
     let solClaim: Awaited<ReturnType<typeof claimDevnetSol>> | null = null;
     if (before < 0.05 * 1e9) {
-      solClaim = await claimDevnetSol(address, 2);
+      solClaim = await claimDevnetSol(address, 1);
       if (!solClaim.ok && solClaim.code === "COOLDOWN_ACTIVE") {
-        // retry once after short wait
-        await new Promise((r) => setTimeout(r, 32_000));
-        solClaim = await claimDevnetSol(address, 2);
+        await new Promise((r) => setTimeout(r, 5000));
+        solClaim = await claimDevnetSol(address, 1);
       }
     }
 
-    // 2) Mint mock USDC from deployer (optional if keypair available)
     const payer = loadDeployer();
-    let usdc:
+    const uiAmount = Math.min(
+      Math.max(Number(body.amount ?? body.usdc) || 100, 1),
+      500
+    );
+
+    let find:
       | {
           amount: number;
           mint: string;
           ata: string;
           signature: string;
           explorerUrl: string;
-          note?: string;
         }
       | { skipped: true; note: string; mint: string } = {
       skipped: true,
-      note: "Chưa cấu hình SOLANA_KEYPAIR_JSON trên server — chỉ nạp SOL. Chạy local hoặc set secret trên Vercel để mint mock USDC.",
+      note: "Server chưa có key deployer — không mint được FIND. Chạy local hoặc cấu hình SOLANA_KEYPAIR_JSON trên Vercel.",
       mint: mintStr,
     };
 
     if (payer) {
       const mint = new PublicKey(mintStr);
       const mintInfo = await getMint(connection, mint);
-      const uiAmount = Math.min(Math.max(Number(body.usdc) || 100, 1), 1000);
       const atomic = BigInt(Math.round(uiAmount * 10 ** mintInfo.decimals));
       const ata = await getOrCreateAssociatedTokenAccount(
         connection,
@@ -124,7 +138,7 @@ export async function POST(req: Request) {
         mint,
         recipient
       );
-      const usdcSig = await mintTo(
+      const sig = await mintTo(
         connection,
         payer,
         mint,
@@ -132,23 +146,23 @@ export async function POST(req: Request) {
         payer,
         atomic
       );
-      usdc = {
+      find = {
         amount: uiAmount,
         mint: mintStr,
         ata: ata.address.toBase58(),
-        signature: usdcSig,
-        explorerUrl: `https://explorer.solana.com/tx/${usdcSig}?cluster=devnet`,
+        signature: sig,
+        explorerUrl: `https://explorer.solana.com/tx/${sig}?cluster=devnet`,
       };
     }
 
-    await new Promise((r) => setTimeout(r, 1500));
+    await new Promise((r) => setTimeout(r, 800));
     const after = await connection.getBalance(recipient);
 
     return NextResponse.json({
       ok: true,
       message: payer
-        ? "Đã nạp tiền ảo Devnet (SOL + mock USDC). Không phải tiền thật."
-        : "Đã nạp SOL Devnet (tiền ảo). Mock USDC cần secret deployer trên server.",
+        ? `Đã gửi ${uiAmount} FIND (token test) + kiểm tra SOL Devnet. Không phải tiền thật.`
+        : "Chỉ thử nạp SOL. FIND cần secret deployer trên server.",
       address,
       sol: {
         before: before / 1e9,
@@ -157,18 +171,20 @@ export async function POST(req: Request) {
         signature: solClaim?.transactionSignature ?? null,
         explorerUrl: solClaim?.explorerUrl ?? null,
         note:
-          solClaim?.ok === false
-            ? solClaim?.message ||
-              "SOL đã đủ hoặc faucet tạm nghỉ."
-            : before >= 0.05 * 1e9
-              ? "Ví đã có đủ SOL test, bỏ qua claim."
-              : "Đã claim SOL Devnet miễn phí.",
+          before >= 0.05 * 1e9
+            ? "Ví đã có đủ SOL test."
+            : solClaim?.ok
+              ? "Đã claim SOL Devnet miễn phí."
+              : solClaim?.message ||
+                "Faucet SOL bận — lấy tay tại faucet.solana.com",
       },
-      usdc,
+      find,
+      // backward compat
+      usdc: find,
       tips: [
-        "Phantom → Settings → Developer Settings → Testnet Mode → Devnet",
-        "Import token mint mock USDC nếu chưa thấy số dư",
-        "Mọi giao dịch chỉ trên Devnet — 0 đồng thật",
+        "Phantom → Settings → Developer → Testnet Mode → Devnet",
+        `Import token FIND: ${mintStr}`,
+        "Nếu Phantom chặn site → bấm «Vẫn tiếp tục (không an toàn)» (app của bạn)",
       ],
     });
   } catch (e) {
@@ -180,8 +196,10 @@ export async function POST(req: Request) {
 export async function GET() {
   return NextResponse.json({
     ok: true,
-    info: "POST { address } để nhận SOL Devnet + mock USDC (tiền ảo, free).",
-    mint: process.env.NEXT_PUBLIC_MOCK_USDC_MINT || null,
-    program: process.env.NEXT_PUBLIC_SAFERETURN_PROGRAM_ID || null,
+    info: "POST { address } để nhận SOL Devnet + FIND test token (0đ thật).",
+    mint: findMintStr(),
+    program:
+      process.env.NEXT_PUBLIC_FINDBACK_PROGRAM_ID ||
+      "3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna",
   });
 }

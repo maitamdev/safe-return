@@ -4,6 +4,7 @@ import { useMemo, useState } from "react";
 import Link from "next/link";
 import { useFindBack } from "@/lib/findback/provider";
 import { BountyCard } from "@/components/findback/BountyCard";
+import { GetStarted } from "@/components/findback/GetStarted";
 import { MagnifyingGlass, Plus } from "@phosphor-icons/react";
 
 export default function BrowseBountiesPage() {
@@ -25,24 +26,27 @@ export default function BrowseBountiesPage() {
 
   return (
     <div>
+      <GetStarted />
+
       <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9945FF]">
-            Browse
+            Danh sách
           </p>
           <h1 className="mt-1 font-display text-3xl font-bold md:text-4xl">
-            Lost-item bounties
+            Bounty tìm đồ
           </h1>
           <p className="mt-2 max-w-xl text-sm text-white/55">
-            FIND is a test SPL token on Solana Devnet — not real USDC. AI scores
-            claims; owners release rewards on-chain.
+            Card ghi <strong className="text-white/70">Seed</strong> = mẫu giao
+            diện (chưa khóa tiền). Muốn giao dịch thật trên Explorer →{" "}
+            <strong className="text-white/70">Tạo bounty</strong>.
           </p>
         </div>
         <Link
           href="/bounties/create"
           className="inline-flex items-center gap-2 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] px-5 py-2.5 text-sm font-bold text-black"
         >
-          <Plus size={16} weight="bold" /> Create bounty
+          <Plus size={16} weight="bold" /> Tạo bounty
         </Link>
       </div>
 

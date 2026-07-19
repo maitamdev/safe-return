@@ -205,12 +205,33 @@ export default function BountyDetailPage() {
           )}
 
           <div className="flex flex-col gap-2 pt-2">
-            {status === "Funded" || status === "Draft" || (!onchain && meta.seed) ? (
+            {meta.seed && !onchain ? (
+              <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100">
+                <strong>Đây là bounty mẫu (Seed)</strong> — chỉ để xem giao diện,
+                chưa khóa tiền on-chain. Muốn demo tx thật:{" "}
+                <Link href="/bounties/create" className="underline">
+                  Tạo bounty mới
+                </Link>{" "}
+                sau khi Kết nối ví + Nhận FIND.
+              </div>
+            ) : null}
+            {!meta.seed &&
+            (status === "Funded" ||
+              status === "Draft" ||
+              (!onchain && !meta.seed)) ? (
               <Link
                 href={`/bounties/${id}/claim`}
                 className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 py-3 text-sm font-bold text-black"
               >
-                Submit found claim <ArrowRight size={16} />
+                Gửi claim tìm thấy <ArrowRight size={16} />
+              </Link>
+            ) : null}
+            {onchain && status === "Funded" ? (
+              <Link
+                href={`/bounties/${id}/claim`}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] px-4 py-3 text-sm font-bold text-black"
+              >
+                Gửi claim tìm thấy <ArrowRight size={16} />
               </Link>
             ) : null}
             {isOwner && expired && status !== "Released" && status !== "Refunded" && (

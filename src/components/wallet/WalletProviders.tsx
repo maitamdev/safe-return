@@ -1,12 +1,8 @@
 "use client";
 
 /**
- * Standard Solana dApp provider stack
- * (same pattern as Solana Cookbook / create-solana-dapp):
  * ConnectionProvider → WalletProvider → WalletModalProvider
- *
- * wallets={[]} = Wallet Standard auto-discovery (Phantom, Solflare, …)
- * without the heavy legacy adapter bundle.
+ * Explicit Phantom adapter + Wallet Standard auto-detect.
  */
 
 import { useMemo, useCallback, type ReactNode } from "react";
@@ -15,6 +11,7 @@ import {
   WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
+import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Buffer } from "buffer";
 import { SOLANA_RPC } from "@/lib/solana/config";
 
@@ -34,22 +31,20 @@ ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => SOLANA_RPC, []);
-  // Wallet Standard: empty list → browser discovers installed wallets
-  const wallets = useMemo(() => [], []);
+  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   const onError = useCallback((error: Error) => {
-    if (process.env.NODE_ENV === "development") {
-      console.warn("[wallet]", error.name, error.message);
-    }
+    // Phantom "blocked" / user reject — surface in console only
+    console.warn("[wallet]", error.name, error.message);
   }, []);
 
   return (
     <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed" }}>
       <WalletProvider
         wallets={wallets}
-        autoConnect
+        autoConnect={false}
         onError={onError}
-        localStorageKey="safereturn-wallet"
+        localStorageKey="findback-wallet"
       >
         <WalletModalProvider>{children}</WalletModalProvider>
       </WalletProvider>

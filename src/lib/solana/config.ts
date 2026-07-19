@@ -18,7 +18,8 @@ export const PROGRAM_ID =
  */
 export const MOCK_USDC_MINT =
   process.env.NEXT_PUBLIC_MOCK_USDC_MINT ||
-  "BGcZtKHFpuNPk9U78vb6oUAt4KFkFhLhu1UomNAZwHRD";
+  process.env.NEXT_PUBLIC_FIND_MINT ||
+  "9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy";
 
 /** SafePoint staff authority pubkey (can lock/release). Defaults to deployer. */
 export const SAFEPOINT_AUTHORITY =

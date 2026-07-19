@@ -48,9 +48,15 @@ export function BountyCard({
         }
       >
         <span
-          className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${statusBadge(status)}`}
+          className={`absolute left-3 top-3 rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider ${
+            b.seed && !status
+              ? "bg-amber-500/20 text-amber-200"
+              : statusBadge(status)
+          }`}
         >
-          {status || (b.seed ? "Seed" : "Draft")}
+          {b.seed && (!status || status === "Funded" || status === "Seed")
+            ? "Mẫu (chưa on-chain)"
+            : status || "Draft"}
         </span>
         {b.aiReport && (
           <span className="absolute right-3 top-3 rounded-full bg-black/50 px-2.5 py-1 text-[10px] font-bold text-[#14F195] backdrop-blur">

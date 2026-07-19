@@ -72,8 +72,10 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
           </nav>
 
           <div className="flex items-center gap-2">
-            <NetworkBadge />
-            <ConnectWalletButton />
+            <div className="hidden sm:block">
+              <NetworkBadge />
+            </div>
+            <ConnectWalletButton dark />
           </div>
         </div>
       </header>
