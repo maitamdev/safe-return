@@ -47,8 +47,8 @@ target/deploy/*-keypair.json
 *.tsbuildinfo
 next-env.d.ts
 
-# Anchor / Solana build (commit IDL only if needed)
-/target/
+# Anchor / Solana build (the generated IDL is a reviewed client contract)
+/target/*
 !/target/idl/
 !/target/idl/**
 /test-ledger/
