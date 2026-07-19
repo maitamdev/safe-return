@@ -10,6 +10,7 @@ export type AiClaimReport = {
   confidence: number; // 0-1
   mode: "live";
   model?: string;
+  provider?: "groq" | "openai-compatible";
 };
 
 export type AiReviewInput = {

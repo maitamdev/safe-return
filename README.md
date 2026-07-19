@@ -27,7 +27,7 @@ Sau khi tạo Supabase project:
 1. Chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) trong SQL Editor.
 2. Điền URL, anon key và service-role key vào `.env.local`.
 3. Thêm `SOLANA_KEYPAIR_JSON` của đúng arbiter/mint authority vào môi trường server.
-4. Thêm `OPENAI_API_KEY` để bật đánh giá AI trực tuyến. Khi thiếu key, hệ thống báo chưa cấu hình và không sinh kết quả thay thế.
+4. Thêm `GROQ_API_KEY` để bật đánh giá Groq Vision trực tuyến. Model mặc định là `qwen/qwen3.6-27b`. Khi thiếu key, hệ thống báo chưa cấu hình và không sinh kết quả thay thế.
 5. Không commit `.env.local` hoặc keypair.
 
 Supabase là nguồn metadata duy nhất. Giao diện đăng ký thay đổi Realtime cho `bounties` và `claims`, đồng thời đọc lại dữ liệu định kỳ nếu kết nối Realtime gián đoạn. Trạng thái tiền và quyền giải ngân luôn được đối chiếu với program trên Solana Devnet.

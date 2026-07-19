@@ -1,5 +1,5 @@
 import { PublicKey } from "@solana/web3.js";
-import { runClaimReview, sha256Hex } from "@/lib/ai/agent";
+import { hasLiveAiProvider, runClaimReview, sha256Hex } from "@/lib/ai/agent";
 import { decisionToU8, riskToU8 } from "@/lib/ai/types";
 import { ARBITER } from "@/lib/findback/config";
 import { fetchBounty, recordAiReviewOnChain } from "@/lib/findback/program";
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
     if (!['ClaimSubmitted', 'AiReviewed'].includes(onchain.status)) {
       throw new ApiError(409, "Claim chưa ở trạng thái có thể đánh giá.");
     }
-    if (!(process.env.OPENAI_API_KEY || process.env.FIND_BACK_AI_KEY)) {
+    if (!hasLiveAiProvider()) {
       throw new ApiError(503, "AI trực tuyến chưa được cấu hình trên máy chủ.");
     }
 

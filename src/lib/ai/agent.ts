@@ -26,22 +26,54 @@ Write explanation and every array item in clear Vietnamese.`;
 export async function runClaimReview(
   input: AiReviewInput
 ): Promise<AiClaimReport> {
-  const key = process.env.OPENAI_API_KEY || process.env.FIND_BACK_AI_KEY;
-  if (!key) {
+  const config = getLiveAiConfig();
+  if (!config) {
     throw new Error("AI trực tuyến chưa được cấu hình trên máy chủ.");
   }
-  return callOpenAiCompatible(key, input);
+  return callOpenAiCompatible(config, input);
+}
+
+export function hasLiveAiProvider() {
+  return getLiveAiConfig() !== null;
+}
+
+type LiveAiConfig = {
+  apiKey: string;
+  baseUrl: string;
+  model: string;
+  provider: "groq" | "openai-compatible";
+};
+
+function getLiveAiConfig(): LiveAiConfig | null {
+  const groqKey = process.env.GROQ_API_KEY?.trim();
+  if (groqKey) {
+    return {
+      apiKey: groqKey,
+      baseUrl: "https://api.groq.com/openai/v1",
+      model: process.env.GROQ_MODEL?.trim() || "qwen/qwen3.6-27b",
+      provider: "groq",
+    };
+  }
+
+  const apiKey = (
+    process.env.OPENAI_API_KEY || process.env.FIND_BACK_AI_KEY
+  )?.trim();
+  if (!apiKey) return null;
+  const baseUrl =
+    process.env.OPENAI_BASE_URL?.replace(/\/$/, "") ||
+    "https://api.openai.com/v1";
+  return {
+    apiKey,
+    baseUrl,
+    model: process.env.OPENAI_MODEL || "gpt-4o-mini",
+    provider: baseUrl.includes("api.groq.com") ? "groq" : "openai-compatible",
+  };
 }
 
 async function callOpenAiCompatible(
-  apiKey: string,
+  config: LiveAiConfig,
   input: AiReviewInput
 ): Promise<AiClaimReport> {
-  const base =
-    process.env.OPENAI_BASE_URL?.replace(/\/$/, "") ||
-    "https://api.openai.com/v1";
-  const model = process.env.OPENAI_MODEL || "gpt-4o-mini";
-
   const userText = [
     `Owner title: ${input.ownerTitle}`,
     `Owner description: ${input.ownerDescription}`,
@@ -71,14 +103,14 @@ async function callOpenAiCompatible(
     });
   }
 
-  const res = await fetch(`${base}/chat/completions`, {
+  const res = await fetch(`${config.baseUrl}/chat/completions`, {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${apiKey}`,
+      Authorization: `Bearer ${config.apiKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model,
+      model: config.model,
       temperature: 0.2,
       response_format: { type: "json_object" },
       messages: [
@@ -120,7 +152,8 @@ async function callOpenAiCompatible(
     ),
     confidence: clampNum(Number(parsed.confidence ?? 0.6), 0, 1),
     mode: "live",
-    model,
+    model: config.model,
+    provider: config.provider,
   };
 }
 

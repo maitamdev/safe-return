@@ -17,7 +17,7 @@ export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, can
           <h2 id="review-title" className="mt-2 text-2xl font-bold">Kết quả so khớp claim</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Kết quả này không tự chuyển tiền. Chủ bounty phải tự kiểm tra và ký quyết định on-chain.</p>
           <p className="mt-4 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
-            AI trực tuyến: {report.model || "đã cấu hình"}
+            {report.provider === "groq" ? "Groq Vision" : "AI trực tuyến"}: {report.model || "đã cấu hình"}
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-bg-deep px-6 py-4 text-center">

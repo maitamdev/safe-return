@@ -16,15 +16,16 @@ describe("live claim review", () => {
   it("fails closed instead of generating a fallback result without an AI key", async () => {
     vi.stubEnv("OPENAI_API_KEY", "");
     vi.stubEnv("FIND_BACK_AI_KEY", "");
+    vi.stubEnv("GROQ_API_KEY", "");
 
     await expect(runClaimReview(input)).rejects.toThrow(
       "AI trực tuyến chưa được cấu hình"
     );
   });
 
-  it("returns only a live report from the configured provider", async () => {
-    vi.stubEnv("OPENAI_API_KEY", "real-provider-key");
-    vi.stubEnv("OPENAI_MODEL", "vision-model");
+  it("returns a live Groq Vision report from the configured provider", async () => {
+    vi.stubEnv("GROQ_API_KEY", "groq-provider-key");
+    vi.stubEnv("GROQ_MODEL", "vision-model");
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue(
@@ -53,6 +54,7 @@ describe("live claim review", () => {
 
     const report = await runClaimReview(input);
     expect(report.mode).toBe("live");
+    expect(report.provider).toBe("groq");
     expect(report.model).toBe("vision-model");
     expect(report.score).toBe(84);
   });
