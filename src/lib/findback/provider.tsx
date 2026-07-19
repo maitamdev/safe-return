@@ -12,7 +12,6 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import type { AiClaimReport } from "@/lib/ai/types";
-import { decisionToU8, riskToU8 } from "@/lib/ai/types";
 import {
   loadBounties,
   saveBounties,
@@ -22,21 +21,24 @@ import {
 // saveBounties used when merging remote
 import {
   acceptClaimOnChain,
+  cancelBountyOnChain,
   createBountyOnChain,
   fetchBounty,
   fundBountyOnChain,
   openDisputeOnChain,
-  recordAiReviewOnChain,
+  resolveDisputeOnChain,
   refundAfterExpiryOnChain,
   rejectClaimOnChain,
   submitClaimOnChain,
   type OnChainBounty,
   type WalletLike,
 } from "./program";
-import { FINDBACK_PROGRAM_ID, FIND_MINT, SOLANA_LIVE } from "./config";
+import { FINDBACK_PROGRAM_ID, FIND_MINT, SOLANA_LIVE, fromAtomic } from "./config";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import {
   fetchBountiesFromSupabase,
+  syncBountyStateToSupabase,
+  syncClaimToSupabase,
   syncBountyToSupabase,
 } from "./db";
 
@@ -44,6 +46,7 @@ type TxState = "idle" | "pending" | "confirmed" | "failed";
 
 type FindBackCtx = {
   bounties: BountyMeta[];
+  loadingBounties: boolean;
   refresh: () => void;
   lastTx: string | null;
   lastTxUrl: string | null;
@@ -64,6 +67,7 @@ type FindBackCtx = {
     days: number;
     imageDataUrl?: string | null;
   }) => Promise<void>;
+  fund: (bountyId: string) => Promise<void>;
   submitClaim: (input: {
     bountyId: string;
     description: string;
@@ -71,10 +75,13 @@ type FindBackCtx = {
     foundAt: string;
     imageDataUrl?: string | null;
   }) => Promise<AiClaimReport | null>;
+  reviewClaim: (bountyId: string) => Promise<AiClaimReport | null>;
   accept: (bountyId: string) => Promise<void>;
   reject: (bountyId: string) => Promise<void>;
   dispute: (bountyId: string) => Promise<void>;
   refund: (bountyId: string) => Promise<void>;
+  cancel: (bountyId: string) => Promise<void>;
+  resolveDispute: (bountyId: string, releaseToFinder: boolean) => Promise<void>;
   fetchOnChain: (bountyId: string) => Promise<OnChainBounty | null>;
 };
 
@@ -86,19 +93,22 @@ async function sha256Bytes(text: string): Promise<Uint8Array> {
   return new Uint8Array(hash);
 }
 
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.replace(/^0x/, "");
-  const out = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < out.length; i++) {
-    out[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
+async function requireVerifiedWallet(address: string) {
+  const response = await fetch("/api/wallet/status", { cache: "no-store" });
+  const json = (await response.json().catch(() => ({}))) as {
+    address?: string | null;
+    error?: string;
+  };
+  if (!response.ok || json.address !== address) {
+    throw new Error(json.error || "Hãy bấm “Xác minh ví” trước khi thao tác.");
   }
-  return out;
 }
 
 export function FindBackProvider({ children }: { children: ReactNode }) {
   const { publicKey, signTransaction, connected } = useWallet();
   const { user } = useAuth();
   const [bounties, setBounties] = useState<BountyMeta[]>([]);
+  const [loadingBounties, setLoadingBounties] = useState(true);
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [lastTxUrl, setLastTxUrl] = useState<string | null>(null);
   const [lastIx, setLastIx] = useState<string | null>(null);
@@ -110,16 +120,17 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    refresh();
-  }, [refresh]);
-
-  // Merge Supabase bounties (shared across devices) when logged in
-  useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      Promise.resolve().then(() => {
+        setBounties(loadBounties());
+        setLoadingBounties(false);
+      });
+      return;
+    }
     let cancelled = false;
     void (async () => {
       const remote = await fetchBountiesFromSupabase();
-      if (cancelled || remote.length === 0) return;
+      if (cancelled) return;
       const local = loadBounties();
       const map = new Map<string, BountyMeta>();
       for (const b of local) map.set(b.id, b);
@@ -134,6 +145,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       );
       saveBounties(merged);
       setBounties(merged);
+      setLoadingBounties(false);
     })();
     return () => {
       cancelled = true;
@@ -154,7 +166,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const requireWallet = useCallback(() => {
     if (!wallet)
       throw new Error(
-        "Chưa nối ví. Bấm «Kết nối ví» — Phantom phải ở chế độ Devnet."
+        "Chưa nối ví. Bấm «Kết nối ví» và bảo đảm Phantom đang ở Devnet."
       );
     return wallet;
   }, [wallet]);
@@ -164,7 +176,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     if (/user rejected|rejected the request|cancel/i.test(raw))
       return "Bạn đã hủy ký trong Phantom. Bấm lại nếu muốn tiếp tục.";
     if (/blockhash|expired|block height/i.test(m))
-      return "Giao dịch hết hạn — bấm lại lần nữa.";
+      return "Giao dịch hết hạn. Hãy bấm lại lần nữa.";
     if (/insufficient|0x1|insufficient funds|no record of a prior/i.test(m))
       return "Thiếu SOL (phí) hoặc thiếu FIND. Bấm «Nhận 100 FIND» ở trang Browse.";
     if (/already in use|already been processed|custom program error: 0x0/i.test(m))
@@ -174,7 +186,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     if (/simulation failed|custom program error/i.test(m))
       return `Lỗi smart contract: ${raw.slice(0, 180)}`;
     if (/failed to fetch|network|429|503/i.test(m))
-      return "RPC Devnet bận — đợi vài giây rồi thử lại.";
+      return "RPC Devnet đang bận. Đợi vài giây rồi thử lại.";
     return raw;
   };
 
@@ -212,6 +224,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       imageDataUrl?: string | null;
     }) => {
       const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
       if (!SOLANA_LIVE) throw new Error("SOLANA_LIVE is off");
       if (!FIND_MINT) throw new Error("FIND mint not configured");
 
@@ -236,11 +249,10 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         ownerWallet: w.publicKey.toBase58(),
         imageDataUrl: input.imageDataUrl ?? null,
         createdAt: Date.now(),
+        status: "Draft",
       };
-      upsertBounty(meta);
-      refresh();
 
-      await runTx("create_bounty", () =>
+      const created = await runTx("create_bounty", () =>
         createBountyOnChain(w, {
           bountyId: input.id,
           rewardUi: input.rewardUi,
@@ -248,21 +260,99 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           metadataHash,
         })
       );
+      const draft = {
+        ...meta,
+        lastTx: created.signature,
+        lastTxUrl: created.url,
+      };
+      upsertBounty(draft);
+      if (user?.id) await syncBountyToSupabase(draft, user.id);
+      refresh();
 
       const funded = await runTx("fund_bounty", () =>
         fundBountyOnChain(w, input.id, input.rewardUi)
       );
 
       const saved = {
-        ...meta,
+        ...draft,
+        status: "Funded",
         lastTx: funded.signature,
         lastTxUrl: funded.url,
       };
       upsertBounty(saved);
-      if (user?.id) void syncBountyToSupabase(saved, user.id);
+      await syncBountyStateToSupabase(saved);
       refresh();
     },
-    [requireWallet, runTx, refresh, user?.id]
+    [requireWallet, runTx, refresh, user]
+  );
+
+  const fund = useCallback(
+    async (bountyId: string) => {
+      const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
+      const meta = loadBounties().find((b) => b.id === bountyId);
+      if (!meta) throw new Error("Không tìm thấy metadata của bounty.");
+      const onchain = await fetchBounty(bountyId);
+      if (!onchain) throw new Error("Không tìm thấy bounty trên Devnet.");
+      const remaining = onchain.rewardAmount - onchain.amountFunded;
+      if (remaining <= BigInt(0)) throw new Error("Bounty đã được nạp đủ phần thưởng.");
+      const result = await runTx("fund_bounty", () =>
+        fundBountyOnChain(w, bountyId, fromAtomic(remaining))
+      );
+      const updated = {
+        ...meta,
+        status: "Funded",
+        lastTx: result.signature,
+        lastTxUrl: result.url,
+      };
+      upsertBounty(updated);
+      await syncBountyStateToSupabase(updated);
+      refresh();
+    },
+    [requireWallet, runTx, refresh]
+  );
+
+  const reviewClaim = useCallback(
+    async (bountyId: string) => {
+      const meta = loadBounties().find((b) => b.id === bountyId);
+      if (!meta?.claim) throw new Error("Chưa có bằng chứng claim để đánh giá.");
+      let report: AiClaimReport | null = null;
+      const result = await runTx("record_ai_review", async () => {
+        const response = await fetch("/api/ai/review", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            bountyId,
+            finderDescription: meta.claim?.description,
+            finderLocation: meta.claim?.location,
+            finderFoundAt: meta.claim?.foundAt,
+            finderImageDataUrl: meta.claim?.imageDataUrl,
+          }),
+        });
+        const json = (await response.json()) as {
+          report?: AiClaimReport;
+          reviewTx?: { signature: string; url: string };
+          error?: string;
+        };
+        if (!response.ok || !json.report || !json.reviewTx) {
+          throw new Error(json.error || "AI review failed");
+        }
+        report = json.report;
+        return json.reviewTx;
+      });
+      const updated: BountyMeta = {
+        ...meta,
+        aiReport: report,
+        status: "AiReviewed",
+        lastTx: result.signature,
+        lastTxUrl: result.url,
+      };
+      upsertBounty(updated);
+      await syncClaimToSupabase(updated);
+      refresh();
+      return report;
+    },
+    [refresh, runTx]
   );
 
   const submitClaim = useCallback(
@@ -274,6 +364,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       imageDataUrl?: string | null;
     }) => {
       const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
       const list = loadBounties();
       const meta = list.find((b) => b.id === input.bountyId);
       if (!meta) throw new Error("Bounty not found off-chain");
@@ -291,49 +382,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
-      await runTx("submit_claim", () =>
+      const claimTx = await runTx("submit_claim", () =>
         submitClaimOnChain(w, input.bountyId, evidenceHash)
       );
 
-      // AI review (server)
-      const aiRes = await fetch("/api/ai/review", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          bountyId: input.bountyId,
-          ownerTitle: meta.title,
-          ownerDescription: meta.description,
-          ownerCategory: meta.category,
-          ownerLocation: meta.location,
-          ownerImageDataUrl: meta.imageDataUrl,
-          finderDescription: input.description,
-          finderLocation: input.location,
-          finderFoundAt: input.foundAt,
-          finderImageDataUrl: input.imageDataUrl,
-        }),
-      });
-      if (!aiRes.ok) {
-        const err = await aiRes.json().catch(() => ({}));
-        throw new Error(
-          (err as { error?: string }).error || "AI review failed"
-        );
-      }
-      const aiJson = (await aiRes.json()) as {
-        report: AiClaimReport;
-        explanationHashHex: string;
-      };
-
-      const explanationHash = hexToBytes(aiJson.explanationHashHex);
-      await runTx("record_ai_review", () =>
-        recordAiReviewOnChain(w, input.bountyId, {
-          score: aiJson.report.score,
-          riskLevel: riskToU8(aiJson.report),
-          decision: decisionToU8(aiJson.report.decision),
-          explanationHash,
-        })
-      );
-
-      const updated: BountyMeta = {
+      const submitted: BountyMeta = {
         ...meta,
         claim: {
           finderWallet: w.publicKey.toBase58(),
@@ -344,16 +397,17 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           submittedAt: Date.now(),
           evidenceHashHex,
         },
-        aiReport: aiJson.report,
-        lastTx: lastTx,
-        lastTxUrl: lastTxUrl,
+        aiReport: null,
+        status: "ClaimSubmitted",
+        lastTx: claimTx.signature,
+        lastTxUrl: claimTx.url,
       };
-      upsertBounty(updated);
-      if (user?.id) void syncBountyToSupabase(updated, user.id);
+      upsertBounty(submitted);
+      await syncClaimToSupabase(submitted);
       refresh();
-      return aiJson.report;
+      return reviewClaim(input.bountyId);
     },
-    [requireWallet, runTx, refresh, lastTx, lastTxUrl, user?.id]
+    [requireWallet, runTx, refresh, reviewClaim]
   );
 
   const accept = useCallback(
@@ -371,7 +425,9 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         acceptClaimOnChain(w, bountyId, new PublicKey(finderStr))
       );
       if (meta) {
-        upsertBounty({ ...meta, lastTx: res.signature, lastTxUrl: res.url });
+        const updated = { ...meta, status: "Released", lastTx: res.signature, lastTxUrl: res.url };
+        upsertBounty(updated);
+        await syncBountyStateToSupabase(updated);
         refresh();
       }
     },
@@ -388,11 +444,13 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       if (meta) {
         upsertBounty({
           ...meta,
+          status: "Funded",
           claim: null,
           aiReport: null,
           lastTx: res.signature,
           lastTxUrl: res.url,
         });
+        await syncBountyStateToSupabase({ ...meta, status: "Funded", claim: null, aiReport: null, lastTx: res.signature, lastTxUrl: res.url });
         refresh();
       }
     },
@@ -402,7 +460,13 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const dispute = useCallback(
     async (bountyId: string) => {
       const w = requireWallet();
-      await runTx("open_dispute", () => openDisputeOnChain(w, bountyId));
+      const result = await runTx("open_dispute", () => openDisputeOnChain(w, bountyId));
+      const meta = loadBounties().find((b) => b.id === bountyId);
+      if (meta) {
+        const updated = { ...meta, status: "Disputed", lastTx: result.signature, lastTxUrl: result.url };
+        upsertBounty(updated);
+        await syncBountyStateToSupabase(updated);
+      }
       refresh();
     },
     [requireWallet, runTx, refresh]
@@ -416,7 +480,57 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       );
       const meta = loadBounties().find((b) => b.id === bountyId);
       if (meta) {
-        upsertBounty({ ...meta, lastTx: res.signature, lastTxUrl: res.url });
+        const updated = { ...meta, status: "Refunded", lastTx: res.signature, lastTxUrl: res.url };
+        upsertBounty(updated);
+        await syncBountyStateToSupabase(updated);
+        refresh();
+      }
+    },
+    [requireWallet, runTx, refresh]
+  );
+
+  const cancel = useCallback(
+    async (bountyId: string) => {
+      const w = requireWallet();
+      const result = await runTx("cancel_bounty", () =>
+        cancelBountyOnChain(w, bountyId)
+      );
+      const meta = loadBounties().find((b) => b.id === bountyId);
+      if (meta) {
+        const updated = { ...meta, status: "Cancelled", lastTx: result.signature, lastTxUrl: result.url };
+        upsertBounty(updated);
+        await syncBountyStateToSupabase(updated);
+        refresh();
+      }
+    },
+    [requireWallet, runTx, refresh]
+  );
+
+  const resolveDispute = useCallback(
+    async (bountyId: string, releaseToFinder: boolean) => {
+      const w = requireWallet();
+      const onchain = await fetchBounty(bountyId);
+      if (!onchain) throw new Error("Không tìm thấy bounty trên Devnet.");
+      const counterparty = new PublicKey(
+        releaseToFinder ? onchain.finder : onchain.owner
+      );
+      const result = await runTx("resolve_dispute", () =>
+        resolveDisputeOnChain(w, bountyId, counterparty, releaseToFinder)
+      );
+      const meta = loadBounties().find((b) => b.id === bountyId);
+      if (meta) {
+        const updated = {
+          ...meta,
+          status: releaseToFinder ? "Released" : "Refunded",
+          lastTx: result.signature,
+          lastTxUrl: result.url,
+        };
+        upsertBounty(updated);
+        try {
+          await syncBountyStateToSupabase(updated);
+        } catch {
+          // Arbiter may not be an off-chain listing participant; on-chain remains authoritative.
+        }
         refresh();
       }
     },
@@ -425,6 +539,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
 
   const value: FindBackCtx = {
     bounties,
+    loadingBounties,
     refresh,
     lastTx,
     lastTxUrl,
@@ -436,11 +551,15 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     programId: FINDBACK_PROGRAM_ID,
     findMint: FIND_MINT,
     createAndFund,
+    fund,
     submitClaim,
+    reviewClaim,
     accept,
     reject,
     dispute,
     refund,
+    cancel,
+    resolveDispute,
     fetchOnChain: fetchBounty,
   };
 
