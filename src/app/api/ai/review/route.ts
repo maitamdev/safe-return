@@ -1,66 +1,108 @@
-import { NextResponse } from "next/server";
+import { PublicKey } from "@solana/web3.js";
 import { runClaimReview, sha256Hex } from "@/lib/ai/agent";
-import type { AiReviewInput } from "@/lib/ai/types";
+import { decisionToU8, riskToU8 } from "@/lib/ai/types";
+import { ARBITER } from "@/lib/findback/config";
+import { fetchBounty, recordAiReviewOnChain } from "@/lib/findback/program";
+import {
+  ApiError,
+  apiErrorResponse,
+  enforceRateLimit,
+  requireApiUser,
+  requireSameOrigin,
+} from "@/lib/server/api-security";
+import { keypairWallet, loadServerKeypair } from "@/lib/server/solana-signer";
+import { createAdminClient } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 
-const MAX_IMAGE = 1_200_000; // ~1.2MB data URL
+const MAX_IMAGE = 1_200_000;
 
 export async function POST(req: Request) {
   try {
-    const body = (await req.json()) as AiReviewInput;
+    requireSameOrigin(req);
+    const user = await requireApiUser();
+    enforceRateLimit(`ai-review:${user.id}`, { limit: 8, windowMs: 10 * 60_000 });
 
-    if (!body.ownerTitle?.trim() || !body.finderDescription?.trim()) {
-      return NextResponse.json(
-        { error: "ownerTitle and finderDescription are required" },
-        { status: 400 }
-      );
+    const body = (await req.json()) as {
+      bountyId?: string;
+      finderDescription?: string;
+      finderLocation?: string;
+      finderFoundAt?: string;
+      finderImageDataUrl?: string | null;
+    };
+    const bountyId = body.bountyId?.trim() || "";
+    if (!bountyId || !body.finderDescription?.trim()) {
+      throw new ApiError(400, "Thiếu mã bounty hoặc mô tả bằng chứng.");
+    }
+    if (body.finderImageDataUrl && body.finderImageDataUrl.length > MAX_IMAGE) {
+      throw new ApiError(400, "Ảnh bằng chứng quá lớn (tối đa khoảng 1 MB).");
     }
 
-    if (
-      body.finderImageDataUrl &&
-      body.finderImageDataUrl.length > MAX_IMAGE
-    ) {
-      return NextResponse.json(
-        { error: "Finder image too large (max ~1MB)" },
-        { status: 400 }
-      );
+    const admin = createAdminClient();
+    const [{ data: profile, error: profileError }, { data: listing, error: listingError }] =
+      await Promise.all([
+        admin
+          .from("profiles")
+          .select("wallet_pubkey,wallet_verified_at")
+          .eq("id", user.id)
+          .maybeSingle(),
+        admin.from("bounties").select("*").eq("id", bountyId).maybeSingle(),
+      ]);
+    if (profileError) throw new Error(profileError.message);
+    if (listingError) throw new Error(listingError.message);
+    if (!profile?.wallet_pubkey || !profile.wallet_verified_at) {
+      throw new ApiError(403, "Hãy xác minh ví trước khi yêu cầu đánh giá.");
     }
-    if (body.ownerImageDataUrl && body.ownerImageDataUrl.length > MAX_IMAGE) {
-      return NextResponse.json(
-        { error: "Owner image too large (max ~1MB)" },
-        { status: 400 }
-      );
+    if (!listing) throw new ApiError(404, "Không tìm thấy bounty.");
+
+    const onchain = await fetchBounty(bountyId);
+    if (!onchain) throw new ApiError(404, "Bounty chưa tồn tại trên Devnet.");
+    if (onchain.finder !== profile.wallet_pubkey) {
+      throw new ApiError(403, "Ví đã xác minh không phải finder của claim này.");
+    }
+    if (!new PublicKey(onchain.arbiter).equals(new PublicKey(ARBITER))) {
+      throw new ApiError(409, "Bounty dùng arbiter khác với cấu hình máy chủ.");
+    }
+    if (!['ClaimSubmitted', 'AiReviewed'].includes(onchain.status)) {
+      throw new ApiError(409, "Claim chưa ở trạng thái có thể đánh giá.");
     }
 
     const report = await runClaimReview({
-      ownerTitle: body.ownerTitle.slice(0, 200),
-      ownerDescription: (body.ownerDescription || "").slice(0, 2000),
-      ownerCategory: body.ownerCategory?.slice(0, 80),
-      ownerLocation: body.ownerLocation?.slice(0, 200),
-      ownerImageDataUrl: body.ownerImageDataUrl,
+      ownerTitle: String(listing.title).slice(0, 200),
+      ownerDescription: String(listing.description || "").slice(0, 2000),
+      ownerCategory: String(listing.category || "").slice(0, 80),
+      ownerLocation: String(listing.location || "").slice(0, 200),
+      ownerImageDataUrl: listing.image_path as string | null,
       finderDescription: body.finderDescription.slice(0, 2000),
       finderLocation: body.finderLocation?.slice(0, 200),
       finderFoundAt: body.finderFoundAt?.slice(0, 80),
       finderImageDataUrl: body.finderImageDataUrl,
-      bountyId: body.bountyId?.slice(0, 32),
+      bountyId,
     });
 
-    const reportJson = JSON.stringify(report);
-    const explanationHashHex = await sha256Hex(reportJson);
+    const explanationHashHex = await sha256Hex(JSON.stringify(report));
+    const signer = loadServerKeypair();
+    if (signer.publicKey.toBase58() !== onchain.arbiter) {
+      throw new ApiError(503, "Khóa arbiter trên máy chủ không khớp bounty.");
+    }
+    const reviewTx = await recordAiReviewOnChain(keypairWallet(signer), bountyId, {
+      score: report.score,
+      riskLevel: riskToU8(report),
+      decision: decisionToU8(report.decision),
+      explanationHash: Uint8Array.from(Buffer.from(explanationHashHex, "hex")),
+    });
 
-    return NextResponse.json({
+    return Response.json({
+      ok: true,
       report,
       explanationHashHex,
+      reviewTx,
       note:
         report.mode === "heuristic"
-          ? "Demo mode: heuristic AI (set OPENAI_API_KEY for live vision+LLM)."
-          : "Live AI review. Owner approval still required on-chain.",
+          ? "Đánh giá quy tắc cục bộ, được arbiter ký lên Devnet."
+          : "AI đã đánh giá và arbiter đã ký kết quả lên Devnet.",
     });
-  } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : "AI review failed" },
-      { status: 500 }
-    );
+  } catch (error) {
+    return apiErrorResponse(error);
   }
 }
