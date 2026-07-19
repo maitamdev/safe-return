@@ -78,7 +78,9 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
       if (error) console.warn("[safereturn/db] bounties:", error.message);
       return [];
     }
-    if (claimError) console.warn("[safereturn/db] claims:", claimError.message);
+    if (claimError && !isMissingRelation(claimError)) {
+      console.warn("[safereturn/db] claims:", claimError.message);
+    }
     const claimMap = new Map((claims || []).map((claim) => [claim.bounty_id, claim]));
 
     return rows.map((row) => {
@@ -116,6 +118,13 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
     console.warn("[safereturn/db] select error", error);
     return [];
   }
+}
+
+function isMissingRelation(error: { code?: string; message?: string }) {
+  return (
+    error.code === "PGRST205" ||
+    Boolean(error.message?.includes("Could not find the table 'public.claims'"))
+  );
 }
 
 function toDbStatus(status: string) {
