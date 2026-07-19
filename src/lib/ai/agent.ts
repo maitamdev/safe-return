@@ -20,6 +20,8 @@ fraud_signals (string[]),
 explanation (string),
 confidence (0-1 number).
 Be strict: ACCEPT only if strong multi-signal match and low fraud risk.
+Images are optional. Never claim a visual match for an image that was not provided.
+Missing images are an evidence limitation, not automatically a fraud signal.
 Human owner must still approve on-chain.
 Write explanation and every array item in clear Vietnamese.`;
 
@@ -82,6 +84,8 @@ async function callOpenAiCompatible(
     `Finder description: ${input.finderDescription}`,
     `Finder location: ${input.finderLocation ?? "n/a"}`,
     `Finder found at: ${input.finderFoundAt ?? "n/a"}`,
+    `Owner reference image: ${hasImage(input.ownerImageDataUrl) ? "attached" : "not provided"}`,
+    `Finder evidence image: ${hasImage(input.finderImageDataUrl) ? "attached" : "not provided"}`,
     `Bounty id: ${input.bountyId ?? "n/a"}`,
   ].join("\n");
 
@@ -90,13 +94,16 @@ async function callOpenAiCompatible(
     | { type: "image_url"; image_url: { url: string } };
 
   const content: ContentPart[] = [{ type: "text", text: userText }];
-  if (input.ownerImageDataUrl?.startsWith("data:")) {
+  const ownerHasImage = hasImage(input.ownerImageDataUrl);
+  const finderHasImage = hasImage(input.finderImageDataUrl);
+
+  if (ownerHasImage && input.ownerImageDataUrl) {
     content.push({
       type: "image_url",
       image_url: { url: input.ownerImageDataUrl },
     });
   }
-  if (input.finderImageDataUrl?.startsWith("data:")) {
+  if (finderHasImage && input.finderImageDataUrl) {
     content.push({
       type: "image_url",
       image_url: { url: input.finderImageDataUrl },
@@ -131,14 +138,38 @@ async function callOpenAiCompatible(
   const raw = json.choices?.[0]?.message?.content ?? "{}";
   const parsed = JSON.parse(raw) as Partial<AiClaimReport>;
 
-  const decision =
+  const parsedDecision =
     parsed.decision === "ACCEPT" ||
     parsed.decision === "REJECT" ||
     parsed.decision === "REVIEW"
       ? parsed.decision
       : "REVIEW";
 
-  const score = clampNum(Number(parsed.score ?? 50), 0, 100);
+  const evidenceQuality = ownerHasImage && finderHasImage
+    ? "image-backed"
+    : ownerHasImage || finderHasImage
+      ? "partial-image"
+      : "text-only";
+  const evidenceNotes = [
+    ...(!ownerHasImage ? ["Chủ tin chưa cung cấp ảnh tham chiếu."] : []),
+    ...(!finderHasImage ? ["Người gửi claim chưa cung cấp ảnh bằng chứng."] : []),
+  ];
+
+  // Without a finder photo there is no visual proof of possession. Keep a live
+  // model's rejection, but never let text-only evidence become auto-acceptable.
+  const decision = !finderHasImage && parsedDecision === "ACCEPT"
+    ? "REVIEW"
+    : parsedDecision;
+  const score = clampNum(
+    Math.min(Number(parsed.score ?? 50), finderHasImage ? 100 : 69),
+    0,
+    100
+  );
+  const confidenceCap = evidenceQuality === "text-only"
+    ? 0.55
+    : evidenceQuality === "partial-image"
+      ? 0.8
+      : 1;
 
   return {
     score,
@@ -150,11 +181,21 @@ async function callOpenAiCompatible(
       parsed.explanation ||
         "AI reviewed the claim. Owner approval still required."
     ),
-    confidence: clampNum(Number(parsed.confidence ?? 0.6), 0, 1),
+    confidence: clampNum(
+      Math.min(Number(parsed.confidence ?? 0.6), confidenceCap),
+      0,
+      1
+    ),
+    evidence_quality: evidenceQuality,
+    evidence_notes: evidenceNotes,
     mode: "live",
     model: config.model,
     provider: config.provider,
   };
+}
+
+function hasImage(value?: string | null): value is string {
+  return Boolean(value?.startsWith("data:image/"));
 }
 
 function arr(v: unknown): string[] {

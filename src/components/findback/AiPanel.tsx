@@ -4,6 +4,11 @@ import type { AiClaimReport } from "@/lib/ai/types";
 import { Brain, CheckCircle, Warning, XCircle } from "@phosphor-icons/react";
 
 const decisionCopy = { ACCEPT: "Có thể chấp nhận", REVIEW: "Cần kiểm tra thêm", REJECT: "Nên từ chối" } as const;
+const evidenceQualityCopy = {
+  "image-backed": "Đã đối chiếu 2 ảnh",
+  "partial-image": "Chỉ có 1 ảnh để kiểm tra",
+  "text-only": "Chỉ đánh giá từ văn bản",
+} as const;
 
 export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, canDecide }: { report: AiClaimReport; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean }) {
   const Icon = report.decision === "ACCEPT" ? CheckCircle : report.decision === "REJECT" ? XCircle : Warning;
@@ -32,6 +37,17 @@ export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, can
       </div>
 
       <p className="mt-5 text-sm leading-7 text-ink">{report.explanation}</p>
+
+      {report.evidence_quality && (
+        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+          <p className="font-bold">Mức bằng chứng: {evidenceQualityCopy[report.evidence_quality]}</p>
+          {report.evidence_notes && report.evidence_notes.length > 0 && (
+            <ul className="mt-2 space-y-1 leading-6">
+              {report.evidence_notes.map((note) => <li key={note}>• {note}</li>)}
+            </ul>
+          )}
+        </div>
+      )}
 
       <div className="mt-6 grid gap-4 lg:grid-cols-3">
         <EvidenceList title="Điểm trùng khớp" items={report.matching_features} empty="Chưa có điểm trùng khớp rõ ràng." tone="good" />

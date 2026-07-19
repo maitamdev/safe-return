@@ -8,6 +8,8 @@ export type AiClaimReport = {
   fraud_signals: string[];
   explanation: string;
   confidence: number; // 0-1
+  evidence_quality?: "image-backed" | "partial-image" | "text-only";
+  evidence_notes?: string[];
   mode: "live";
   model?: string;
   provider?: "groq" | "openai-compatible";
