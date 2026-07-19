@@ -1,22 +1,22 @@
-/** FindBack AI — Solana Devnet config */
+/** SafeReturn — Solana Devnet config */
 
 export const SOLANA_CLUSTER = "devnet" as const;
 
 export const SOLANA_RPC =
   process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
 
-/** FindBack program (target/deploy/findback-keypair.json) */
+/** SafeReturn program (technical Anchor artifact name: findback). */
 export const FINDBACK_PROGRAM_ID =
   process.env.NEXT_PUBLIC_FINDBACK_PROGRAM_ID ||
   "3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna";
 
 /**
- * FIND Reward Token — Devnet SPL test mint (NOT real USDC).
+ * FIND Reward Token — a real SPL token deployed on Devnet.
+ * It has no monetary value and is used only by the escrow program.
  * Created by scripts/setup-findback-devnet.mjs
  */
 export const FIND_MINT =
   process.env.NEXT_PUBLIC_FIND_MINT ||
-  process.env.NEXT_PUBLIC_MOCK_USDC_MINT ||
   "9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy";
 
 export const FIND_DECIMALS = 6;
@@ -26,7 +26,6 @@ export const FIND_NAME = "FIND Reward Token";
 /** Default arbiter (deployer) for dispute resolve */
 export const ARBITER =
   process.env.NEXT_PUBLIC_ARBITER ||
-  process.env.NEXT_PUBLIC_SAFEPOINT_AUTHORITY ||
   "DoNrsajZ2Yo8C1biPb8BiB2z3S5ZwZ9VWuFMwF8R2CUa";
 
 export const SOLANA_LIVE =
