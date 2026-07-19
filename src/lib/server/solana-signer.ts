@@ -21,6 +21,22 @@ export function loadServerKeypair(): Keypair {
   return Keypair.fromSecretKey(Uint8Array.from(secret));
 }
 
+export function loadSponsorKeypair(): Keypair {
+  const inline = process.env.SPONSOR_KEYPAIR_JSON?.trim();
+  if (!inline) {
+    throw new Error("Server chưa cấu hình SPONSOR_KEYPAIR_JSON cho phí Devnet.");
+  }
+  const parsed = JSON.parse(inline) as unknown;
+  if (
+    !Array.isArray(parsed) ||
+    parsed.length !== 64 ||
+    parsed.some((value) => !Number.isInteger(value) || value < 0 || value > 255)
+  ) {
+    throw new Error("SPONSOR_KEYPAIR_JSON không phải secret key Solana 64 byte hợp lệ.");
+  }
+  return Keypair.fromSecretKey(Uint8Array.from(parsed));
+}
+
 export function keypairWallet(keypair: Keypair): WalletLike {
   return {
     publicKey: keypair.publicKey,

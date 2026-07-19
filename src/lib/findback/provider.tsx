@@ -37,10 +37,12 @@ import {
   FINDBACK_PROGRAM_ID,
   FIND_MINT,
   PROTOCOL_V2_ENABLED,
+  SPONSORED_FEES_ENABLED,
   SOLANA_LIVE,
   fromAtomic,
   toAtomic,
 } from "./config";
+import { sendSponsoredTransaction } from "./sponsored";
 import {
   evidenceIntegrityPayload,
   evidenceIntegrityPayloadV2,
@@ -343,14 +345,24 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
 
       const created = existing
         ? null
-        : await runTx("create_bounty", () =>
-            createBountyOnChain(w, {
-              bountyId: input.id,
-              rewardUi: input.rewardUi,
-              deadlineUnix,
-              metadataHash,
-            })
-          );
+        : SPONSORED_FEES_ENABLED && useV2
+          ? await runTx("create_bounty_sponsored", () =>
+              sendSponsoredTransaction(w, {
+                action: "create_bounty",
+                bountyId: input.id,
+                rewardUi: input.rewardUi,
+                deadlineUnix,
+                metadataHashHex,
+              })
+            )
+          : await runTx("create_bounty", () =>
+              createBountyOnChain(w, {
+                bountyId: input.id,
+                rewardUi: input.rewardUi,
+                deadlineUnix,
+                metadataHash,
+              })
+            );
       const draft = {
         ...meta,
         lastTx: created?.signature ?? null,
@@ -369,9 +381,16 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         throw new Error(`Bounty đã ở trạng thái ${existing.status}, không thể nạp lại.`);
       }
 
-      const funded = await runTx("fund_bounty", () =>
-        fundBountyOnChain(w, input.id, input.rewardUi)
-      );
+      const funded = SPONSORED_FEES_ENABLED && useV2
+        ? await runTx("fund_bounty_sponsored", () =>
+            sendSponsoredTransaction(w, {
+              action: "fund_bounty",
+              bountyId: input.id,
+            })
+          )
+        : await runTx("fund_bounty", () =>
+            fundBountyOnChain(w, input.id, input.rewardUi)
+          );
 
       const saved = {
         ...draft,
@@ -396,9 +415,18 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       if (!onchain) throw new Error("Không tìm thấy bounty trên Devnet.");
       const remaining = onchain.rewardAmount - onchain.amountFunded;
       if (remaining <= BigInt(0)) throw new Error("Bounty đã được nạp đủ phần thưởng.");
-      const result = await runTx("fund_bounty", () =>
-        fundBountyOnChain(w, bountyId, fromAtomic(remaining))
-      );
+      const useSponsored =
+        SPONSORED_FEES_ENABLED && onchain.protocolVersion >= 2;
+      const result = useSponsored
+        ? await runTx("fund_bounty_sponsored", () =>
+            sendSponsoredTransaction(w, {
+              action: "fund_bounty",
+              bountyId,
+            })
+          )
+        : await runTx("fund_bounty", () =>
+            fundBountyOnChain(w, bountyId, fromAtomic(remaining))
+          );
       const updated = {
         ...meta,
         status: "Funded",
@@ -500,9 +528,17 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         .join("");
 
       const claimTx = useV2
-        ? await runTx("submit_claim_v2", () =>
-            submitClaimV2OnChain(w, input.bountyId, evidenceHash)
-          )
+        ? SPONSORED_FEES_ENABLED
+          ? await runTx("submit_claim_v2_sponsored", () =>
+              sendSponsoredTransaction(w, {
+                action: "submit_claim_v2",
+                bountyId: input.bountyId,
+                evidenceHashHex,
+              })
+            )
+          : await runTx("submit_claim_v2", () =>
+              submitClaimV2OnChain(w, input.bountyId, evidenceHash)
+            )
         : await runTx("submit_claim", () =>
             submitClaimOnChain(w, input.bountyId, evidenceHash)
           );

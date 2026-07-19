@@ -30,44 +30,41 @@ pub mod findback {
         deadline: i64,
         metadata_hash: [u8; 32],
     ) -> Result<()> {
-        require!(
-            bounty_id.len() > 0 && bounty_id.len() <= MAX_ID_LEN,
-            FbError::InvalidId
-        );
-        require!(reward_amount > 0, FbError::ZeroReward);
-        let now = Clock::get()?.unix_timestamp;
-        require!(deadline > now, FbError::InvalidDeadline);
-
-        let b = &mut ctx.accounts.bounty;
-        b.owner = ctx.accounts.owner.key();
-        b.finder = Pubkey::default();
-        b.arbiter = ctx.accounts.arbiter.key();
-        b.mint = ctx.accounts.mint.key();
-        b.bounty_id = bounty_id;
-        b.reward_amount = reward_amount;
-        b.amount_funded = 0;
-        b.deadline = deadline;
-        b.status = BountyStatus::Draft;
-        b.metadata_hash = metadata_hash;
-        b.evidence_hash = [0u8; 32];
-        b.ai_score = 0;
-        b.ai_risk = 0;
-        b.ai_decision = 0;
-        b.ai_explanation_hash = [0u8; 32];
-        b.bump = ctx.bumps.bounty;
-        b.vault_bump = ctx.bumps.vault_authority;
-        b.created_at = now;
-        b.updated_at = now;
-        b.protocol_version = 2;
-
-        emit!(BountyCreated {
-            bounty: b.key(),
-            owner: b.owner,
-            bounty_id: b.bounty_id.clone(),
+        initialize_bounty(
+            &mut ctx.accounts.bounty,
+            ctx.accounts.owner.key(),
+            ctx.accounts.arbiter.key(),
+            ctx.accounts.mint.key(),
+            bounty_id,
             reward_amount,
             deadline,
-        });
-        Ok(())
+            metadata_hash,
+            ctx.bumps.bounty,
+            ctx.bumps.vault_authority,
+        )
+    }
+
+    /// Gasless onboarding variant. The owner still authorizes the bounty while a restricted
+    /// application sponsor pays only the account rent and transaction fee.
+    pub fn create_bounty_sponsored(
+        ctx: Context<CreateBountySponsored>,
+        bounty_id: String,
+        reward_amount: u64,
+        deadline: i64,
+        metadata_hash: [u8; 32],
+    ) -> Result<()> {
+        initialize_bounty(
+            &mut ctx.accounts.bounty,
+            ctx.accounts.owner.key(),
+            ctx.accounts.arbiter.key(),
+            ctx.accounts.mint.key(),
+            bounty_id,
+            reward_amount,
+            deadline,
+            metadata_hash,
+            ctx.bumps.bounty,
+            ctx.bumps.vault_authority,
+        )
     }
 
     pub fn fund_bounty(ctx: Context<FundBounty>, amount: u64) -> Result<()> {
@@ -93,22 +90,22 @@ pub mod findback {
         );
         token::transfer(cpi, amount)?;
 
-        b.amount_funded = b
-            .amount_funded
-            .checked_add(amount)
-            .ok_or(FbError::MathOverflow)?;
-        if b.amount_funded >= b.reward_amount {
-            b.status = BountyStatus::Funded;
-        }
-        b.updated_at = Clock::get()?.unix_timestamp;
+        apply_funding(b, amount)
+    }
 
-        emit!(BountyFunded {
-            bounty: b.key(),
-            amount,
-            total_funded: b.amount_funded,
-            status: b.status,
-        });
-        Ok(())
+    pub fn fund_bounty_sponsored(ctx: Context<FundBountySponsored>, amount: u64) -> Result<()> {
+        let b = &mut ctx.accounts.bounty;
+        validate_funding(b, ctx.accounts.owner.key(), ctx.accounts.mint.key(), amount)?;
+        let cpi = CpiContext::new(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.owner_token.to_account_info(),
+                to: ctx.accounts.vault_token.to_account_info(),
+                authority: ctx.accounts.owner.to_account_info(),
+            },
+        );
+        token::transfer(cpi, amount)?;
+        apply_funding(b, amount)
     }
 
     pub fn submit_claim(ctx: Context<SubmitClaim>, evidence_hash: [u8; 32]) -> Result<()> {
@@ -141,40 +138,26 @@ pub mod findback {
     /// Existing v1 bounty accounts remain readable and settle through their
     /// original instructions; all new multi-claim clients use this instruction.
     pub fn submit_claim_v2(ctx: Context<SubmitClaimV2>, evidence_hash: [u8; 32]) -> Result<()> {
-        let b = &ctx.accounts.bounty;
-        require!(b.protocol_version >= 2, FbError::ProtocolVersionMismatch);
-        require!(b.status == BountyStatus::Funded, FbError::InvalidStatus);
-        require!(b.amount_funded >= b.reward_amount, FbError::NotFullyFunded);
-        let now = Clock::get()?.unix_timestamp;
-        require!(now <= b.deadline, FbError::PastDeadline);
-        require!(
-            ctx.accounts.finder.key() != b.owner,
-            FbError::OwnerCannotClaim
-        );
-        require!(evidence_hash != [0u8; 32], FbError::EmptyEvidence);
-
-        let claim = &mut ctx.accounts.claim;
-        claim.bounty = b.key();
-        claim.finder = ctx.accounts.finder.key();
-        claim.evidence_hash = evidence_hash;
-        claim.ai_input_hash = [0u8; 32];
-        claim.ai_report_hash = [0u8; 32];
-        claim.ai_model_hash = [0u8; 32];
-        claim.ai_score = 0;
-        claim.ai_risk = 0;
-        claim.ai_decision = 1;
-        claim.status = ClaimV2Status::Submitted;
-        claim.bump = ctx.bumps.claim;
-        claim.created_at = now;
-        claim.updated_at = now;
-
-        emit!(ClaimV2Submitted {
-            bounty: b.key(),
-            claim: claim.key(),
-            finder: claim.finder,
+        initialize_claim_v2(
+            &ctx.accounts.bounty,
+            &mut ctx.accounts.claim,
+            ctx.accounts.finder.key(),
             evidence_hash,
-        });
-        Ok(())
+            ctx.bumps.claim,
+        )
+    }
+
+    pub fn submit_claim_v2_sponsored(
+        ctx: Context<SubmitClaimV2Sponsored>,
+        evidence_hash: [u8; 32],
+    ) -> Result<()> {
+        initialize_claim_v2(
+            &ctx.accounts.bounty,
+            &mut ctx.accounts.claim,
+            ctx.accounts.finder.key(),
+            evidence_hash,
+            ctx.bumps.claim,
+        )
     }
 
     /// Records off-chain AI result (hash + score). Does NOT move tokens.
@@ -885,6 +868,29 @@ pub struct CreateBounty<'info> {
 }
 
 #[derive(Accounts)]
+#[instruction(bounty_id: String)]
+pub struct CreateBountySponsored<'info> {
+    pub owner: Signer<'info>,
+    #[account(mut)]
+    pub sponsor: Signer<'info>,
+    /// CHECK: arbiter pubkey stored only.
+    pub arbiter: UncheckedAccount<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        init,
+        payer = sponsor,
+        space = Bounty::SPACE,
+        seeds = [BOUNTY_SEED, bounty_id.as_bytes()],
+        bump
+    )]
+    pub bounty: Account<'info, Bounty>,
+    /// CHECK: PDA vault authority.
+    #[account(seeds = [VAULT_SEED, bounty_id.as_bytes()], bump)]
+    pub vault_authority: UncheckedAccount<'info>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct FundBounty<'info> {
     #[account(mut)]
     pub owner: Signer<'info>,
@@ -919,6 +925,41 @@ pub struct FundBounty<'info> {
 }
 
 #[derive(Accounts)]
+pub struct FundBountySponsored<'info> {
+    pub owner: Signer<'info>,
+    #[account(mut)]
+    pub sponsor: Signer<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        mut,
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump,
+        has_one = owner,
+        has_one = mint
+    )]
+    pub bounty: Account<'info, Bounty>,
+    /// CHECK: PDA authority verified by seeds.
+    #[account(seeds = [VAULT_SEED, bounty.bounty_id.as_bytes()], bump = bounty.vault_bump)]
+    pub vault_authority: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = owner
+    )]
+    pub owner_token: Account<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = sponsor,
+        associated_token::mint = mint,
+        associated_token::authority = vault_authority
+    )]
+    pub vault_token: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
 pub struct SubmitClaim<'info> {
     pub finder: Signer<'info>,
     #[account(
@@ -941,6 +982,27 @@ pub struct SubmitClaimV2<'info> {
     #[account(
         init,
         payer = finder,
+        space = ClaimV2::SPACE,
+        seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), finder.key().as_ref()],
+        bump
+    )]
+    pub claim: Account<'info, ClaimV2>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct SubmitClaimV2Sponsored<'info> {
+    pub finder: Signer<'info>,
+    #[account(mut)]
+    pub sponsor: Signer<'info>,
+    #[account(
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        init,
+        payer = sponsor,
         space = ClaimV2::SPACE,
         seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), finder.key().as_ref()],
         bump
@@ -1441,6 +1503,141 @@ pub enum FbError {
     ProtocolVersionMismatch,
     #[msg("Settlement is not final")]
     SettlementNotFinal,
+}
+
+#[allow(clippy::too_many_arguments)]
+fn initialize_bounty(
+    bounty: &mut Account<Bounty>,
+    owner: Pubkey,
+    arbiter: Pubkey,
+    mint: Pubkey,
+    bounty_id: String,
+    reward_amount: u64,
+    deadline: i64,
+    metadata_hash: [u8; 32],
+    bump: u8,
+    vault_bump: u8,
+) -> Result<()> {
+    require!(
+        !bounty_id.is_empty() && bounty_id.len() <= MAX_ID_LEN,
+        FbError::InvalidId
+    );
+    require!(reward_amount > 0, FbError::ZeroReward);
+    let now = Clock::get()?.unix_timestamp;
+    require!(deadline > now, FbError::InvalidDeadline);
+
+    bounty.owner = owner;
+    bounty.finder = Pubkey::default();
+    bounty.arbiter = arbiter;
+    bounty.mint = mint;
+    bounty.bounty_id = bounty_id;
+    bounty.reward_amount = reward_amount;
+    bounty.amount_funded = 0;
+    bounty.deadline = deadline;
+    bounty.status = BountyStatus::Draft;
+    bounty.metadata_hash = metadata_hash;
+    bounty.evidence_hash = [0u8; 32];
+    bounty.ai_score = 0;
+    bounty.ai_risk = 0;
+    bounty.ai_decision = 0;
+    bounty.ai_explanation_hash = [0u8; 32];
+    bounty.bump = bump;
+    bounty.vault_bump = vault_bump;
+    bounty.created_at = now;
+    bounty.updated_at = now;
+    bounty.protocol_version = 2;
+
+    emit!(BountyCreated {
+        bounty: bounty.key(),
+        owner,
+        bounty_id: bounty.bounty_id.clone(),
+        reward_amount,
+        deadline,
+    });
+    Ok(())
+}
+
+fn validate_funding(
+    bounty: &Account<Bounty>,
+    owner: Pubkey,
+    mint: Pubkey,
+    amount: u64,
+) -> Result<()> {
+    require_keys_eq!(bounty.owner, owner, FbError::Unauthorized);
+    require!(
+        matches!(bounty.status, BountyStatus::Draft | BountyStatus::Funded),
+        FbError::InvalidStatus
+    );
+    require!(amount > 0, FbError::ZeroReward);
+    require_keys_eq!(bounty.mint, mint, FbError::InvalidMint);
+    let remaining = remaining_funding(bounty.reward_amount, bounty.amount_funded)
+        .ok_or(FbError::MathOverflow)?;
+    require!(amount <= remaining, FbError::FundingExceedsReward);
+    Ok(())
+}
+
+fn apply_funding(bounty: &mut Account<Bounty>, amount: u64) -> Result<()> {
+    bounty.amount_funded = bounty
+        .amount_funded
+        .checked_add(amount)
+        .ok_or(FbError::MathOverflow)?;
+    if bounty.amount_funded >= bounty.reward_amount {
+        bounty.status = BountyStatus::Funded;
+    }
+    bounty.updated_at = Clock::get()?.unix_timestamp;
+    emit!(BountyFunded {
+        bounty: bounty.key(),
+        amount,
+        total_funded: bounty.amount_funded,
+        status: bounty.status,
+    });
+    Ok(())
+}
+
+fn initialize_claim_v2(
+    bounty: &Account<Bounty>,
+    claim: &mut Account<ClaimV2>,
+    finder: Pubkey,
+    evidence_hash: [u8; 32],
+    bump: u8,
+) -> Result<()> {
+    require!(
+        bounty.protocol_version >= 2,
+        FbError::ProtocolVersionMismatch
+    );
+    require!(
+        bounty.status == BountyStatus::Funded,
+        FbError::InvalidStatus
+    );
+    require!(
+        bounty.amount_funded >= bounty.reward_amount,
+        FbError::NotFullyFunded
+    );
+    let now = Clock::get()?.unix_timestamp;
+    require!(now <= bounty.deadline, FbError::PastDeadline);
+    require!(finder != bounty.owner, FbError::OwnerCannotClaim);
+    require!(evidence_hash != [0u8; 32], FbError::EmptyEvidence);
+
+    claim.bounty = bounty.key();
+    claim.finder = finder;
+    claim.evidence_hash = evidence_hash;
+    claim.ai_input_hash = [0u8; 32];
+    claim.ai_report_hash = [0u8; 32];
+    claim.ai_model_hash = [0u8; 32];
+    claim.ai_score = 0;
+    claim.ai_risk = 0;
+    claim.ai_decision = 1;
+    claim.status = ClaimV2Status::Submitted;
+    claim.bump = bump;
+    claim.created_at = now;
+    claim.updated_at = now;
+    emit!(ClaimV2Submitted {
+        bounty: bounty.key(),
+        claim: claim.key(),
+        finder,
+        evidence_hash,
+    });
+    Ok(())
 }
 
 fn remaining_funding(reward_amount: u64, amount_funded: u64) -> Option<u64> {

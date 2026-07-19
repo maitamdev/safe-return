@@ -11,8 +11,11 @@ import {
   RETURN_ATTESTATION_SEED,
   bountyPda,
   claimV2Pda,
+  createBountySponsoredInstruction,
+  fundBountySponsoredInstruction,
   reputationPda,
   returnAttestationPda,
+  submitClaimV2SponsoredInstruction,
 } from "./program";
 
 type IdlInstruction = { name: string; discriminator: number[] };
@@ -100,5 +103,41 @@ describe("FindBack generated IDL contract", () => {
         PROGRAM_PK,
       )[0],
     );
+  });
+
+  it("keeps sponsored instructions restricted to the user and sponsor signers", () => {
+    const owner = Keypair.generate().publicKey;
+    const sponsor = Keypair.generate().publicKey;
+    const bountyId = "sponsored-test";
+    const instructionsToCheck = [
+      createBountySponsoredInstruction({
+        owner,
+        sponsor,
+        bountyId,
+        rewardAmount: BigInt(1_000_000),
+        deadlineUnix: 2_000_000_000,
+        metadataHash: new Uint8Array(32).fill(1),
+      }),
+      fundBountySponsoredInstruction({
+        owner,
+        sponsor,
+        bountyId,
+        amount: BigInt(1_000_000),
+      }),
+      submitClaimV2SponsoredInstruction({
+        finder: owner,
+        sponsor,
+        bountyId,
+        evidenceHash: new Uint8Array(32).fill(2),
+      }),
+    ];
+
+    for (const instruction of instructionsToCheck) {
+      const signers = instruction.keys.filter((key) => key.isSigner);
+      expect(instruction.programId).toEqual(PROGRAM_PK);
+      expect(signers).toHaveLength(2);
+      expect(signers.some((key) => key.pubkey.equals(owner))).toBe(true);
+      expect(signers.some((key) => key.pubkey.equals(sponsor) && key.isWritable)).toBe(true);
+    }
   });
 });

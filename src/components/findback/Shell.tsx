@@ -104,6 +104,9 @@ function transactionLabel(ix: string | null) {
     refund_after_expiry: "yêu cầu hoàn tiền",
     cancel_bounty: "lệnh hủy bounty",
     resolve_dispute: "quyết định phân xử",
+    create_bounty_sponsored: "bounty được tài trợ phí",
+    fund_bounty_sponsored: "escrow được tài trợ phí",
+    submit_claim_v2_sponsored: "claim được tài trợ phí",
   };
   return ix ? labels[ix] ?? ix : "giao dịch";
 }

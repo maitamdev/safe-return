@@ -52,6 +52,9 @@ export const IX = {
   open_dispute_v2: Buffer.from([61, 105, 238, 185, 222, 78, 48, 138]),
   resolve_dispute_v2: Buffer.from([35, 255, 241, 246, 120, 1, 194, 73]),
   attest_settlement: Buffer.from([139, 194, 42, 227, 36, 121, 240, 227]),
+  create_bounty_sponsored: Buffer.from([60, 19, 90, 70, 98, 64, 136, 4]),
+  fund_bounty_sponsored: Buffer.from([84, 28, 214, 201, 200, 21, 52, 48]),
+  submit_claim_v2_sponsored: Buffer.from([88, 167, 40, 12, 141, 217, 243, 23]),
 } as const;
 
 const CLAIM_V2_DISCRIMINATOR = Buffer.from([91, 3, 14, 101, 67, 160, 222, 63]);
@@ -277,6 +280,92 @@ function encodeBytes32(h: Uint8Array | Buffer): Buffer {
   const b = Buffer.alloc(32);
   Buffer.from(h).copy(b, 0, 0, 32);
   return b;
+}
+
+export function createBountySponsoredInstruction(args: {
+  owner: PublicKey;
+  sponsor: PublicKey;
+  bountyId: string;
+  rewardAmount: bigint;
+  deadlineUnix: number;
+  metadataHash: Uint8Array;
+}): TransactionInstruction {
+  const mint = requireMint();
+  const arbiter = requireArbiter();
+  const [bounty] = bountyPda(args.bountyId);
+  const [vaultAuthority] = vaultAuthorityPda(args.bountyId);
+  return new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: args.owner, isSigner: true, isWritable: false },
+      { pubkey: args.sponsor, isSigner: true, isWritable: true },
+      { pubkey: arbiter, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: vaultAuthority, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      IX.create_bounty_sponsored,
+      encodeString(args.bountyId),
+      encodeU64(args.rewardAmount),
+      encodeI64(args.deadlineUnix),
+      encodeBytes32(args.metadataHash),
+    ]),
+  });
+}
+
+export function fundBountySponsoredInstruction(args: {
+  owner: PublicKey;
+  sponsor: PublicKey;
+  bountyId: string;
+  amount: bigint;
+}): TransactionInstruction {
+  const mint = requireMint();
+  const [bounty] = bountyPda(args.bountyId);
+  const [vaultAuthority] = vaultAuthorityPda(args.bountyId);
+  const ownerToken = getAssociatedTokenAddressSync(mint, args.owner);
+  const vaultToken = getAssociatedTokenAddressSync(mint, vaultAuthority, true);
+  return new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: args.owner, isSigner: true, isWritable: false },
+      { pubkey: args.sponsor, isSigner: true, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: vaultAuthority, isSigner: false, isWritable: false },
+      { pubkey: ownerToken, isSigner: false, isWritable: true },
+      { pubkey: vaultToken, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([IX.fund_bounty_sponsored, encodeU64(args.amount)]),
+  });
+}
+
+export function submitClaimV2SponsoredInstruction(args: {
+  finder: PublicKey;
+  sponsor: PublicKey;
+  bountyId: string;
+  evidenceHash: Uint8Array;
+}): TransactionInstruction {
+  const [bounty] = bountyPda(args.bountyId);
+  const [claim] = claimV2Pda(args.bountyId, args.finder);
+  return new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: args.finder, isSigner: true, isWritable: false },
+      { pubkey: args.sponsor, isSigner: true, isWritable: true },
+      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: claim, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      IX.submit_claim_v2_sponsored,
+      encodeBytes32(args.evidenceHash),
+    ]),
+  });
 }
 
 async function sendIx(
