@@ -2,134 +2,62 @@
 
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { ArrowSquareOut, Plus, Tray } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { FIND_SYMBOL } from "@/lib/findback/config";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
-import { statusBadge } from "@/components/findback/BountyCard";
+import { statusBadge, statusLabel } from "@/components/findback/BountyCard";
 
 export default function DashboardPage() {
   const { publicKey, connected } = useWallet();
-  const { bounties, lastTxUrl, lastIx, txState } = useFindBack();
-  const mine = publicKey
-    ? bounties.filter((b) => b.ownerWallet === publicKey.toBase58())
-    : [];
-  const claimed = publicKey
-    ? bounties.filter((b) => b.claim?.finderWallet === publicKey.toBase58())
-    : [];
-
-  const locked = mine.reduce((s, b) => s + (b.claim || b.aiReport ? 0 : b.rewardUi), 0);
+  const { bounties, loadingBounties, lastTxUrl, lastIx, txState } = useFindBack();
+  const address = publicKey?.toBase58();
+  const owned = address ? bounties.filter((b) => b.ownerWallet === address) : [];
+  const claimed = address ? bounties.filter((b) => b.claim?.finderWallet === address) : [];
+  const totalRewards = owned.reduce((total, bounty) => total + bounty.rewardUi, 0);
 
   return (
-    <div className="space-y-8">
-      <div>
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#9945FF]">
-          Owner dashboard
-        </p>
-        <h1 className="mt-1 font-display text-3xl font-bold">Your bounties</h1>
-        <p className="mt-2 text-sm text-white/55">
-          AI recommends. You sign. Escrow only releases after your approval.
-        </p>
+    <div>
+      <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
+        <div>
+          <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Hoạt động của tôi</h1>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Quản lý tin do ví hiện tại tạo và theo dõi các claim đã gửi.</p>
+        </div>
+        <Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} />Tạo tin mới</Link>
       </div>
 
-      {!connected && (
-        <div className="rounded-3xl border border-white/10 bg-white/5 p-6">
-          <p className="mb-3 text-sm text-white/60">Connect Phantom to manage bounties.</p>
-          <ConnectWalletButton size="md" />
-        </div>
+      {!connected && <div className="app-card mt-8 p-6"><h2 className="text-lg font-bold">Kết nối ví để xem dữ liệu cá nhân</h2><p className="mt-2 mb-4 text-sm text-ink-soft">Tài khoản email xác thực người dùng. Địa chỉ Phantom xác định bounty và claim on-chain.</p><ConnectWalletButton size="md" /></div>}
+
+      {connected && (
+        <>
+          <dl className="mt-8 grid gap-4 sm:grid-cols-3">
+            <Stat label="Tin đã tạo" value={loadingBounties ? "Đang tải" : String(owned.length)} />
+            <Stat label={`Tổng thưởng đã đặt (${FIND_SYMBOL})`} value={loadingBounties ? "Đang tải" : totalRewards.toLocaleString("vi-VN")} />
+            <Stat label="Claim đã gửi" value={loadingBounties ? "Đang tải" : String(claimed.length)} />
+          </dl>
+
+          {lastTxUrl && <a href={lastTxUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-forest hover:underline">Giao dịch gần nhất: {txState} {lastIx ? `(${lastIx})` : ""}<ArrowSquareOut size={15} /></a>}
+
+          <section className="mt-10">
+            <h2 className="text-xl font-bold">Tin do tôi tạo</h2>
+            {owned.length > 0 ? <div className="mt-4 grid gap-3">{owned.map((bounty) => <BountyRow key={bounty.id} bounty={bounty} />)}</div> : <Empty text="Ví này chưa tạo bounty nào." action="Tạo tin đầu tiên" href="/bounties/create" />}
+          </section>
+
+          <section className="mt-10 border-t border-line pt-8">
+            <h2 className="text-xl font-bold">Claim tôi đã gửi</h2>
+            {claimed.length > 0 ? <div className="mt-4 grid gap-3">{claimed.map((bounty) => <BountyRow key={bounty.id} bounty={bounty} />)}</div> : <Empty text="Ví này chưa gửi claim nào." action="Xem tin đang mở" href="/bounties" />}
+          </section>
+        </>
       )}
-
-      <div className="grid gap-4 sm:grid-cols-3">
-        <Stat label="Owned bounties" value={String(mine.length)} />
-        <Stat label={`Listed ${FIND_SYMBOL}`} value={String(locked || "—")} />
-        <Stat
-          label="Last tx"
-          value={
-            lastTxUrl ? (
-              <a href={lastTxUrl} className="text-[#14F195] hover:underline" target="_blank" rel="noreferrer">
-                {txState} · {lastIx}
-              </a>
-            ) : (
-              "—"
-            )
-          }
-        />
-      </div>
-
-      <section>
-        <h2 className="text-sm font-bold uppercase tracking-wider text-white/45">
-          Created by you
-        </h2>
-        <div className="mt-3 space-y-2">
-          {mine.length === 0 && (
-            <p className="text-sm text-white/40">
-              No on-chain bounties yet.{" "}
-              <Link href="/bounties/create" className="text-[#14F195] underline">
-                Create one
-              </Link>
-            </p>
-          )}
-          {mine.map((b) => (
-            <Link
-              key={b.id}
-              href={`/bounties/${b.id}`}
-              className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3 transition hover:border-[#9945FF]/40"
-            >
-              <div>
-                <p className="font-semibold">{b.title}</p>
-                <p className="text-xs text-white/40">
-                  {b.rewardUi} {FIND_SYMBOL} · {b.location}
-                </p>
-                {b.aiReport && (
-                  <p className="mt-1 text-xs text-[#9945FF]">
-                    AI {b.aiReport.score} · {b.aiReport.decision}
-                  </p>
-                )}
-              </div>
-              <span
-                className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase ${statusBadge(
-                  b.aiReport ? "AiReviewed" : b.claim ? "ClaimSubmitted" : "Funded"
-                )}`}
-              >
-                {b.aiReport ? "AI reviewed" : b.claim ? "Claim" : "Open"}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
-
-      <section>
-        <h2 className="text-sm font-bold uppercase tracking-wider text-white/45">
-          Claims you submitted
-        </h2>
-        <div className="mt-3 space-y-2">
-          {claimed.length === 0 && (
-            <p className="text-sm text-white/40">No claims yet.</p>
-          )}
-          {claimed.map((b) => (
-            <Link
-              key={b.id}
-              href={`/bounties/${b.id}`}
-              className="flex items-center justify-between rounded-2xl border border-white/10 bg-white/[0.03] px-4 py-3"
-            >
-              <span className="font-semibold">{b.title}</span>
-              <span className="text-xs text-white/45">
-                {b.aiReport ? `AI ${b.aiReport.score}` : "pending AI"}
-              </span>
-            </Link>
-          ))}
-        </div>
-      </section>
     </div>
   );
 }
 
-function Stat({ label, value }: { label: string; value: React.ReactNode }) {
-  return (
-    <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-4">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-white/40">
-        {label}
-      </p>
-      <div className="mt-2 text-xl font-bold">{value}</div>
-    </div>
-  );
+function Stat({ label, value }: { label: string; value: string }) { return <div className="app-card p-5"><dt className="text-sm font-semibold text-ink-soft">{label}</dt><dd className="mt-2 text-2xl font-bold text-ink">{value}</dd></div>; }
+
+function BountyRow({ bounty }: { bounty: ReturnType<typeof useFindBack>["bounties"][number] }) {
+  const status = bounty.status || (bounty.aiReport ? "AiReviewed" : bounty.claim ? "ClaimSubmitted" : "Draft");
+  return <Link href={`/bounties/${bounty.id}`} className="app-card flex flex-col justify-between gap-4 p-4 transition hover:border-forest/45 sm:flex-row sm:items-center"><div><h3 className="font-bold text-ink">{bounty.title}</h3><p className="mt-1 text-sm text-ink-soft">{bounty.rewardUi} {FIND_SYMBOL} | {bounty.location}</p></div><span className={`self-start rounded-lg border px-2.5 py-1 text-xs font-bold sm:self-auto ${statusBadge(status)}`}>{statusLabel(status)}</span></Link>;
 }
+
+function Empty({ text, action, href }: { text: string; action: string; href: string }) { return <div className="app-card mt-4 flex flex-col items-center p-8 text-center"><Tray size={30} className="text-forest" /><p className="mt-3 text-sm text-ink-soft">{text}</p><Link href={href} className="app-button-secondary mt-4">{action}</Link></div>; }
