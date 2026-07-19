@@ -1,7 +1,7 @@
 [package]
 name = "findback"
 version = "0.1.0"
-description = "FindBack AI — lost & found bounty escrow on Solana"
+description = "SafeReturn — lost & found bounty escrow on Solana"
 edition = "2021"
 license = "MIT"
 
