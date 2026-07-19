@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "node:path";
 
 const isDev = process.env.NODE_ENV === "development";
 const contentSecurityPolicy = `
@@ -44,6 +45,10 @@ const nextConfig: NextConfig = {
       os: false,
       crypto: false,
       stream: false,
+    };
+    config.resolve.alias = {
+      ...config.resolve.alias,
+      "bigint-buffer": path.resolve(process.cwd(), "src/lib/vendor/bigint-buffer.ts"),
     };
     config.externals = [
       ...(Array.isArray(config.externals) ? config.externals : []),
