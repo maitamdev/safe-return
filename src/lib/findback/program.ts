@@ -1,5 +1,5 @@
 /**
- * FindBack AI — real Solana client (Anchor discriminators, no fake txs).
+ * SafeReturn — real Solana client (Anchor discriminators, no fake txs).
  */
 
 import {
@@ -158,6 +158,7 @@ async function sendIx(
   ixs: TransactionInstruction[],
   label: string
 ): Promise<{ signature: string; url: string }> {
+  void label;
   const connection = getConnection();
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
@@ -412,6 +413,57 @@ export async function openDisputeOnChain(wallet: WalletLike, bountyId: string) {
     data: Buffer.from(IX.open_dispute),
   });
   return sendIx(wallet, [ix], "open_dispute");
+}
+
+export async function cancelBountyOnChain(wallet: WalletLike, bountyId: string) {
+  const [bounty] = bountyPda(bountyId);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.from(IX.cancel_bounty),
+  });
+  return sendIx(wallet, [ix], "cancel_bounty");
+}
+
+export async function resolveDisputeOnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  counterparty: PublicKey,
+  releaseToFinder: boolean
+) {
+  const connection = getConnection();
+  const mint = requireMint();
+  const [bounty] = bountyPda(bountyId);
+  const [vaultAuth] = vaultAuthorityPda(bountyId);
+  const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
+  const counterpartyAta = getAssociatedTokenAddressSync(mint, counterparty, true);
+  const createAta = await ensureAtaIx(
+    connection,
+    wallet.publicKey,
+    counterparty,
+    mint
+  );
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+      { pubkey: counterparty, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: vaultAuth, isSigner: false, isWritable: false },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: counterpartyAta, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      IX.resolve_dispute,
+      Buffer.from([releaseToFinder ? 1 : 0]),
+    ]),
+  });
+  return sendIx(wallet, createAta ? [createAta, ix] : [ix], "resolve_dispute");
 }
 
 /** Manual Borsh-ish decode of Bounty account (Anchor layout). */
