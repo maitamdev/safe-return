@@ -17,7 +17,7 @@ export function UserMenu({ dark = false }: { dark?: boolean }) {
             : "rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900"
         }
       >
-        Setup login
+        Thiết lập
       </Link>
     );
   }
