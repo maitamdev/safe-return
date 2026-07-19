@@ -79,14 +79,19 @@ export async function POST(req: Request) {
         ? await mintTo(connection, payer, mint, ata.address, payer, shortfall)
         : null;
     const mintedUi = Number(shortfall) / 10 ** mintInfo.decimals;
+    const balanceUi = Number(ata.amount + shortfall) / 10 ** mintInfo.decimals;
+    const findNote =
+      shortfall > BigInt(0)
+        ? `Đã cấp thêm ${mintedUi} FIND Devnet. Số dư hiện tại là ${balanceUi} FIND.`
+        : `Ví đã có ${balanceUi} FIND Devnet, không cấp thêm.`;
 
     const afterSol = await connection.getBalance(recipient);
     return Response.json({
       ok: true,
       message:
         shortfall > BigInt(0)
-          ? `Đã bổ sung ${mintedUi} FIND để ví đạt tối đa ${TARGET_FIND} FIND Devnet.`
-          : `Ví đã có ít nhất ${TARGET_FIND} FIND Devnet, không mint thêm.`,
+          ? `Đã bổ sung FIND để ví đạt mức khởi đầu ${TARGET_FIND} FIND Devnet.`
+          : findNote,
       address,
       sol: {
         before: beforeSol / 1e9,
@@ -101,7 +106,9 @@ export async function POST(req: Request) {
       },
       find: {
         amount: mintedUi,
-        balance: Number(ata.amount + shortfall) / 10 ** mintInfo.decimals,
+        balance: balanceUi,
+        skipped: shortfall === BigInt(0),
+        note: findNote,
         mint: FIND_MINT,
         ata: ata.address.toBase58(),
         signature,

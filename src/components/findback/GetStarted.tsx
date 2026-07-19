@@ -12,16 +12,12 @@ import {
   Warning,
 } from "@phosphor-icons/react";
 import { FIND_MINT, FIND_SYMBOL, explorerTokensUrl, explorerTxUrl } from "@/lib/findback/config";
+import {
+  formatFundingSuccess,
+  type DevnetFundResult,
+} from "@/lib/findback/funding";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import { TokenBalances } from "@/components/wallet/TokenBalances";
-
-type FundResult = {
-  ok?: boolean;
-  error?: string;
-  message?: string;
-  sol?: { claimed?: boolean; explorerUrl?: string | null; note?: string };
-  find?: { amount?: number; skipped?: boolean; note?: string; signature?: string; explorerUrl?: string };
-};
 
 export function GetStarted() {
   const { publicKey, connected } = useWallet();
@@ -47,13 +43,11 @@ export function GetStarted() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ address, amount: 100 }),
       });
-      const result = (await response.json()) as FundResult;
+      const result = (await response.json()) as DevnetFundResult;
       if (!response.ok || !result.ok) throw new Error(result.error || "Không chuẩn bị được ví Devnet.");
 
-      if (result.find?.skipped) {
-        setMessage(`${result.sol?.note || "Đã kiểm tra SOL Devnet."} ${result.find.note || ""}`.trim());
-      } else {
-        setMessage(`Ví đã sẵn sàng. ${result.find?.amount ?? 100} ${FIND_SYMBOL} Devnet đã được cấp và SOL phí mạng đã được kiểm tra.`);
+      setMessage(formatFundingSuccess(result, FIND_SYMBOL));
+      if (!result.find?.skipped && (result.find?.amount ?? 0) > 0) {
         const signature = result.find?.signature;
         if (signature) setTxUrl(result.find?.explorerUrl || explorerTxUrl(signature));
       }
