@@ -2,15 +2,16 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import Image from "next/image";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { ArrowLeft, Check, ImageSquare, LockKey } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { FIND_SYMBOL } from "@/lib/findback/config";
+import { optimizeImage } from "@/lib/images/optimize";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
-import Link from "next/link";
 
-function newId() {
-  return `FB-${Math.random().toString(36).slice(2, 8).toUpperCase()}`;
-}
+const steps = ["Thông tin đồ vật", "Địa điểm và hạn", "Phần thưởng", "Xác nhận"];
 
 export default function CreateBountyPage() {
   const router = useRouter();
@@ -18,289 +19,141 @@ export default function CreateBountyPage() {
   const { createAndFund, txState, findMint } = useFindBack();
   const [step, setStep] = useState(0);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
+  const [error, setError] = useState<string | null>(null);
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [category, setCategory] = useState("Điện tử");
   const [location, setLocation] = useState("");
-  const [rewardUi, setRewardUi] = useState(50);
+  const [rewardUi, setRewardUi] = useState(10);
   const [days, setDays] = useState(7);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
+  const [imageBusy, setImageBusy] = useState(false);
 
-  const onFile = (file: File | null) => {
+  const onFile = async (file: File | null) => {
+    setError(null);
     if (!file) return;
-    if (file.size > 900_000) {
-      setErr("Ảnh tối đa ~900KB");
+    setImageBusy(true);
+    try {
+      const optimized = await optimizeImage(file);
+      setImageDataUrl(optimized.dataUrl);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setImageBusy(false);
+    }
+  };
+
+  const validateStep = () => {
+    if (step === 0 && (!title.trim() || description.trim().length < 20)) return "Hãy nhập tên đồ và mô tả ít nhất 20 ký tự.";
+    if (step === 1 && !location.trim()) return "Hãy nhập khu vực làm mất đồ.";
+    if (step === 1 && (days < 1 || days > 60)) return "Hạn nhận claim phải từ 1 đến 60 ngày.";
+    if (step === 2 && (!Number.isFinite(rewardUi) || rewardUi <= 0)) return "Phần thưởng phải lớn hơn 0 FIND.";
+    return null;
+  };
+
+  const next = () => {
+    const problem = validateStep();
+    if (problem) {
+      setError(problem);
       return;
     }
-    if (!file.type.startsWith("image/")) {
-      setErr("Chỉ nhận file ảnh");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => setImageDataUrl(String(reader.result));
-    reader.readAsDataURL(file);
+    setError(null);
+    setStep((current) => Math.min(3, current + 1));
   };
 
   const submit = async () => {
-    setErr(null);
+    setError(null);
     if (!connected) {
-      setErr("Kết nối Phantom (Devnet) trước khi ký.");
+      setError("Hãy kết nối Phantom ở mạng Devnet trước khi ký.");
       return;
     }
     if (!findMint) {
-      setErr("Thiếu FIND mint — liên hệ admin / chạy setup.");
-      return;
-    }
-    if (!title.trim() || !description.trim() || !location.trim()) {
-      setErr("Điền đủ tên đồ, mô tả và nơi mất.");
+      setError("Ứng dụng chưa cấu hình mint FIND Devnet.");
       return;
     }
     setBusy(true);
     try {
-      const id = newId();
-      await createAndFund({
-        id,
-        title: title.trim(),
-        description: description.trim(),
-        category,
-        location: location.trim(),
-        rewardUi,
-        days,
-        imageDataUrl,
-      });
+      const id = `FB-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+      await createAndFund({ id, title: title.trim(), description: description.trim(), category, location: location.trim(), rewardUi, days, imageDataUrl });
       router.push(`/bounties/${id}`);
-    } catch (e) {
-      setErr(e instanceof Error ? e.message : String(e));
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
       setBusy(false);
     }
   };
 
-  const steps = ["Đồ vật", "Nơi mất", "Thưởng", "Ký ví"];
-
   return (
-    <div className="mx-auto max-w-xl">
-      <Link
-        href="/bounties"
-        className="text-xs font-medium text-white/40 hover:text-white/70"
-      >
-        ← Quay lại danh sách
-      </Link>
-      <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.2em] text-[#9945FF]">
-        Tạo tin
-      </p>
-      <h1 className="mt-1 text-3xl font-bold tracking-tight">
-        Đăng tin mất đồ
-      </h1>
-      <p className="mt-2 text-sm text-white/50">
-        Khóa thưởng {FIND_SYMBOL} trên Solana Devnet. AI sẽ chấm claim sau — bạn
-        vẫn là người bấm chấp nhận.
-      </p>
-
-      <div className="mt-6 flex gap-2">
-        {steps.map((s, i) => (
-          <button
-            key={s}
-            type="button"
-            onClick={() => setStep(i)}
-            className={`flex-1 rounded-full py-2.5 text-[11px] font-bold transition ${
-              i === step
-                ? "bg-white text-black"
-                : i < step
-                  ? "bg-[#14F195]/20 text-[#14F195]"
-                  : "bg-white/5 text-white/40"
-            }`}
-          >
-            {i + 1}. {s}
-          </button>
-        ))}
+    <div className="mx-auto max-w-3xl">
+      <Link href="/bounties" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-forest"><ArrowLeft size={16} />Danh sách tin</Link>
+      <div className="mt-6">
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Tạo tin mất đồ</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-soft">Thông tin mô tả được lưu trong Supabase. Smart contract chỉ lưu hash, số thưởng, thời hạn và trạng thái giao dịch.</p>
       </div>
 
-      <div className="mt-6 space-y-4 rounded-[1.75rem] border border-white/10 bg-white/[0.03] p-5 md:p-6">
+      <ol className="mt-8 grid grid-cols-4 gap-2" aria-label="Tiến độ tạo tin">
+        {steps.map((label, index) => (
+          <li key={label} className="min-w-0">
+            <div className={`h-1.5 rounded-full ${index <= step ? "bg-forest" : "bg-line"}`} />
+            <p className={`mt-2 hidden text-xs sm:block ${index === step ? "font-bold text-ink" : "text-ink-muted"}`}>{label}</p>
+          </li>
+        ))}
+      </ol>
+
+      <div className="app-card mt-6 p-5 sm:p-7">
         {step === 0 && (
-          <>
-            <Field label="Tên đồ vật">
-              <input
-                className={inputCls}
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                placeholder="VD: Laptop Dell XPS bạc"
-              />
+          <div className="space-y-5">
+            <Field label="Tên đồ vật" hint="Tên ngắn và dễ nhận biết."><input className="app-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ví dụ: Laptop Dell XPS màu bạc" maxLength={120} /></Field>
+            <Field label="Loại đồ"><select className="app-input" value={category} onChange={(event) => setCategory(event.target.value)}>{["Điện tử", "Laptop", "Điện thoại", "Ví và túi", "Giấy tờ", "Chìa khóa", "Khác"].map((item) => <option key={item}>{item}</option>)}</select></Field>
+            <Field label="Mô tả nhận dạng" hint="Nêu màu sắc, thương hiệu, vết xước hoặc đặc điểm riêng. Không ghi thông tin bí mật dùng để xác minh."><textarea className="app-input min-h-32 resize-y" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả những đặc điểm người tìm có thể nhìn thấy" maxLength={1800} /></Field>
+            <Field label="Ảnh tham chiếu" hint="Không bắt buộc. Ảnh được lưu off-chain và không công khai trên blockchain.">
+              <span className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-bg-deep p-4 text-center hover:border-forest">
+                <ImageSquare size={26} className="text-forest" /><span className="mt-2 text-sm font-semibold">{imageBusy ? "Đang tối ưu ảnh" : "Chọn ảnh, tối đa 10 MB"}</span><input type="file" accept="image/*" disabled={imageBusy} className="sr-only" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
+              </span>
+              {imageDataUrl && <div className="mt-3"><Image unoptimized src={imageDataUrl} alt="Ảnh tham chiếu đã chọn" width={960} height={540} className="max-h-56 w-auto rounded-xl object-cover" /></div>}
             </Field>
-            <Field label="Loại">
-              <select
-                className={inputCls}
-                value={category}
-                onChange={(e) => setCategory(e.target.value)}
-              >
-                {[
-                  "Điện tử",
-                  "Laptop",
-                  "Điện thoại",
-                  "Ví / túi",
-                  "Giấy tờ",
-                  "Khác",
-                ].map((c) => (
-                  <option key={c} value={c} className="bg-[#0b1224]">
-                    {c}
-                  </option>
-                ))}
-              </select>
-            </Field>
-            <Field label="Mô tả (màu, thương hiệu, vết xước…)">
-              <textarea
-                className={`${inputCls} min-h-[110px]`}
-                value={description}
-                onChange={(e) => setDescription(e.target.value)}
-                placeholder="Càng chi tiết, AI chấm claim càng chính xác…"
-              />
-            </Field>
-            <Field label="Ảnh tham chiếu (lưu off-chain, không lên chain)">
-              <input
-                type="file"
-                accept="image/*"
-                onChange={(e) => onFile(e.target.files?.[0] ?? null)}
-                className="text-sm text-white/60"
-              />
-              {imageDataUrl && (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={imageDataUrl}
-                  alt=""
-                  className="mt-2 h-28 rounded-xl object-cover"
-                />
-              )}
-            </Field>
-          </>
-        )}
-
-        {step === 1 && (
-          <>
-            <Field label="Nơi mất / khu vực">
-              <input
-                className={inputCls}
-                value={location}
-                onChange={(e) => setLocation(e.target.value)}
-                placeholder="VD: UEF, Thủ Đức, thư viện tầng 2…"
-              />
-            </Field>
-            <Field label="Hạn nhận claim (ngày)">
-              <input
-                type="number"
-                min={1}
-                max={60}
-                className={inputCls}
-                value={days}
-                onChange={(e) => setDays(Number(e.target.value) || 7)}
-              />
-            </Field>
-          </>
-        )}
-
-        {step === 2 && (
-          <>
-            <Field label={`Số thưởng (${FIND_SYMBOL} test)`}>
-              <input
-                type="number"
-                min={1}
-                className={inputCls}
-                value={rewardUi}
-                onChange={(e) => setRewardUi(Number(e.target.value) || 1)}
-              />
-            </Field>
-            <p className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs leading-relaxed text-amber-100">
-              <strong>{FIND_SYMBOL}</strong> là token test trên Devnet — không
-              phải tiền thật. Cần số dư trong ví (bấm «Nhận 100 FIND» ở trang
-              danh sách).
-            </p>
-          </>
-        )}
-
-        {step === 3 && (
-          <div className="space-y-3 text-sm text-white/70">
-            <Row k="Đồ" v={title || "—"} />
-            <Row k="Nơi" v={location || "—"} />
-            <Row k="Thưởng" v={`${rewardUi} ${FIND_SYMBOL}`} />
-            <Row k="Hạn" v={`${days} ngày`} />
-            <Row k="Ví" v={connected ? "Đã nối Phantom" : "Chưa nối"} />
-            {!connected && (
-              <div className="pt-2">
-                <ConnectWalletButton dark size="md" />
-              </div>
-            )}
-            <p className="rounded-2xl border border-white/10 bg-black/30 p-3 text-xs text-white/45">
-              Bấm «Tạo & khóa thưởng» sẽ mở Phantom để ký 2 giao dịch thật trên
-              Devnet. Có thể xem chữ ký trên Solana Explorer sau khi xong.
-            </p>
           </div>
         )}
 
-        {err && (
-          <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 p-3 text-xs text-rose-200">
-            {err}
-          </p>
+        {step === 1 && (
+          <div className="space-y-5">
+            <Field label="Khu vực làm mất" hint="Đủ cụ thể để người tìm lọc tin, nhưng không đăng địa chỉ nhà riêng."><input className="app-input" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Ví dụ: Thư viện tầng 2, cơ sở Thủ Đức" maxLength={180} /></Field>
+            <Field label="Thời gian nhận claim"><div className="flex items-center gap-3"><input type="number" min={1} max={60} className="app-input max-w-32" value={days} onChange={(event) => setDays(Number(event.target.value))} /><span className="text-sm text-ink-soft">ngày kể từ lúc tạo</span></div></Field>
+          </div>
         )}
 
-        <div className="flex justify-between gap-2 pt-2">
-          <button
-            type="button"
-            disabled={step === 0 || busy}
-            onClick={() => setStep((s) => Math.max(0, s - 1))}
-            className="rounded-full border border-white/15 px-5 py-2.5 text-sm font-semibold disabled:opacity-40"
-          >
-            Quay lại
-          </button>
-          {step < 3 ? (
-            <button
-              type="button"
-              onClick={() => setStep((s) => s + 1)}
-              className="rounded-full bg-white px-6 py-2.5 text-sm font-bold text-black"
-            >
-              Tiếp tục
-            </button>
-          ) : (
-            <button
-              type="button"
-              disabled={busy || txState === "pending"}
-              onClick={() => void submit()}
-              className="rounded-full bg-gradient-to-r from-[#9945FF] to-[#14F195] px-6 py-2.5 text-sm font-bold text-black disabled:opacity-50"
-            >
-              {busy ? "Đang ký…" : "Tạo & khóa thưởng"}
-            </button>
-          )}
+        {step === 2 && (
+          <div className="space-y-5">
+            <Field label={`Phần thưởng bằng ${FIND_SYMBOL}`} hint="FIND là SPL token thật trên Devnet, chỉ dùng trong smart contract và không có giá trị tiền tệ."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Phantom sẽ yêu cầu ký giao dịch tạo bounty và giao dịch chuyển FIND vào vault. SOL Devnet chỉ được dùng để trả phí mạng.</p></div></div>
+          </div>
+        )}
+
+        {step === 3 && (
+          <div>
+            <h2 className="text-xl font-bold">Kiểm tra trước khi ký</h2>
+            <dl className="mt-5 grid gap-4 sm:grid-cols-2">
+              <Summary label="Đồ vật" value={title} /><Summary label="Loại" value={category} /><Summary label="Khu vực" value={location} /><Summary label="Hạn nhận claim" value={`${days} ngày`} /><Summary label="Phần thưởng" value={`${rewardUi} ${FIND_SYMBOL}`} /><Summary label="Ví" value={connected ? "Đã kết nối Devnet" : "Chưa kết nối"} />
+            </dl>
+            {!connected && <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="mb-3 text-sm text-amber-900">Kết nối ví để hoàn tất hai giao dịch Devnet.</p><ConnectWalletButton size="md" /></div>}
+          </div>
+        )}
+
+        {error && <p className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
+
+        <div className="mt-7 flex items-center justify-between gap-3 border-t border-line pt-5">
+          <button type="button" disabled={step === 0 || busy} onClick={() => { setError(null); setStep((current) => Math.max(0, current - 1)); }} className="app-button-secondary">Quay lại</button>
+          {step < 3 ? <button type="button" onClick={next} className="app-button-primary">Tiếp tục</button> : <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary">{busy ? "Đang xử lý giao dịch" : <><Check size={17} weight="bold" />Tạo và khóa thưởng</>}</button>}
         </div>
       </div>
     </div>
   );
 }
 
-const inputCls =
-  "w-full rounded-xl border border-white/10 bg-black/30 px-3 py-2.5 text-sm outline-none focus:border-[#9945FF]/50";
-
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <label className="block space-y-1.5">
-      <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-        {label}
-      </span>
-      {children}
-    </label>
-  );
+function Field({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
+  return <label className="block"><span className="text-sm font-bold text-ink">{label}</span>{hint && <span className="mt-1 block text-xs leading-5 text-ink-muted">{hint}</span>}<span className="mt-2 block">{children}</span></label>;
 }
 
-function Row({ k, v }: { k: string; v: string }) {
-  return (
-    <div className="flex justify-between gap-4 border-b border-white/5 py-2">
-      <span className="text-white/40">{k}</span>
-      <span className="text-right font-medium text-white">{v}</span>
-    </div>
-  );
+function Summary({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl border border-line bg-bg-deep p-4"><dt className="text-xs font-semibold text-ink-muted">{label}</dt><dd className="mt-1 break-words text-sm font-semibold text-ink">{value || "Chưa nhập"}</dd></div>;
 }
