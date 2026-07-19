@@ -8,6 +8,7 @@ import {
   SystemProgram,
   Transaction,
   TransactionInstruction,
+  VersionedTransaction,
   type Commitment,
 } from "@solana/web3.js";
 import {
@@ -158,7 +159,6 @@ async function sendIx(
   ixs: TransactionInstruction[],
   label: string
 ): Promise<{ signature: string; url: string }> {
-  void label;
   const connection = getConnection();
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
@@ -168,6 +168,40 @@ async function sendIx(
     lastValidBlockHeight,
   });
   for (const ix of ixs) tx.add(ix);
+
+  const message = tx.compileMessage();
+  if (message.header.numRequiredSignatures !== 1) {
+    throw new Error(
+      `${label}: giao dịch phải chỉ có một ví ký, nhưng đang yêu cầu ${message.header.numRequiredSignatures} chữ ký.`
+    );
+  }
+
+  const wireSize = tx.serialize({
+    requireAllSignatures: false,
+    verifySignatures: false,
+  }).length;
+  if (wireSize > 1232) {
+    throw new Error(
+      `${label}: giao dịch dài ${wireSize} byte, vượt giới hạn 1232 byte của Solana.`
+    );
+  }
+
+  // Phantom recommends simulating with sigVerify=false before requesting a
+  // wallet signature. A VersionedTransaction lets web3.js pass that option
+  // explicitly while the wallet can still sign the familiar legacy tx.
+  const simulation = await connection.simulateTransaction(
+    new VersionedTransaction(message),
+    {
+      commitment: "confirmed",
+      sigVerify: false,
+    }
+  );
+  if (simulation.value.err) {
+    const logs = simulation.value.logs?.slice(-8).join(" | ") || "Không có log RPC";
+    throw new Error(
+      `${label}: mô phỏng Devnet thất bại (${JSON.stringify(simulation.value.err)}). ${logs}`
+    );
+  }
 
   const signed = await wallet.signTransaction(tx);
   const sig = await connection.sendRawTransaction(signed.serialize(), {
