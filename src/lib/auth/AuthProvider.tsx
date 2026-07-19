@@ -29,18 +29,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const configured = isSupabaseConfigured();
   const [user, setUser] = useState<User | null>(null);
   const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(configured);
 
   useEffect(() => {
-    if (!configured) {
-      setLoading(false);
-      return;
-    }
+    if (!configured) return;
     const supabase = createClient();
-    if (!supabase) {
-      setLoading(false);
-      return;
-    }
+    if (!supabase) return;
 
     let mounted = true;
     supabase.auth.getSession().then(({ data }) => {
