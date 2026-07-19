@@ -144,8 +144,8 @@ export default function BountyDetailPage() {
             {isOwner && onchain?.status === "Draft" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => fund(id))} className="app-button-primary w-full">Khóa phần thưởng vào escrow</button>}
             {isOwner && onchain?.status === "Draft" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => cancel(id))} className="app-button-secondary w-full">Hủy bounty chưa nạp tiền</button>}
             {canClaim && <Link href={`/bounties/${id}/claim`} className="app-button-primary w-full">Tôi đã tìm thấy đồ</Link>}
-            {isFinder && ["ClaimSubmitted", "AiReviewed"].includes(status) && !meta.aiReport && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(async () => { await reviewClaim(id); })} className="app-button-primary w-full">Đánh giá bằng AI trực tuyến</button>}
-            {(isOwner || isFinder) && ["ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => dispute(id))} className="app-button-secondary w-full">Mở tranh chấp</button>}
+            {isFinder && ["ClaimSubmitted", "AiReviewed"].includes(status) && !currentClaim?.aiReport && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(async () => { await reviewClaim(id, walletAddress); })} className="app-button-primary w-full">Đánh giá bằng AI trực tuyến</button>}
+            {(isOwner || isFinder) && ["ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => dispute(id, isOwner ? meta.claim?.finderWallet : walletAddress))} className="app-button-secondary w-full">Mở tranh chấp</button>}
             {isOwner && onchain && ["Funded", "ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => refund(id))} className="app-button-secondary w-full">Yêu cầu hoàn tiền khi hết hạn</button>}
           </div>
         </aside>
@@ -164,7 +164,7 @@ export default function BountyDetailPage() {
 
       {claims.length > 0 && <ClaimsSection bountyId={id} claims={claims} />}
 
-      {meta.aiReport && <div className="mt-8"><AiReviewPanel report={meta.aiReport} canDecide={canDecide} busy={busy || txState === "pending"} onAccept={() => void run(() => accept(id))} onReject={() => void run(() => reject(id))} onDispute={() => void run(() => dispute(id))} /></div>}
+      {meta.aiReport && <div className="mt-8"><AiReviewPanel report={meta.aiReport} provenance={{ inputHash: meta.claim?.aiInputHash, reportHash: meta.claim?.aiReportHash, modelHash: meta.claim?.aiModelHash, promptVersion: meta.claim?.aiPromptVersion }} canDecide={canDecide} busy={busy || txState === "pending"} onAccept={() => void run(() => accept(id, meta.claim?.finderWallet))} onReject={() => void run(() => reject(id, meta.claim?.finderWallet))} onDispute={() => void run(() => dispute(id, meta.claim?.finderWallet))} /></div>}
       {error && <p className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{error}</p>}
     </div>
   );

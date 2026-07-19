@@ -1,5 +1,6 @@
-import { explorerTxUrl } from "@/lib/findback/config";
-import { fetchBounty, getConnection } from "@/lib/findback/program";
+import { PublicKey } from "@solana/web3.js";
+import { explorerTxUrl, PROTOCOL_V2_ENABLED } from "@/lib/findback/config";
+import { fetchBounty, fetchClaimV2, getConnection } from "@/lib/findback/program";
 import {
   ApiError,
   apiErrorResponse,
@@ -16,7 +17,12 @@ export async function POST(req: Request) {
     requireSameOrigin(req);
     const user = await requireApiUser();
     enforceRateLimit(`bounty-sync:${user.id}`, { limit: 30, windowMs: 60_000 });
-    const body = (await req.json()) as { bountyId?: string; signature?: string | null };
+    const body = (await req.json()) as {
+      bountyId?: string;
+      signature?: string | null;
+      finderWallet?: string | null;
+      claimPda?: string | null;
+    };
     const bountyId = body.bountyId?.trim() || "";
     if (!bountyId) throw new ApiError(400, "Thiếu mã bounty.");
 
@@ -33,9 +39,17 @@ export async function POST(req: Request) {
 
     const onchain = await fetchBounty(bountyId);
     if (!onchain) throw new ApiError(404, "Không tìm thấy bounty trên Devnet.");
+    const useV2 = PROTOCOL_V2_ENABLED && onchain.protocolVersion >= 2;
+    const chainClaim = useV2 && body.finderWallet
+      ? await fetchClaimV2(bountyId, new PublicKey(body.finderWallet))
+      : null;
+    if (body.claimPda && chainClaim?.address !== body.claimPda) {
+      throw new ApiError(409, "Claim PDA không khớp dữ liệu đồng bộ.");
+    }
     const allowed =
       profile.wallet_pubkey === onchain.owner ||
       profile.wallet_pubkey === onchain.finder ||
+      profile.wallet_pubkey === chainClaim?.finder ||
       (profile.is_arbiter && profile.wallet_pubkey === onchain.arbiter);
     if (!allowed) throw new ApiError(403, "Ví không phải thành viên của bounty.");
 
@@ -59,7 +73,22 @@ export async function POST(req: Request) {
       .eq("id", bountyId);
     if (updateError) throw new Error(updateError.message);
 
-    if (onchain.status === "Funded" && isDefaultKey(onchain.finder)) {
+    if (useV2 && chainClaim) {
+      const { error: claimUpdateError } = await admin
+        .from("claims")
+        .update({
+          status: toDbStatus(chainClaim.status),
+          ...(lastTx
+            ? { last_tx: lastTx, last_tx_url: explorerTxUrl(lastTx) }
+            : {}),
+          updated_at: new Date().toISOString(),
+        })
+        .eq("claim_pda", chainClaim.address)
+        .eq("bounty_id", bountyId);
+      if (claimUpdateError) throw new Error(claimUpdateError.message);
+    }
+
+    if (!useV2 && onchain.status === "Funded" && isDefaultKey(onchain.finder)) {
       const { error: deleteError } = await admin
         .from("claims")
         .delete()

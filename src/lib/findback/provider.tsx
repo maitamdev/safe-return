@@ -16,14 +16,18 @@ import type { AiClaimReport } from "@/lib/ai/types";
 import type { BountyMeta } from "./store";
 import {
   acceptClaimOnChain,
+  acceptClaimV2OnChain,
   cancelBountyOnChain,
   createBountyOnChain,
   fetchBounty,
   fundBountyOnChain,
   openDisputeOnChain,
+  openDisputeV2OnChain,
   resolveDisputeOnChain,
+  resolveDisputeV2OnChain,
   refundAfterExpiryOnChain,
   rejectClaimOnChain,
+  rejectClaimV2OnChain,
   submitClaimOnChain,
   submitClaimV2OnChain,
   type OnChainBounty,
@@ -87,13 +91,13 @@ type FindBackCtx = {
     foundAt: string;
     imageDataUrl?: string | null;
   }) => Promise<AiClaimReport | null>;
-  reviewClaim: (bountyId: string) => Promise<AiClaimReport | null>;
-  accept: (bountyId: string) => Promise<void>;
-  reject: (bountyId: string) => Promise<void>;
-  dispute: (bountyId: string) => Promise<void>;
+  reviewClaim: (bountyId: string, finderWallet?: string) => Promise<AiClaimReport | null>;
+  accept: (bountyId: string, finderWallet?: string) => Promise<void>;
+  reject: (bountyId: string, finderWallet?: string) => Promise<void>;
+  dispute: (bountyId: string, finderWallet?: string) => Promise<void>;
   refund: (bountyId: string) => Promise<void>;
   cancel: (bountyId: string) => Promise<void>;
-  resolveDispute: (bountyId: string, releaseToFinder: boolean) => Promise<void>;
+  resolveDispute: (bountyId: string, releaseToFinder: boolean, finderWallet?: string) => Promise<void>;
   fetchOnChain: (bountyId: string) => Promise<OnChainBounty | null>;
 };
 
@@ -409,15 +413,19 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   );
 
   const reviewClaim = useCallback(
-    async (bountyId: string) => {
+    async (bountyId: string, finderWallet?: string) => {
       const meta = currentBounty(bountyId);
-      if (!meta?.claim) throw new Error("Chưa có bằng chứng claim để đánh giá.");
+      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      const targetClaim = finderWallet
+        ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
+        : meta.claim;
+      if (!targetClaim) throw new Error("Chưa có bằng chứng claim để đánh giá.");
       let report: AiClaimReport | null = null;
       const result = await runTx("record_ai_review", async () => {
         const response = await fetch("/api/ai/review", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ bountyId }),
+          body: JSON.stringify({ bountyId, claimId: targetClaim.id }),
         });
         const json = (await response.json()) as {
           report?: AiClaimReport;
@@ -530,23 +538,32 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   );
 
   const accept = useCallback(
-    async (bountyId: string) => {
+    async (bountyId: string, finderWallet?: string) => {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
       if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
       const onchain = await fetchBounty(bountyId);
+      const targetClaim = finderWallet
+        ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
+        : meta.claim;
       const finderStr =
-        onchain?.finder &&
+        targetClaim?.finderWallet ||
+        (onchain?.finder &&
         onchain.finder !== "11111111111111111111111111111111"
           ? onchain.finder
-          : meta?.claim?.finderWallet;
+          : undefined);
       if (!finderStr) throw new Error("No finder on claim");
-      const res = await runTx("accept_claim", () =>
-        acceptClaimOnChain(w, bountyId, new PublicKey(finderStr))
-      );
+      const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
+      const res = useV2
+        ? await runTx("accept_claim_v2", () =>
+            acceptClaimV2OnChain(w, bountyId, new PublicKey(finderStr))
+          )
+        : await runTx("accept_claim", () =>
+            acceptClaimOnChain(w, bountyId, new PublicKey(finderStr))
+          );
       const updated = { ...meta, status: "Released", lastTx: res.signature, lastTxUrl: res.url };
-      await syncBountyStateToSupabase(updated);
+      await syncBountyStateToSupabase(updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
@@ -554,14 +571,22 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   );
 
   const reject = useCallback(
-    async (bountyId: string) => {
+    async (bountyId: string, finderWallet?: string) => {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
       if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
-      const res = await runTx("reject_claim", () =>
-        rejectClaimOnChain(w, bountyId)
-      );
+      const onchain = await fetchBounty(bountyId);
+      const targetClaim = finderWallet
+        ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
+        : meta.claim;
+      const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
+      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
+      const res = useV2
+        ? await runTx("reject_claim_v2", () =>
+            rejectClaimV2OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
+          )
+        : await runTx("reject_claim", () => rejectClaimOnChain(w, bountyId));
       const updated = {
         ...meta,
         status: "Funded",
@@ -570,7 +595,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTx: res.signature,
         lastTxUrl: res.url,
       };
-      await syncBountyStateToSupabase(updated);
+      await syncBountyStateToSupabase(updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
@@ -578,14 +603,24 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   );
 
   const dispute = useCallback(
-    async (bountyId: string) => {
+    async (bountyId: string, finderWallet?: string) => {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
       if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
-      const result = await runTx("open_dispute", () => openDisputeOnChain(w, bountyId));
+      const onchain = await fetchBounty(bountyId);
+      const targetClaim = finderWallet
+        ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
+        : meta.claim;
+      const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
+      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
+      const result = useV2
+        ? await runTx("open_dispute_v2", () =>
+            openDisputeV2OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
+          )
+        : await runTx("open_dispute", () => openDisputeOnChain(w, bountyId));
       const updated = { ...meta, status: "Disputed", lastTx: result.signature, lastTxUrl: result.url };
-      await syncBountyStateToSupabase(updated);
+      await syncBountyStateToSupabase(updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
@@ -627,26 +662,40 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   );
 
   const resolveDispute = useCallback(
-    async (bountyId: string, releaseToFinder: boolean) => {
+    async (bountyId: string, releaseToFinder: boolean, finderWallet?: string) => {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
       if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
       const onchain = await fetchBounty(bountyId);
       if (!onchain) throw new Error("Không tìm thấy bounty trên Devnet.");
-      const counterparty = new PublicKey(
-        releaseToFinder ? onchain.finder : onchain.owner
-      );
-      const result = await runTx("resolve_dispute", () =>
-        resolveDisputeOnChain(w, bountyId, counterparty, releaseToFinder)
-      );
+      const targetClaim = finderWallet
+        ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
+        : meta.claim;
+      const useV2 = PROTOCOL_V2_ENABLED && onchain.protocolVersion >= 2;
+      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
+      const result = useV2
+        ? await runTx("resolve_dispute_v2", () =>
+            resolveDisputeV2OnChain(
+              w,
+              bountyId,
+              new PublicKey(targetClaim!.finderWallet!),
+              releaseToFinder
+            )
+          )
+        : await runTx("resolve_dispute", () => {
+            const counterparty = new PublicKey(
+              releaseToFinder ? onchain.finder : onchain.owner
+            );
+            return resolveDisputeOnChain(w, bountyId, counterparty, releaseToFinder);
+          });
       const updated = {
         ...meta,
         status: releaseToFinder ? "Released" : "Refunded",
         lastTx: result.signature,
         lastTxUrl: result.url,
       };
-      await syncBountyStateToSupabase(updated);
+      await syncBountyStateToSupabase(updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },

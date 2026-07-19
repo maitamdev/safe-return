@@ -19,6 +19,10 @@ export type ClaimMeta = {
   submittedAt: number;
   evidenceHashHex?: string;
   aiReport?: AiClaimReport | null;
+  aiInputHash?: string | null;
+  aiReportHash?: string | null;
+  aiModelHash?: string | null;
+  aiPromptVersion?: string | null;
   status?: string;
   lastTx?: string | null;
   lastTxUrl?: string | null;

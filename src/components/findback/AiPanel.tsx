@@ -1,7 +1,7 @@
 "use client";
 
 import type { AiClaimReport } from "@/lib/ai/types";
-import { Brain, CheckCircle, Warning, XCircle } from "@phosphor-icons/react";
+import { Brain, CheckCircle, Fingerprint, ShieldCheck, Warning, XCircle } from "@phosphor-icons/react";
 
 const decisionCopy = { ACCEPT: "Có thể chấp nhận", REVIEW: "Cần kiểm tra thêm", REJECT: "Nên từ chối" } as const;
 const evidenceQualityCopy = {
@@ -10,7 +10,14 @@ const evidenceQualityCopy = {
   "text-only": "Chỉ đánh giá từ văn bản",
 } as const;
 
-export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, canDecide }: { report: AiClaimReport; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean }) {
+type AiProvenance = {
+  inputHash?: string | null;
+  reportHash?: string | null;
+  modelHash?: string | null;
+  promptVersion?: string | null;
+};
+
+export function AiReviewPanel({ report, provenance, onAccept, onReject, onDispute, busy, canDecide }: { report: AiClaimReport; provenance?: AiProvenance; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean }) {
   const Icon = report.decision === "ACCEPT" ? CheckCircle : report.decision === "REJECT" ? XCircle : Warning;
   const tone = report.decision === "ACCEPT" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : report.decision === "REJECT" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800";
 
@@ -37,6 +44,27 @@ export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, can
       </div>
 
       <p className="mt-5 text-sm leading-7 text-ink">{report.explanation}</p>
+
+      {provenance?.inputHash && provenance.reportHash && provenance.modelHash && (
+        <details className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+          <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-emerald-900">
+            <ShieldCheck size={18} weight="fill" aria-hidden />
+            Provenance AI đã ghi lên Claim PDA
+          </summary>
+          <p className="mt-2 max-w-2xl text-xs leading-5 text-emerald-800">
+            Ba hash dưới đây khóa đúng dữ liệu đầu vào, báo cáo đầu ra và model đã dùng. AI không có quyền tự chuyển phần thưởng.
+          </p>
+          <dl className="mt-4 grid gap-3 md:grid-cols-2">
+            <HashRow label="Input" value={provenance.inputHash} />
+            <HashRow label="Report" value={provenance.reportHash} />
+            <HashRow label="Model" value={provenance.modelHash} />
+            <div className="rounded-lg border border-emerald-200 bg-white p-3">
+              <dt className="text-[11px] font-semibold text-emerald-700">Prompt</dt>
+              <dd className="mt-1 break-all font-mono text-[11px] text-emerald-950">{provenance.promptVersion || "Không rõ"}</dd>
+            </div>
+          </dl>
+        </details>
+      )}
 
       {report.evidence_quality && (
         <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
@@ -66,6 +94,15 @@ export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, can
         </div>
       )}
     </section>
+  );
+}
+
+function HashRow({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="rounded-lg border border-emerald-200 bg-white p-3">
+      <dt className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700"><Fingerprint size={14} aria-hidden />{label}</dt>
+      <dd className="mt-1 break-all font-mono text-[10px] leading-5 text-emerald-950">{value}</dd>
+    </div>
   );
 }
 

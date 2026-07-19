@@ -38,6 +38,10 @@ type ClaimRow = {
   image_data?: string | null;
   evidence_hash: string;
   ai_report?: unknown;
+  ai_input_hash?: string | null;
+  ai_report_hash?: string | null;
+  ai_model_hash?: string | null;
+  ai_prompt_version?: string | null;
   status?: string;
   last_tx?: string | null;
   last_tx_url?: string | null;
@@ -71,12 +75,18 @@ export async function syncBountyToSupabase(
 }
 
 export async function syncBountyStateToSupabase(
-  bounty: BountyMeta
+  bounty: BountyMeta,
+  claim?: BountyMeta["claim"]
 ): Promise<void> {
   const response = await fetch("/api/bounties/sync", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ bountyId: bounty.id, signature: bounty.lastTx ?? null }),
+    body: JSON.stringify({
+      bountyId: bounty.id,
+      signature: bounty.lastTx ?? null,
+      finderWallet: claim?.finderWallet ?? null,
+      claimPda: claim?.claimPda ?? null,
+    }),
   });
   const json = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) throw new Error(json.error || "Không đồng bộ được trạng thái.");
@@ -127,7 +137,10 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
     const bountyClaims = (claimGroups.get(row.id) || []).sort(
       (left, right) => Date.parse(right.submitted_at) - Date.parse(left.submitted_at)
     );
-    const claim = bountyClaims[0];
+    const claim = bountyClaims.find((candidate) => {
+      const report = candidate.ai_report as BountyMeta["aiReport"] | undefined;
+      return report?.mode === "live";
+    }) || bountyClaims[0];
     const storedReport = claim?.ai_report as BountyMeta["aiReport"] | undefined;
     const liveReport = storedReport?.mode === "live" ? storedReport : null;
     const createdAt = Date.parse(row.created_at);
@@ -185,6 +198,10 @@ function fromClaimRow(bountyId: string, claim: ClaimRow) {
     submittedAt: Date.parse(claim.submitted_at),
     evidenceHashHex: claim.evidence_hash,
     aiReport: storedReport?.mode === "live" ? storedReport : null,
+    aiInputHash: claim.ai_input_hash,
+    aiReportHash: claim.ai_report_hash,
+    aiModelHash: claim.ai_model_hash,
+    aiPromptVersion: claim.ai_prompt_version,
     status: claim.status,
     lastTx: claim.last_tx,
     lastTxUrl: claim.last_tx_url,
