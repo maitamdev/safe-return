@@ -14,8 +14,8 @@ const WalletProviders = dynamic(
 
 function Loading() {
   return (
-    <div className="flex min-h-dvh items-center justify-center bg-[#070b14] text-white/60">
-      Loading FindBack…
+    <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-4 text-center text-sm text-ink-soft">
+      Đang khởi tạo kết nối ví Devnet…
     </div>
   );
 }
@@ -26,7 +26,7 @@ export default function BountiesLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-dvh bg-[#070b14]">
+    <div className="min-h-[100dvh] bg-bg">
       <AuthGate>
         <WalletProviders>
           <WalletBridge />
