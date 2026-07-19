@@ -2,9 +2,10 @@
 
 import { FormEvent, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { useRouter } from "next/navigation";
+import { CircleNotch, ShieldCheck } from "@phosphor-icons/react";
 import { useAuth } from "@/lib/auth/AuthProvider";
-import { CircleNotch } from "@phosphor-icons/react";
 
 export default function SignupPage() {
   const { signUp, configured } = useAuth();
@@ -16,124 +17,59 @@ export default function SignupPage() {
   const [error, setError] = useState<string | null>(null);
   const [info, setInfo] = useState<string | null>(null);
 
-  const onSubmit = async (e: FormEvent) => {
-    e.preventDefault();
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
     setError(null);
     setInfo(null);
     if (!configured) {
-      setError("Chưa cấu hình Supabase. Xem trang Đăng nhập để biết cách setup.");
+      setError("Ứng dụng chưa cấu hình Supabase.");
       return;
     }
     if (password.length < 6) {
-      setError("Mật khẩu tối thiểu 6 ký tự.");
+      setError("Mật khẩu cần ít nhất 6 ký tự.");
       return;
     }
     setBusy(true);
     try {
       const note = await signUp(email, password, name);
-      if (note) {
-        setInfo(
-          note +
-            " → Supabase Dashboard: Auth → Providers → Email → tắt Confirm email, rồi đăng nhập lại. Hoặc mở email xác nhận."
-        );
-      } else {
+      if (note) setInfo("Tài khoản đã được tạo. Hãy mở email để xác nhận rồi đăng nhập.");
+      else {
         router.replace("/bounties");
         router.refresh();
       }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Đăng ký thất bại");
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Đăng ký thất bại.");
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div className="relative flex min-h-dvh flex-1 items-center justify-center bg-[#06080f] px-4 py-16">
-      <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(ellipse_at_top,_rgba(20,241,149,0.14),_transparent_50%)]" />
-      <div className="relative mx-auto w-full max-w-md">
-        <p className="text-[10px] font-bold uppercase tracking-[0.2em] text-[#14F195]">
-          30 giây là xong
-        </p>
-        <h1 className="mt-2 text-3xl font-bold tracking-tight text-white">
-          Tạo tài khoản miễn phí
-        </h1>
-        <p className="mt-2 text-sm text-white/55">
-          Chỉ cần email. Vào app xong mới nối Phantom — không cần hiểu crypto.
-        </p>
-
-        <form
-          onSubmit={(e) => void onSubmit(e)}
-          className="mt-6 space-y-4 rounded-3xl border border-white/10 bg-white/[0.04] p-6"
-        >
-          <label className="block space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-              Tên hiển thị
-            </span>
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-[#14F195]/40"
-              placeholder="Mai / Quinn…"
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-              Email
-            </span>
-            <input
-              type="email"
-              required
-              value={email}
-              onChange={(e) => setEmail(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-[#14F195]/40"
-              placeholder="ban@email.com"
-            />
-          </label>
-          <label className="block space-y-1.5">
-            <span className="text-[11px] font-semibold uppercase tracking-wider text-white/45">
-              Mật khẩu (≥ 6 ký tự)
-            </span>
-            <input
-              type="password"
-              required
-              minLength={6}
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              className="w-full rounded-xl border border-white/10 bg-black/40 px-3 py-2.5 text-sm text-white outline-none focus:border-[#14F195]/40"
-            />
-          </label>
-
-          {error && (
-            <p className="rounded-xl border border-rose-500/30 bg-rose-500/10 px-3 py-2 text-xs text-rose-200">
-              {error}
-            </p>
-          )}
-          {info && (
-            <p className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-100">
-              {info}{" "}
-              <Link href="/login" className="underline">
-                Đăng nhập
-              </Link>
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy}
-            className="flex w-full items-center justify-center gap-2 rounded-full bg-white py-3 text-sm font-bold text-black disabled:opacity-50"
-          >
-            {busy && <CircleNotch size={16} className="animate-spin" />}
-            {busy ? "Đang tạo…" : "Đăng ký"}
-          </button>
-        </form>
-
-        <p className="mt-5 text-center text-sm text-white/50">
-          Đã có tài khoản?{" "}
-          <Link href="/login" className="font-semibold text-[#14F195] hover:underline">
-            Đăng nhập
-          </Link>
-        </p>
+    <main className="grid min-h-[100dvh] flex-1 bg-bg lg:grid-cols-[1.05fr_0.95fr]">
+      <div className="relative hidden overflow-hidden lg:block">
+        <Image src="/images/safereturn-hero-map.png" alt="Bản đồ tìm đồ thất lạc của SafeReturn" fill priority sizes="55vw" className="object-cover" />
+        <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-white/80 bg-white/92 p-6 shadow-[0_20px_60px_rgba(26,58,42,0.17)] backdrop-blur-md">
+          <p className="text-lg font-bold text-ink">Không bao giờ chia sẻ seed phrase</p>
+          <p className="mt-2 text-sm leading-6 text-ink-soft">SafeReturn chỉ yêu cầu chữ ký giao dịch Devnet trong cửa sổ Phantom.</p>
+        </div>
       </div>
-    </div>
+      <div className="flex items-center justify-center px-4 py-12 sm:px-8">
+      <div className="w-full max-w-md">
+        <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-forest"><ShieldCheck size={20} weight="fill" />SafeReturn</Link>
+        <h1 className="mt-6 text-3xl font-bold tracking-tight">Tạo tài khoản</h1>
+        <p className="mt-2 text-sm leading-6 text-ink-soft">Đăng ký bằng email trước. Bạn không cần cung cấp seed phrase hoặc kết nối ví ở bước này.</p>
+        {!configured && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900">Thiếu cấu hình Supabase. Xem <Link href="/setup" className="font-bold underline">trang thiết lập</Link>.</div>}
+        <form onSubmit={(event) => void submit(event)} className="app-card mt-6 space-y-5 p-5 sm:p-6">
+          <label className="block"><span className="text-sm font-bold">Tên hiển thị</span><input value={name} onChange={(event) => setName(event.target.value)} className="app-input mt-2" autoComplete="name" placeholder="Tên của bạn" maxLength={80} /></label>
+          <label className="block"><span className="text-sm font-bold">Email</span><input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="app-input mt-2" placeholder="ban@example.com" /></label>
+          <label className="block"><span className="text-sm font-bold">Mật khẩu</span><span className="mt-1 block text-xs text-ink-muted">Ít nhất 6 ký tự.</span><input type="password" required minLength={6} autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} className="app-input mt-2" /></label>
+          {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
+          {info && <p className="rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-900" role="status">{info} <Link href="/login" className="font-bold underline">Đăng nhập</Link></p>}
+          <button type="submit" disabled={busy || !configured} className="app-button-primary w-full">{busy && <CircleNotch size={17} className="animate-spin" />}{busy ? "Đang tạo tài khoản" : "Đăng ký"}</button>
+        </form>
+        <p className="mt-6 text-center text-sm text-ink-soft">Đã có tài khoản? <Link href="/login" className="font-bold text-forest hover:underline">Đăng nhập</Link></p>
+      </div>
+      </div>
+    </main>
   );
 }
