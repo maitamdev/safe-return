@@ -2,9 +2,7 @@
 
 import { useState } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
-  Wallet,
   Coins,
   CheckCircle,
   CircleNotch,
@@ -14,13 +12,13 @@ import {
 } from "@phosphor-icons/react";
 import { FIND_MINT, FIND_SYMBOL } from "@/lib/findback/config";
 import Link from "next/link";
+import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
 /**
  * Vietnamese onboarding — what confused users actually need.
  */
 export function GetStarted() {
   const { publicKey, connected } = useWallet();
-  const { setVisible } = useWalletModal();
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -42,8 +40,7 @@ export function GetStarted() {
     setErr(null);
     setMsg(null);
     if (!address) {
-      setErr("Bấm «Kết nối ví» trước.");
-      setVisible(true);
+      setErr("Bấm «Kết nối ví» trước (nút trắng bên dưới).");
       return;
     }
     setBusy(true);
@@ -102,13 +99,9 @@ export function GetStarted() {
             <strong className="text-white">Devnet</strong>.
           </p>
           {!connected ? (
-            <button
-              type="button"
-              onClick={() => setVisible(true)}
-              className="mt-3 inline-flex items-center gap-2 rounded-full bg-white px-4 py-2 text-xs font-bold text-black"
-            >
-              <Wallet size={14} weight="bold" /> Kết nối ví
-            </button>
+            <div className="mt-3">
+              <ConnectWalletButton dark size="md" />
+            </div>
           ) : (
             <p className="mt-3 inline-flex items-center gap-1.5 text-xs font-semibold text-[#14F195]">
               <CheckCircle size={14} weight="fill" /> Đã nối ·{" "}

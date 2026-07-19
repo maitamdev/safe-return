@@ -2,7 +2,7 @@
 
 /**
  * ConnectionProvider → WalletProvider → WalletModalProvider
- * Explicit Phantom adapter + Wallet Standard auto-detect.
+ * autoConnect MUST be true so picking Phantom in the modal actually connects.
  */
 
 import { useMemo, useCallback, type ReactNode } from "react";
@@ -31,10 +31,10 @@ ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => SOLANA_RPC, []);
+  // Explicit Phantom — also works with Wallet Standard auto-discovery
   const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
 
   const onError = useCallback((error: Error) => {
-    // Phantom "blocked" / user reject — surface in console only
     console.warn("[wallet]", error.name, error.message);
   }, []);
 
@@ -42,7 +42,7 @@ export function WalletProviders({ children }: { children: ReactNode }) {
     <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed" }}>
       <WalletProvider
         wallets={wallets}
-        autoConnect={false}
+        autoConnect
         onError={onError}
         localStorageKey="findback-wallet"
       >
