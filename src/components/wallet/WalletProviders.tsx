@@ -11,7 +11,6 @@ import {
   WalletProvider,
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
-import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Buffer } from "buffer";
 import { SOLANA_RPC } from "@/lib/findback/config";
 
@@ -31,8 +30,9 @@ ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
   const endpoint = useMemo(() => SOLANA_RPC, []);
-  // Explicit Phantom support also works with Wallet Standard auto-discovery.
-  const wallets = useMemo(() => [new PhantomWalletAdapter()], []);
+  // Modern wallets such as Phantom are discovered through Wallet Standard.
+  // Passing a legacy Phantom adapter as well registers it twice and floods the console.
+  const wallets = useMemo(() => [], []);
 
   const onError = useCallback((error: Error) => {
     console.warn("[wallet]", error.name, error.message);
