@@ -1,5 +1,5 @@
 [workspace]
-members = ["programs/*"]
+members = ["programs/findback"]
 resolver = "2"
 
 [profile.release]
