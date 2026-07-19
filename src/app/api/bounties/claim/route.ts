@@ -1,5 +1,6 @@
-import type { AiClaimReport } from "@/lib/ai/types";
+import { createHash } from "node:crypto";
 import { explorerTxUrl } from "@/lib/findback/config";
+import { evidenceIntegrityPayload } from "@/lib/findback/integrity";
 import { fetchBounty, getConnection } from "@/lib/findback/program";
 import type { BountyMeta } from "@/lib/findback/store";
 import {
@@ -18,7 +19,6 @@ type ClaimBody = {
   bountyId?: string;
   signature?: string | null;
   claim?: BountyMeta["claim"];
-  aiReport?: AiClaimReport | null;
 };
 
 export async function POST(req: Request) {
@@ -59,52 +59,50 @@ export async function POST(req: Request) {
     }
     const txUrl = body.signature ? explorerTxUrl(body.signature) : null;
 
-    if (!body.aiReport) {
-      if (!isFinder || onchain.status !== "ClaimSubmitted") {
-        throw new ApiError(409, "Claim on-chain chưa sẵn sàng để đồng bộ.");
-      }
-      const evidenceHex = Buffer.from(onchain.evidenceHash).toString("hex");
-      if (evidenceHex !== body.claim.evidenceHashHex) {
-        throw new ApiError(409, "Hash bằng chứng không khớp dữ liệu on-chain.");
-      }
-      const { error } = await admin.from("claims").upsert({
-        bounty_id: bountyId,
-        finder_id: user.id,
-        finder_wallet: onchain.finder,
-        description: body.claim.description.slice(0, 2000),
-        location: body.claim.location.slice(0, 200),
-        found_at: body.claim.foundAt.slice(0, 80),
-        image_data: body.claim.imageDataUrl ?? null,
-        evidence_hash: evidenceHex,
-        ai_report: null,
-        status: "claim_submitted",
-        last_tx: body.signature ?? null,
-        last_tx_url: txUrl,
-        submitted_at: new Date(body.claim.submittedAt).toISOString(),
-        updated_at: new Date().toISOString(),
-      });
-      if (error) throw new Error(error.message);
-    } else {
-      if (onchain.status !== "AiReviewed" || onchain.aiScore !== body.aiReport.score) {
-        throw new ApiError(409, "Kết quả AI không khớp dữ liệu on-chain.");
-      }
-      const { error } = await admin
-        .from("claims")
-        .update({
-          ai_report: body.aiReport,
-          status: "ai_reviewed",
-          last_tx: body.signature ?? null,
-          last_tx_url: txUrl,
-          updated_at: new Date().toISOString(),
-        })
-        .eq("bounty_id", bountyId);
-      if (error) throw new Error(error.message);
+    if (!isFinder || onchain.status !== "ClaimSubmitted") {
+      throw new ApiError(409, "Claim on-chain chưa sẵn sàng để đồng bộ.");
     }
+    const evidenceHex = Buffer.from(onchain.evidenceHash).toString("hex");
+    const computedEvidenceHash = createHash("sha256")
+      .update(
+        evidenceIntegrityPayload({
+          description: body.claim.description,
+          location: body.claim.location,
+          foundAt: body.claim.foundAt,
+          imageDataUrl: body.claim.imageDataUrl,
+          finder: onchain.finder,
+        })
+      )
+      .digest("hex");
+    if (
+      evidenceHex !== body.claim.evidenceHashHex ||
+      computedEvidenceHash !== evidenceHex
+    ) {
+      throw new ApiError(409, "Hash bằng chứng không khớp dữ liệu on-chain.");
+    }
+    const now = new Date().toISOString();
+    const { error } = await admin.from("claims").upsert({
+      bounty_id: bountyId,
+      finder_id: user.id,
+      finder_wallet: onchain.finder,
+      description: body.claim.description.slice(0, 2000),
+      location: body.claim.location.slice(0, 200),
+      found_at: body.claim.foundAt.slice(0, 80),
+      image_data: body.claim.imageDataUrl ?? null,
+      evidence_hash: evidenceHex,
+      ai_report: null,
+      status: "claim_submitted",
+      last_tx: body.signature ?? null,
+      last_tx_url: txUrl,
+      submitted_at: now,
+      updated_at: now,
+    });
+    if (error) throw new Error(error.message);
 
     const { error: bountyError } = await admin
       .from("bounties")
       .update({
-        status: body.aiReport ? "ai_reviewed" : "claim_submitted",
+        status: "claim_submitted",
         last_tx: body.signature ?? null,
         last_tx_url: txUrl,
         updated_at: new Date().toISOString(),
@@ -112,7 +110,7 @@ export async function POST(req: Request) {
       .eq("id", bountyId);
     if (bountyError) throw new Error(bountyError.message);
 
-    return Response.json({ ok: true, status: body.aiReport ? "ai_reviewed" : "claim_submitted" });
+    return Response.json({ ok: true, status: "claim_submitted" });
   } catch (error) {
     return apiErrorResponse(error);
   }

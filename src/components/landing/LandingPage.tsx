@@ -155,7 +155,7 @@ export function LandingPage() {
                 </a>
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <TrustItem icon={Database} title="Dữ liệu thật" body="Supabase lưu tin do người dùng tạo, không chèn dữ liệu mẫu." />
+                <TrustItem icon={Database} title="Dữ liệu người dùng" body="Supabase lưu tin do người dùng tạo và cập nhật trạng thái theo giao dịch." />
                 <TrustItem icon={Fingerprint} title="Có thể kiểm tra" body="Chữ ký giao dịch mở trực tiếp trên Solana Explorer." />
                 <TrustItem icon={LockKey} title="Escrow an toàn" body="FIND Devnet nằm trong vault đến khi chủ đồ quyết định." />
                 <TrustItem icon={Brain} title="AI chỉ tư vấn" body="Kết quả so khớp không có quyền tự chuyển phần thưởng." />

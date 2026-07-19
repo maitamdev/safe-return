@@ -3,32 +3,24 @@
 import { createClient } from "@/lib/supabase/client";
 import type { BountyMeta } from "./store";
 
-export async function syncBountyToSupabase(
-  bounty: BountyMeta,
-  ownerId: string
-): Promise<void> {
+function requireClient() {
   const supabase = createClient();
-  if (!supabase || !ownerId) return;
-  const { error } = await supabase.from("bounties").upsert(
-    {
-      id: bounty.id,
-      owner_id: ownerId,
-      owner_wallet: bounty.ownerWallet,
-      title: bounty.title,
-      description: bounty.description,
-      category: bounty.category,
-      location: bounty.location,
-      reward_ui: bounty.rewardUi,
-      deadline_unix: bounty.deadlineUnix,
-      image_path: bounty.imageDataUrl ?? null,
-      status: toDbStatus(bounty.status || "Draft"),
-      last_tx: bounty.lastTx ?? null,
-      last_tx_url: bounty.lastTxUrl ?? null,
-      updated_at: new Date().toISOString(),
-    },
-    { onConflict: "id" }
-  );
-  if (error) throw new Error(`Không đồng bộ được bounty: ${error.message}`);
+  if (!supabase) {
+    throw new Error("Ứng dụng chưa cấu hình kết nối Supabase.");
+  }
+  return supabase;
+}
+
+export async function syncBountyToSupabase(
+  bounty: BountyMeta
+): Promise<void> {
+  const response = await fetch("/api/bounties/register", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ bounty }),
+  });
+  const json = (await response.json().catch(() => ({}))) as { error?: string };
+  if (!response.ok) throw new Error(json.error || "Không lưu được metadata bounty.");
 }
 
 export async function syncBountyStateToSupabase(
@@ -52,7 +44,6 @@ export async function syncClaimToSupabase(bounty: BountyMeta): Promise<void> {
       bountyId: bounty.id,
       signature: bounty.lastTx ?? null,
       claim: bounty.claim,
-      aiReport: bounty.aiReport ?? null,
     }),
   });
   const json = (await response.json().catch(() => ({}))) as { error?: string };
@@ -60,75 +51,87 @@ export async function syncClaimToSupabase(bounty: BountyMeta): Promise<void> {
 }
 
 export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
-  const supabase = createClient();
-  if (!supabase) return [];
-  try {
-    const [{ data: rows, error }, { data: claims, error: claimError }] =
-      await Promise.all([
-        supabase
-          .from("bounties")
-          .select(
-            "id,owner_wallet,title,description,category,location,reward_ui,deadline_unix,image_path,status,last_tx,last_tx_url,created_at"
-          )
-          .order("created_at", { ascending: false })
-          .limit(100),
-        supabase.from("claims").select("*"),
-      ]);
-    if (error || !rows) {
-      if (error) console.warn("[safereturn/db] bounties:", error.message);
-      return [];
-    }
-    if (claimError && !isMissingRelation(claimError)) {
-      console.warn("[safereturn/db] claims:", claimError.message);
-    }
-    const claimMap = new Map((claims || []).map((claim) => [claim.bounty_id, claim]));
+  const supabase = requireClient();
+  const [{ data: rows, error }, { data: claims, error: claimError }] =
+    await Promise.all([
+      supabase
+        .from("bounties")
+        .select(
+          "id,owner_wallet,title,description,category,location,reward_ui,deadline_unix,image_path,metadata_hash,status,last_tx,last_tx_url,created_at"
+        )
+        .order("created_at", { ascending: false })
+        .limit(100),
+      supabase.from("claims").select("*"),
+    ]);
+  if (error || !rows) throw new Error(error?.message || "Không đọc được danh sách bounty.");
+  if (claimError) throw new Error(claimError.message);
+  const claimMap = new Map((claims || []).map((claim) => [claim.bounty_id, claim]));
 
-    return rows.map((row) => {
-      const claim = claimMap.get(row.id);
-      return {
-        id: row.id,
-        title: row.title,
-        description: row.description || "",
-        category: row.category || "Other",
-        location: row.location || "",
-        rewardUi: Number(row.reward_ui) || 0,
-        deadlineUnix: Number(row.deadline_unix) || 0,
-        ownerWallet: row.owner_wallet || undefined,
-        imageDataUrl: row.image_path || null,
-        createdAt: row.created_at ? new Date(row.created_at).getTime() : Date.now(),
-        status: fromDbStatus(row.status || "draft"),
-        aiReport: (claim?.ai_report as BountyMeta["aiReport"]) ?? null,
-        claim: claim
-          ? {
-              finderWallet: claim.finder_wallet,
-              description: claim.description,
-              location: claim.location,
-              foundAt: claim.found_at,
-              imageDataUrl: claim.image_data,
-              submittedAt: new Date(claim.submitted_at).getTime(),
-              evidenceHashHex: claim.evidence_hash,
-            }
-          : null,
-        lastTx: row.last_tx || null,
-        lastTxUrl: row.last_tx_url || null,
-        seed: false,
-      } satisfies BountyMeta;
+  return rows.map((row) => {
+    const claim = claimMap.get(row.id);
+    const storedReport = claim?.ai_report as BountyMeta["aiReport"] | undefined;
+    const liveReport = storedReport?.mode === "live" ? storedReport : null;
+    const createdAt = Date.parse(row.created_at);
+    if (!Number.isFinite(createdAt)) {
+      throw new Error(`Bounty ${row.id} thiếu thời điểm tạo hợp lệ.`);
+    }
+    return {
+      id: row.id,
+      title: row.title,
+      description: row.description || "",
+      category: row.category || "Other",
+      location: row.location || "",
+      rewardUi: Number(row.reward_ui) || 0,
+      deadlineUnix: Number(row.deadline_unix) || 0,
+      ownerWallet: row.owner_wallet || undefined,
+      imageDataUrl: row.image_path || null,
+      metadataHashHex: row.metadata_hash || null,
+      createdAt,
+      status: fromDbStatus(row.status || "draft"),
+      aiReport: liveReport,
+      claim: claim
+        ? {
+            finderWallet: claim.finder_wallet,
+            description: claim.description,
+            location: claim.location,
+            foundAt: claim.found_at,
+            imageDataUrl: claim.image_data,
+            submittedAt: Date.parse(claim.submitted_at),
+            evidenceHashHex: claim.evidence_hash,
+          }
+        : null,
+      lastTx: row.last_tx || null,
+      lastTxUrl: row.last_tx_url || null,
+    } satisfies BountyMeta;
+  });
+}
+
+export function subscribeToBountyChanges(
+  onChange: () => void,
+  onError: (message: string) => void
+) {
+  const supabase = requireClient();
+  const channel = supabase
+    .channel(`findback-live-${crypto.randomUUID()}`)
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "bounties" },
+      onChange
+    )
+    .on(
+      "postgres_changes",
+      { event: "*", schema: "public", table: "claims" },
+      onChange
+    )
+    .subscribe((status) => {
+      if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
+        onError("Kết nối dữ liệu thời gian thực bị gián đoạn.");
+      }
     });
-  } catch (error) {
-    console.warn("[safereturn/db] select error", error);
-    return [];
-  }
-}
 
-function isMissingRelation(error: { code?: string; message?: string }) {
-  return (
-    error.code === "PGRST205" ||
-    Boolean(error.message?.includes("Could not find the table 'public.claims'"))
-  );
-}
-
-function toDbStatus(status: string) {
-  return status.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+  return () => {
+    void supabase.removeChannel(channel);
+  };
 }
 
 function fromDbStatus(status: string) {

@@ -8,7 +8,7 @@ export type AiClaimReport = {
   fraud_signals: string[];
   explanation: string;
   confidence: number; // 0-1
-  mode: "live" | "heuristic";
+  mode: "live";
   model?: string;
 };
 

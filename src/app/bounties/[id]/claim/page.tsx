@@ -7,7 +7,6 @@ import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ArrowLeft, ImageSquare, ShieldWarning } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
-import { getBountyMeta } from "@/lib/findback/store";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import type { AiClaimReport } from "@/lib/ai/types";
 import { AiReviewPanel } from "@/components/findback/AiPanel";
@@ -17,8 +16,8 @@ export default function SubmitClaimPage() {
   const params = useParams();
   const id = String(params?.id || "");
   const { connected } = useWallet();
-  const { bounties, submitClaim, txState } = useFindBack();
-  const meta = bounties.find((b) => b.id === id) || getBountyMeta(id);
+  const { bounties, loadingBounties, submitClaim, txState } = useFindBack();
+  const meta = bounties.find((b) => b.id === id);
   const [description, setDescription] = useState("");
   const [location, setLocation] = useState("");
   const [foundAt, setFoundAt] = useState("");
@@ -27,6 +26,11 @@ export default function SubmitClaimPage() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<AiClaimReport | null>(null);
+  const [submitted, setSubmitted] = useState(false);
+
+  if (loadingBounties) {
+    return <div className="app-card mx-auto max-w-2xl p-6 text-sm text-ink-soft">Đang tải dữ liệu từ Supabase...</div>;
+  }
 
   if (!meta) {
     return <EmptyMessage id={id} />;
@@ -64,6 +68,7 @@ export default function SubmitClaimPage() {
     try {
       const result = await submitClaim({ bountyId: id, description: description.trim(), location: location.trim() || meta.location, foundAt, imageDataUrl });
       setReport(result);
+      setSubmitted(true);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
     } finally {
@@ -71,14 +76,14 @@ export default function SubmitClaimPage() {
     }
   };
 
-  if (report) {
+  if (submitted) {
     return (
       <div className="mx-auto max-w-4xl">
         <div className="mb-6 flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
           <div><h1 className="text-2xl font-bold">Claim đã được ghi nhận</h1><p className="mt-2 text-sm text-ink-soft">Chủ đồ sẽ xem kết quả và quyết định giải ngân.</p></div>
           <Link href={`/bounties/${id}`} className="app-button-primary">Về chi tiết tin</Link>
         </div>
-        <AiReviewPanel report={report} canDecide={false} />
+        {report && <AiReviewPanel report={report} canDecide={false} />}
       </div>
     );
   }
@@ -102,12 +107,12 @@ export default function SubmitClaimPage() {
         <label className="block"><span className="text-sm font-bold">Ảnh bằng chứng</span><span className="mt-2 flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-bg-deep p-4 text-center hover:border-forest"><ImageSquare size={26} className="text-forest" /><span className="mt-2 text-sm font-semibold">{imageBusy ? "Đang tối ưu ảnh" : "Chọn ảnh, tối đa 10 MB"}</span><input type="file" accept="image/*" disabled={imageBusy} className="sr-only" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} /></span></label>
         {imageDataUrl && <div><Image unoptimized src={imageDataUrl} alt="Ảnh bằng chứng đã chọn" width={960} height={540} className="max-h-64 w-auto rounded-xl object-cover" /></div>}
         {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
-        <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary w-full">{busy ? "Đang ghi claim và đánh giá" : "Gửi claim lên Devnet"}</button>
+        <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary w-full">{busy ? "Đang ghi claim" : "Gửi claim lên Devnet"}</button>
       </div>
     </div>
   );
 }
 
 function EmptyMessage({ id }: { id: string }) {
-  return <div className="app-card mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-bold">Không tìm thấy tin</h1><p className="mt-2 text-sm text-ink-soft">Metadata cho bounty {id || "này"} không có trên thiết bị hoặc Supabase.</p><Link href="/bounties" className="app-button-primary mt-5">Về danh sách</Link></div>;
+  return <div className="app-card mx-auto max-w-lg p-6 text-center"><h1 className="text-xl font-bold">Không tìm thấy tin</h1><p className="mt-2 text-sm text-ink-soft">Bounty {id || "này"} không tồn tại trong dữ liệu Supabase bạn được phép xem.</p><Link href="/bounties" className="app-button-primary mt-5">Về danh sách</Link></div>;
 }

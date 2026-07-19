@@ -14,11 +14,10 @@ import {
   Timer,
 } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
-import { getBountyMeta } from "@/lib/findback/store";
 import { AiReviewPanel } from "@/components/findback/AiPanel";
 import { statusBadge, statusLabel } from "@/components/findback/BountyCard";
 import { FIND_SYMBOL, explorerAddressUrl, fromAtomic } from "@/lib/findback/config";
-import type { OnChainBounty } from "@/lib/findback/program";
+import { bountyPda, getConnection, type OnChainBounty } from "@/lib/findback/program";
 
 const flow = ["Draft", "Funded", "ClaimSubmitted", "AiReviewed", "Released"];
 
@@ -27,7 +26,7 @@ export default function BountyDetailPage() {
   const id = String(params?.id || "");
   const { publicKey } = useWallet();
   const { bounties, loadingBounties, fetchOnChain, fund, reviewClaim, accept, reject, dispute, refund, cancel, txState, lastTxUrl, programId } = useFindBack();
-  const meta = bounties.find((b) => b.id === id) || getBountyMeta(id);
+  const meta = bounties.find((b) => b.id === id);
   const [onchain, setOnchain] = useState<OnChainBounty | null>(null);
   const [chainLoading, setChainLoading] = useState(true);
   const [chainError, setChainError] = useState<string | null>(null);
@@ -50,12 +49,19 @@ export default function BountyDetailPage() {
           setChainLoading(false);
         });
     };
+    const connection = getConnection();
     const first = window.setTimeout(load, 0);
-    const interval = window.setInterval(load, 15_000);
+    const subscriptionId = connection.onAccountChange(
+      bountyPda(id)[0],
+      load,
+      "confirmed"
+    );
+    const interval = window.setInterval(load, 60_000);
     return () => {
       cancelled = true;
       window.clearTimeout(first);
       window.clearInterval(interval);
+      void connection.removeAccountChangeListener(subscriptionId);
     };
   }, [fetchOnChain, id]);
 
@@ -127,7 +133,7 @@ export default function BountyDetailPage() {
             {isOwner && onchain?.status === "Draft" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => fund(id))} className="app-button-primary w-full">Khóa phần thưởng vào escrow</button>}
             {isOwner && onchain?.status === "Draft" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => cancel(id))} className="app-button-secondary w-full">Hủy bounty chưa nạp tiền</button>}
             {canClaim && <Link href={`/bounties/${id}/claim`} className="app-button-primary w-full">Tôi đã tìm thấy đồ</Link>}
-            {isFinder && status === "ClaimSubmitted" && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(async () => { await reviewClaim(id); })} className="app-button-primary w-full">Chạy lại đánh giá AI</button>}
+            {isFinder && ["ClaimSubmitted", "AiReviewed"].includes(status) && !meta.aiReport && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(async () => { await reviewClaim(id); })} className="app-button-primary w-full">Đánh giá bằng AI trực tuyến</button>}
             {(isOwner || isFinder) && ["ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => dispute(id))} className="app-button-secondary w-full">Mở tranh chấp</button>}
             {isOwner && onchain && ["Funded", "ClaimSubmitted", "AiReviewed"].includes(status) && <button type="button" disabled={busy || txState === "pending"} onClick={() => void run(() => refund(id))} className="app-button-secondary w-full">Yêu cầu hoàn tiền khi hết hạn</button>}
           </div>
@@ -156,4 +162,4 @@ export default function BountyDetailPage() {
 function Info({ icon: Icon, value }: { icon: typeof MapPin; value: string }) { return <div className="flex items-start gap-2 rounded-xl border border-line bg-bg-deep p-3"><Icon size={17} className="mt-0.5 shrink-0 text-forest" /><span>{value}</span></div>; }
 function ChainRow({ label, value }: { label: string; value: React.ReactNode }) { return <div className="flex items-start justify-between gap-4 py-3 text-sm"><dt className="text-ink-muted">{label}</dt><dd className="text-right font-semibold text-ink">{value}</dd></div>; }
 function DetailSkeleton() { return <div className="grid gap-8 lg:grid-cols-2"><div><div className="skeleton aspect-[16/9]" /><div className="skeleton mt-5 h-9 w-2/3" /><div className="skeleton mt-4 h-4 w-full" /></div><div className="app-card space-y-4 p-6"><div className="skeleton h-6 w-1/2" /><div className="skeleton h-12 w-full" /><div className="skeleton h-12 w-full" /></div></div>; }
-function NotFound({ id }: { id: string }) { return <div className="app-card mx-auto max-w-lg p-7 text-center"><h1 className="text-xl font-bold">Không tìm thấy tin</h1><p className="mt-2 text-sm leading-6 text-ink-soft">Metadata cho bounty {id || "này"} không tồn tại trong Supabase hoặc bộ nhớ cục bộ.</p><Link href="/bounties" className="app-button-primary mt-5">Về danh sách</Link></div>; }
+function NotFound({ id }: { id: string }) { return <div className="app-card mx-auto max-w-lg p-7 text-center"><h1 className="text-xl font-bold">Không tìm thấy tin</h1><p className="mt-2 text-sm leading-6 text-ink-soft">Bounty {id || "này"} không tồn tại trong dữ liệu Supabase bạn được phép xem.</p><Link href="/bounties" className="app-button-primary mt-5">Về danh sách</Link></div>; }

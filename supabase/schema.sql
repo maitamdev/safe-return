@@ -88,25 +88,7 @@ drop policy if exists "Owners delete own bounties" on public.bounties;
 
 create policy "Authenticated users can read bounties"
   on public.bounties for select to authenticated using (true);
-create policy "Owners insert own bounties"
-  on public.bounties for insert to authenticated
-  with check (
-    auth.uid() = owner_id and exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid()
-        and p.wallet_verified_at is not null
-        and p.wallet_pubkey = owner_wallet
-    )
-  );
-create policy "Owners update own bounties"
-  on public.bounties for update to authenticated
-  using (auth.uid() = owner_id) with check (auth.uid() = owner_id);
-create policy "Owners delete own draft bounties"
-  on public.bounties for delete to authenticated
-  using (auth.uid() = owner_id and status in ('draft', 'cancelled'));
-
-revoke update on public.bounties from authenticated;
-grant update (status, last_tx, last_tx_url, updated_at) on public.bounties to authenticated;
+revoke insert, update, delete on public.bounties from authenticated;
 
 create table if not exists public.claims (
   bounty_id text primary key references public.bounties (id) on delete cascade,
@@ -142,6 +124,33 @@ create policy "Participants read private claims"
 -- Browser chỉ có quyền đọc claim theo RLS. Mọi ghi dữ liệu đi qua API server,
 -- được kiểm tra lại với tài khoản Solana rồi dùng service-role để cập nhật.
 revoke insert, update, delete on public.claims from authenticated;
+
+-- Không tiếp tục hiển thị kết quả heuristic từ các bản cũ.
+update public.claims
+set ai_report = null, updated_at = now()
+where ai_report is not null and coalesce(ai_report->>'mode', '') <> 'live';
+
+-- Bật thay đổi thời gian thực. Client chỉ nhận các hàng vượt qua RLS của chính nó.
+alter table public.bounties replica identity full;
+alter table public.claims replica identity full;
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'bounties'
+    ) then
+      alter publication supabase_realtime add table public.bounties;
+    end if;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'claims'
+    ) then
+      alter publication supabase_realtime add table public.claims;
+    end if;
+  end if;
+end;
+$$;
 
 drop function if exists public.submit_bounty_claim(text,text,jsonb,text,text);
 drop function if exists public.record_bounty_ai_review(text,jsonb,text,text);

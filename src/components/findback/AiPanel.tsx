@@ -16,8 +16,8 @@ export function AiReviewPanel({ report, onAccept, onReject, onDispute, busy, can
           <p className="flex items-center gap-2 text-sm font-bold text-forest"><Brain size={19} weight="duotone" />Đánh giá bằng chứng</p>
           <h2 id="review-title" className="mt-2 text-2xl font-bold">Kết quả so khớp claim</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Kết quả này không tự chuyển tiền. Chủ bounty phải tự kiểm tra và ký quyết định on-chain.</p>
-          <p className={`mt-4 inline-flex rounded-lg border px-3 py-1.5 text-xs font-bold ${report.mode === "live" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-amber-200 bg-amber-50 text-amber-800"}`}>
-            {report.mode === "live" ? `AI trực tuyến: ${report.model || "đã cấu hình"}` : "Đánh giá quy tắc cục bộ, không phải AI trực tuyến"}
+          <p className="mt-4 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
+            AI trực tuyến: {report.model || "đã cấu hình"}
           </p>
         </div>
         <div className="rounded-2xl border border-line bg-bg-deep px-6 py-4 text-center">

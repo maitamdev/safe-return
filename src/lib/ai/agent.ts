@@ -1,4 +1,3 @@
-import { heuristicScore } from "./score";
 import type { AiClaimReport, AiReviewInput } from "./types";
 
 /**
@@ -6,8 +5,7 @@ import type { AiClaimReport, AiReviewInput } from "./types";
  * analyze_evidence, compare_item_description, detect_fraud_signals,
  * score_claim, explain_decision
  *
- * Live path: OpenAI-compatible vision+chat when OPENAI_API_KEY is set.
- * Fallback: labeled heuristic (mode: "heuristic") — never claimed as live LLM.
+ * Uses a live OpenAI-compatible vision model. It never fabricates a local result.
  */
 
 const SYSTEM = `You are SafeReturn AI, a careful lost-and-found claim reviewer.
@@ -30,20 +28,9 @@ export async function runClaimReview(
 ): Promise<AiClaimReport> {
   const key = process.env.OPENAI_API_KEY || process.env.FIND_BACK_AI_KEY;
   if (!key) {
-    return heuristicScore(input);
+    throw new Error("AI trực tuyến chưa được cấu hình trên máy chủ.");
   }
-
-  try {
-    const report = await callOpenAiCompatible(key, input);
-    return report;
-  } catch (e) {
-    const fallback = heuristicScore(input);
-    fallback.explanation =
-      `Live AI unavailable (${e instanceof Error ? e.message : "error"}). ` +
-      `Fell back to heuristic. ` +
-      fallback.explanation;
-    return fallback;
-  }
+  return callOpenAiCompatible(key, input);
 }
 
 async function callOpenAiCompatible(

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
@@ -28,6 +28,7 @@ export default function CreateBountyPage() {
   const [days, setDays] = useState(7);
   const [imageDataUrl, setImageDataUrl] = useState<string | null>(null);
   const [imageBusy, setImageBusy] = useState(false);
+  const bountyIdRef = useRef<string | null>(null);
 
   const onFile = async (file: File | null) => {
     setError(null);
@@ -73,7 +74,8 @@ export default function CreateBountyPage() {
     }
     setBusy(true);
     try {
-      const id = `FB-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+      const id = bountyIdRef.current ?? `FB-${crypto.randomUUID().replaceAll("-", "").slice(0, 10).toUpperCase()}`;
+      bountyIdRef.current = id;
       await createAndFund({ id, title: title.trim(), description: description.trim(), category, location: location.trim(), rewardUi, days, imageDataUrl });
       router.push(`/bounties/${id}`);
     } catch (cause) {
@@ -124,7 +126,7 @@ export default function CreateBountyPage() {
 
         {step === 2 && (
           <div className="space-y-5">
-            <Field label={`Phần thưởng bằng ${FIND_SYMBOL}`} hint="FIND là SPL token thật trên Devnet, chỉ dùng trong smart contract và không có giá trị tiền tệ."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
+            <Field label={`Phần thưởng bằng ${FIND_SYMBOL}`} hint="FIND là SPL token thử nghiệm trên Devnet, chỉ dùng trong smart contract và không có giá trị tiền tệ."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
             <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Phantom sẽ yêu cầu ký giao dịch tạo bounty và giao dịch chuyển FIND vào vault. SOL Devnet chỉ được dùng để trả phí mạng.</p></div></div>
           </div>
         )}
