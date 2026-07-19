@@ -27,6 +27,7 @@ export function ConnectWalletButton({
   const { setVisible } = useWalletModal();
   const [hint, setHint] = useState<string | null>(null);
   const [verifiedAddress, setVerifiedAddress] = useState<string | null>(null);
+  const [serviceReady, setServiceReady] = useState(true);
   const [verifying, setVerifying] = useState(false);
   const pad = size === "md" ? "px-4 py-2.5 text-sm" : "px-3 py-2 text-xs";
 
@@ -36,10 +37,22 @@ export function ConnectWalletButton({
     fetch("/api/wallet/status", { cache: "no-store" })
       .then(async (response) => {
         if (!response.ok) return null;
-        return (await response.json()) as { address?: string | null };
+        return (await response.json()) as {
+          address?: string | null;
+          configured?: boolean;
+          adminConfigured?: boolean;
+          schemaReady?: boolean;
+        };
       })
       .then((json) => {
-        if (!cancelled) setVerifiedAddress(json?.address || null);
+        if (!cancelled) {
+          setVerifiedAddress(json?.address || null);
+          setServiceReady(
+            json?.configured !== false &&
+              json?.adminConfigured !== false &&
+              json?.schemaReady !== false
+          );
+        }
       })
       .catch(() => {
         if (!cancelled) setVerifiedAddress(null);
@@ -135,7 +148,7 @@ export function ConnectWalletButton({
         <div className={`inline-flex flex-col items-end gap-1.5 ${className}`}>
           <button
             type="button"
-            disabled={verifying}
+            disabled={verifying || !serviceReady}
             onClick={() => void verifyWallet()}
             className={`inline-flex items-center justify-center gap-2 rounded-xl font-semibold transition active:translate-y-px disabled:cursor-wait disabled:opacity-60 ${
               dark
@@ -148,8 +161,13 @@ export function ConnectWalletButton({
             ) : (
               <ShieldCheck size={15} weight="bold" />
             )}
-            {verifying ? "Đang xác minh" : `Xác minh ${short}`}
+            {verifying ? "Đang xác minh" : serviceReady ? `Xác minh ${short}` : "Hệ thống chưa sẵn sàng"}
           </button>
+          {!serviceReady && (
+            <p className={`max-w-72 text-right text-xs ${dark ? "text-amber-100" : "text-amber-800"}`}>
+              Quản trị viên cần hoàn tất secret key và migration Supabase.
+            </p>
+          )}
           {hint && (
             <p className={`max-w-72 text-right text-xs ${dark ? "text-amber-100" : "text-amber-800"}`}>
               {hint}
