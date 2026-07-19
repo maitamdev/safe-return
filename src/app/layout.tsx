@@ -1,7 +1,6 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/Navbar";
-import { LanguageProvider } from "@/lib/i18n";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import "./globals.css";
 
@@ -18,17 +17,33 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "FindBack AI — Tìm đồ · AI kiểm chứng · Thưởng Solana",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
+  title: "SafeReturn: Tìm đồ thất lạc trên Solana Devnet",
   description:
-    "Nền tảng tìm đồ thất lạc: AI chấm điểm claim, Solana khóa thưởng minh bạch. Dùng được ngay trên Devnet — không cần hiểu blockchain.",
+    "Đăng tin thất lạc, kiểm tra bằng chứng và khóa phần thưởng minh bạch trên Solana Devnet.",
   keywords: [
-    "FindBack AI",
+    "SafeReturn",
     "tìm đồ thất lạc",
     "Solana",
     "AI claim",
     "escrow",
     "lost and found",
   ],
+  applicationName: "SafeReturn",
+  manifest: "/manifest.webmanifest",
+  openGraph: {
+    title: "SafeReturn: Tìm đồ thất lạc trên Solana Devnet",
+    description: "Đối chiếu bằng chứng và trao thưởng FIND minh bạch trên mạng thử nghiệm Solana.",
+    type: "website",
+    locale: "vi_VN",
+    siteName: "SafeReturn",
+  },
+  twitter: { card: "summary_large_image", title: "SafeReturn", description: "Tìm đồ thất lạc với bằng chứng có thể kiểm tra trên Solana Devnet." },
+};
+
+export const viewport = {
+  themeColor: "#08784a",
+  colorScheme: "light",
 };
 
 export default function RootLayout({
@@ -42,12 +57,10 @@ export default function RootLayout({
       className={`${sans.variable} ${mono.variable} h-full antialiased`}
     >
       <body className="flex min-h-full flex-col font-sans">
-        <LanguageProvider>
-          <AuthProvider>
-            <Navbar />
-            {children}
-          </AuthProvider>
-        </LanguageProvider>
+        <AuthProvider>
+          <Navbar />
+          {children}
+        </AuthProvider>
       </body>
     </html>
   );
