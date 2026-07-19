@@ -1,6 +1,9 @@
 import { createHash } from "node:crypto";
 import { explorerTxUrl, fromAtomic } from "@/lib/findback/config";
-import { metadataIntegrityPayload } from "@/lib/findback/integrity";
+import {
+  metadataIntegrityPayload,
+  metadataIntegrityPayloadV2,
+} from "@/lib/findback/integrity";
 import { fetchBounty, getConnection } from "@/lib/findback/program";
 import type { BountyMeta } from "@/lib/findback/store";
 import {
@@ -11,6 +14,7 @@ import {
   requireSameOrigin,
 } from "@/lib/server/api-security";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { verifyStoredImage } from "@/lib/server/media";
 
 export const runtime = "nodejs";
 
@@ -57,9 +61,42 @@ export async function POST(req: Request) {
     if (onchain.owner !== profile.wallet_pubkey || bounty.ownerWallet !== onchain.owner) {
       throw new ApiError(403, "Ví chủ bounty không khớp Devnet.");
     }
+    const useV2 = bounty.protocolVersion === 2 || onchain.protocolVersion >= 2;
+    if (useV2 && (bounty.protocolVersion !== 2 || onchain.protocolVersion < 2)) {
+      throw new ApiError(409, "Phiên bản metadata không khớp protocol on-chain.");
+    }
+    if (useV2 && bounty.media) {
+      await verifyStoredImage({
+        admin,
+        userId: user.id,
+        bountyId: bounty.id,
+        purpose: "listing",
+        media: bounty.media,
+      });
+    }
     const metadataHashHex = Buffer.from(onchain.metadataHash).toString("hex");
     const computedMetadataHash = createHash("sha256")
-      .update(metadataIntegrityPayload(bounty))
+      .update(
+        useV2
+          ? metadataIntegrityPayloadV2({
+              bountyId: bounty.id,
+              owner: onchain.owner,
+              rewardBaseUnits: onchain.rewardAmount.toString(),
+              deadlineUnix: onchain.deadline,
+              title: bounty.title,
+              description: bounty.description,
+              category: bounty.category,
+              location: bounty.location,
+              image: bounty.media
+                ? {
+                    sha256: bounty.media.sha256,
+                    mimeType: bounty.media.mimeType,
+                    byteSize: bounty.media.byteSize,
+                  }
+                : null,
+            })
+          : metadataIntegrityPayload(bounty)
+      )
       .digest("hex");
     if (
       metadataHashHex !== bounty.metadataHashHex ||
@@ -84,8 +121,7 @@ export async function POST(req: Request) {
     }
 
     const now = new Date().toISOString();
-    const { error } = await admin.from("bounties").upsert(
-      {
+    const row = {
         id: bounty.id,
         owner_id: user.id,
         owner_wallet: onchain.owner,
@@ -95,13 +131,24 @@ export async function POST(req: Request) {
         location: bounty.location.trim().slice(0, 180),
         reward_ui: fromAtomic(onchain.rewardAmount),
         deadline_unix: onchain.deadline,
-        image_path: bounty.imageDataUrl ?? null,
+        image_path: useV2 ? null : bounty.imageDataUrl ?? null,
         metadata_hash: metadataHashHex,
         status: toDbStatus(onchain.status),
         last_tx: signature,
         last_tx_url: signature ? explorerTxUrl(signature) : null,
         updated_at: now,
-      },
+        ...(useV2
+          ? {
+              protocol_version: 2,
+              image_storage_path: bounty.media?.storagePath ?? null,
+              image_sha256: bounty.media?.sha256 ?? null,
+              image_mime_type: bounty.media?.mimeType ?? null,
+              image_byte_size: bounty.media?.byteSize ?? null,
+            }
+          : {}),
+      };
+    const { error } = await admin.from("bounties").upsert(
+      row,
       { onConflict: "id" }
     );
     if (error) throw new Error(error.message);

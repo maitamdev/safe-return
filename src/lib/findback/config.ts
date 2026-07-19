@@ -32,6 +32,9 @@ export const SOLANA_LIVE =
   process.env.NEXT_PUBLIC_SOLANA_LIVE !== "0" &&
   process.env.NEXT_PUBLIC_SOLANA_LIVE !== "false";
 
+/** Enabled only after the v2 program upgrade and Supabase migration are live. */
+export const PROTOCOL_V2_ENABLED = process.env.NEXT_PUBLIC_PROTOCOL_V2 === "1";
+
 export function explorerTxUrl(sig: string) {
   return `https://explorer.solana.com/tx/${sig}?cluster=devnet`;
 }

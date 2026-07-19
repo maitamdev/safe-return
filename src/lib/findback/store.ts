@@ -4,6 +4,25 @@
  */
 
 import type { AiClaimReport } from "@/lib/ai/types";
+import type { StoredMedia } from "@/lib/media/types";
+
+export type ClaimMeta = {
+  id?: string;
+  claimPda?: string | null;
+  protocolVersion?: number;
+  finderWallet?: string;
+  description: string;
+  location: string;
+  foundAt: string;
+  imageDataUrl?: string | null;
+  media?: StoredMedia | null;
+  submittedAt: number;
+  evidenceHashHex?: string;
+  aiReport?: AiClaimReport | null;
+  status?: string;
+  lastTx?: string | null;
+  lastTxUrl?: string | null;
+};
 
 export type BountyMeta = {
   id: string;
@@ -15,19 +34,16 @@ export type BountyMeta = {
   deadlineUnix: number;
   ownerWallet?: string;
   imageDataUrl?: string | null;
+  media?: StoredMedia | null;
+  protocolVersion?: number;
   createdAt: number;
   status?: string;
   /** full AI report for latest claim */
   aiReport?: AiClaimReport | null;
-  claim?: {
-    finderWallet?: string;
-    description: string;
-    location: string;
-    foundAt: string;
-    imageDataUrl?: string | null;
-    submittedAt: number;
-    evidenceHashHex?: string;
-  } | null;
+  /** Legacy/latest claim compatibility view. */
+  claim?: ClaimMeta | null;
+  /** Protocol v2 exposes every independent finder claim. */
+  claims?: ClaimMeta[];
   lastTx?: string | null;
   lastTxUrl?: string | null;
   metadataHashHex?: string | null;

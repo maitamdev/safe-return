@@ -68,6 +68,34 @@ export async function removePrivateImage(
   await admin.storage.from(bucket).remove([storagePath]);
 }
 
+export async function verifyStoredImage(args: {
+  admin: SupabaseClient;
+  userId: string;
+  bountyId: string;
+  purpose: MediaPurpose;
+  media: StoredMedia;
+}) {
+  const expectedPrefix = `${args.userId}/${args.bountyId}/`;
+  if (!args.media.storagePath.startsWith(expectedPrefix)) {
+    throw new ApiError(403, "Đường dẫn ảnh không thuộc tài khoản và bounty này.");
+  }
+  const bucket = args.purpose === "listing" ? "listing-media" : "claim-evidence";
+  const { data, error } = await args.admin.storage
+    .from(bucket)
+    .download(args.media.storagePath);
+  if (error || !data) throw new ApiError(409, "Không tìm thấy ảnh đã tải lên.");
+  const bytes = Buffer.from(await data.arrayBuffer());
+  const sha256 = createHash("sha256").update(bytes).digest("hex");
+  if (
+    sha256 !== args.media.sha256 ||
+    bytes.length !== args.media.byteSize ||
+    data.type !== args.media.mimeType ||
+    !hasExpectedSignature(bytes, args.media.mimeType)
+  ) {
+    throw new ApiError(409, "Nội dung ảnh lưu trữ không khớp commitment.");
+  }
+}
+
 function hasExpectedSignature(bytes: Buffer, mimeType: ImageDescriptorV2["mimeType"]) {
   if (mimeType === "image/jpeg") {
     return bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff;

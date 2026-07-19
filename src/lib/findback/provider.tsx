@@ -25,11 +25,26 @@ import {
   refundAfterExpiryOnChain,
   rejectClaimOnChain,
   submitClaimOnChain,
+  submitClaimV2OnChain,
   type OnChainBounty,
   type WalletLike,
 } from "./program";
-import { FINDBACK_PROGRAM_ID, FIND_MINT, SOLANA_LIVE, fromAtomic } from "./config";
-import { evidenceIntegrityPayload, metadataIntegrityPayload } from "./integrity";
+import {
+  FINDBACK_PROGRAM_ID,
+  FIND_MINT,
+  PROTOCOL_V2_ENABLED,
+  SOLANA_LIVE,
+  fromAtomic,
+  toAtomic,
+} from "./config";
+import {
+  evidenceIntegrityPayload,
+  evidenceIntegrityPayloadV2,
+  imageDescriptorFromDataUrl,
+  metadataIntegrityPayload,
+  metadataIntegrityPayloadV2,
+} from "./integrity";
+import { uploadPrivateMedia } from "@/lib/media/client";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import {
   fetchBountiesFromSupabase,
@@ -211,7 +226,10 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   };
 
   const runTx = useCallback(
-    async (ixName: string, fn: () => Promise<{ signature: string; url: string }>) => {
+    async <T extends { signature: string; url: string }>(
+      ixName: string,
+      fn: () => Promise<T>
+    ): Promise<T> => {
       setError(null);
       setTxState("pending");
       setLastIx(ixName);
@@ -250,29 +268,56 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
 
       let deadlineUnix =
         Math.floor(Date.now() / 1000) + Math.max(1, input.days) * 86400;
-      const metaPayload = metadataIntegrityPayload({
-        title: input.title,
-        description: input.description,
-        category: input.category,
-        location: input.location,
-      });
-      const metadataHash = await sha256Bytes(metaPayload);
-      const metadataHashHex = Array.from(metadataHash)
-        .map((byte) => byte.toString(16).padStart(2, "0"))
-        .join("");
-
       const existing = await fetchBounty(input.id);
       if (existing) {
         if (existing.owner !== w.publicKey.toBase58()) {
           throw new Error("Mã bounty đã thuộc về ví khác.");
         }
+        deadlineUnix = existing.deadline;
+      }
+      const useV2 = existing
+        ? existing.protocolVersion >= 2
+        : PROTOCOL_V2_ENABLED;
+      const imageDescriptor = useV2
+        ? await imageDescriptorFromDataUrl(input.imageDataUrl)
+        : null;
+      const media = useV2 && input.imageDataUrl
+        ? await uploadPrivateMedia({
+            purpose: "listing",
+            bountyId: input.id,
+            dataUrl: input.imageDataUrl,
+          })
+        : null;
+      const metaPayload = useV2
+        ? metadataIntegrityPayloadV2({
+            bountyId: input.id,
+            owner: w.publicKey.toBase58(),
+            rewardBaseUnits: (existing?.rewardAmount ?? toAtomic(input.rewardUi)).toString(),
+            deadlineUnix,
+            title: input.title,
+            description: input.description,
+            category: input.category,
+            location: input.location,
+            image: imageDescriptor,
+          })
+        : metadataIntegrityPayload({
+            title: input.title,
+            description: input.description,
+            category: input.category,
+            location: input.location,
+          });
+      const metadataHash = await sha256Bytes(metaPayload);
+      const metadataHashHex = Array.from(metadataHash)
+        .map((byte) => byte.toString(16).padStart(2, "0"))
+        .join("");
+
+      if (existing) {
         const existingMetadataHashHex = Array.from(existing.metadataHash)
           .map((byte) => byte.toString(16).padStart(2, "0"))
           .join("");
         if (existingMetadataHashHex !== metadataHashHex) {
           throw new Error("Metadata Supabase không khớp hash bounty trên Devnet.");
         }
-        deadlineUnix = existing.deadline;
       }
 
       const meta: BountyMeta = {
@@ -284,7 +329,9 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         rewardUi: existing ? fromAtomic(existing.rewardAmount) : input.rewardUi,
         deadlineUnix,
         ownerWallet: w.publicKey.toBase58(),
-        imageDataUrl: input.imageDataUrl ?? null,
+        imageDataUrl: useV2 ? null : input.imageDataUrl ?? null,
+        media,
+        protocolVersion: existing?.protocolVersion ?? (useV2 ? 2 : 1),
         createdAt: Date.now(),
         status: existing?.status || "Draft",
         metadataHashHex,
@@ -410,21 +457,50 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const meta = currentBounty(input.bountyId);
       if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
 
-      const evidencePayload = evidenceIntegrityPayload({
-        description: input.description,
-        location: input.location,
-        foundAt: input.foundAt,
-        imageDataUrl: input.imageDataUrl,
-        finder: w.publicKey.toBase58(),
-      });
+      const onchain = await fetchBounty(input.bountyId);
+      if (!onchain) throw new Error("Không tìm thấy bounty trên Solana Devnet.");
+      const useV2 = onchain.protocolVersion >= 2 && PROTOCOL_V2_ENABLED;
+      const imageDescriptor = useV2
+        ? await imageDescriptorFromDataUrl(input.imageDataUrl)
+        : null;
+      const media = useV2 && input.imageDataUrl
+        ? await uploadPrivateMedia({
+            purpose: "claim",
+            bountyId: input.bountyId,
+            dataUrl: input.imageDataUrl,
+          })
+        : null;
+      const evidencePayload = useV2
+        ? evidenceIntegrityPayloadV2({
+            bountyId: input.bountyId,
+            description: input.description,
+            location: input.location,
+            foundAt: input.foundAt,
+            image: imageDescriptor,
+            finder: w.publicKey.toBase58(),
+          })
+        : evidenceIntegrityPayload({
+            description: input.description,
+            location: input.location,
+            foundAt: input.foundAt,
+            imageDataUrl: input.imageDataUrl,
+            finder: w.publicKey.toBase58(),
+          });
       const evidenceHash = await sha256Bytes(evidencePayload);
       const evidenceHashHex = Array.from(evidenceHash)
         .map((b) => b.toString(16).padStart(2, "0"))
         .join("");
 
-      const claimTx = await runTx("submit_claim", () =>
-        submitClaimOnChain(w, input.bountyId, evidenceHash)
-      );
+      const claimTx = useV2
+        ? await runTx("submit_claim_v2", () =>
+            submitClaimV2OnChain(w, input.bountyId, evidenceHash)
+          )
+        : await runTx("submit_claim", () =>
+            submitClaimOnChain(w, input.bountyId, evidenceHash)
+          );
+      const claimPda = useV2
+        ? (claimTx as { signature: string; url: string; claimPda: string }).claimPda
+        : null;
 
       const submitted: BountyMeta = {
         ...meta,
@@ -433,7 +509,10 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           description: input.description,
           location: input.location,
           foundAt: input.foundAt,
-          imageDataUrl: input.imageDataUrl ?? null,
+          imageDataUrl: useV2 ? null : input.imageDataUrl ?? null,
+          media,
+          protocolVersion: useV2 ? 2 : 1,
+          claimPda,
           submittedAt: Date.now(),
           evidenceHashHex,
         },
