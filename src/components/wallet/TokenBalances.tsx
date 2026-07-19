@@ -44,17 +44,20 @@ export function TokenBalances({ dark = false }: { dark?: boolean }) {
   }, [connection, publicKey]);
 
   useEffect(() => {
-    void refresh();
-    if (!publicKey) return;
+    const first = window.setTimeout(() => void refresh(), 0);
+    if (!publicKey) return () => window.clearTimeout(first);
     const id = setInterval(() => void refresh(), 12_000);
-    return () => clearInterval(id);
+    return () => {
+      window.clearTimeout(first);
+      clearInterval(id);
+    };
   }, [publicKey, refresh, tick]);
 
   // Allow parent to force refresh via custom event
   useEffect(() => {
     const onFunded = () => setTick((t) => t + 1);
-    window.addEventListener("findback:funded", onFunded);
-    return () => window.removeEventListener("findback:funded", onFunded);
+    window.addEventListener("safereturn:funded", onFunded);
+    return () => window.removeEventListener("safereturn:funded", onFunded);
   }, []);
 
   if (!publicKey) return null;
@@ -62,7 +65,7 @@ export function TokenBalances({ dark = false }: { dark?: boolean }) {
   const addr = publicKey.toBase58();
   const pill = dark
     ? "rounded-full border border-white/15 bg-white/5 px-2.5 py-1 font-mono text-[10px] font-semibold text-white/80 transition hover:border-[#14F195]/40 hover:text-[#14F195]"
-    : "rounded-full border border-line bg-white/80 px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/30 hover:text-forest";
+    : "rounded-lg border border-line bg-white px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/40 hover:text-forest";
 
   return (
     <div className="inline-flex flex-wrap items-center gap-1.5">
