@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/Navbar";
 import { LanguageProvider } from "@/lib/i18n";
+import { AuthProvider } from "@/lib/auth/AuthProvider";
 import "./globals.css";
 
 const sans = Be_Vietnam_Pro({
@@ -43,8 +44,10 @@ export default function RootLayout({
     >
       <body className="flex min-h-full flex-col font-sans">
         <LanguageProvider>
-          <Navbar />
-          {children}
+          <AuthProvider>
+            <Navbar />
+            {children}
+          </AuthProvider>
         </LanguageProvider>
       </body>
     </html>

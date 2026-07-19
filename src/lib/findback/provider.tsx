@@ -19,6 +19,7 @@ import {
   upsertBounty,
   type BountyMeta,
 } from "./store";
+// saveBounties used when merging remote
 import {
   acceptClaimOnChain,
   createBountyOnChain,
@@ -33,6 +34,11 @@ import {
   type WalletLike,
 } from "./program";
 import { FINDBACK_PROGRAM_ID, FIND_MINT, SOLANA_LIVE } from "./config";
+import { useAuth } from "@/lib/auth/AuthProvider";
+import {
+  fetchBountiesFromSupabase,
+  syncBountyToSupabase,
+} from "./db";
 
 type TxState = "idle" | "pending" | "confirmed" | "failed";
 
@@ -91,6 +97,7 @@ function hexToBytes(hex: string): Uint8Array {
 
 export function FindBackProvider({ children }: { children: ReactNode }) {
   const { publicKey, signTransaction, connected } = useWallet();
+  const { user } = useAuth();
   const [bounties, setBounties] = useState<BountyMeta[]>([]);
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [lastTxUrl, setLastTxUrl] = useState<string | null>(null);
@@ -105,6 +112,33 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     refresh();
   }, [refresh]);
+
+  // Merge Supabase bounties (shared across devices) when logged in
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+    void (async () => {
+      const remote = await fetchBountiesFromSupabase();
+      if (cancelled || remote.length === 0) return;
+      const local = loadBounties();
+      const map = new Map<string, BountyMeta>();
+      for (const b of local) map.set(b.id, b);
+      for (const b of remote) {
+        const prev = map.get(b.id);
+        if (!prev || (b.createdAt || 0) >= (prev.createdAt || 0)) {
+          map.set(b.id, { ...prev, ...b, seed: false });
+        }
+      }
+      const merged = Array.from(map.values()).sort(
+        (a, b) => (b.createdAt || 0) - (a.createdAt || 0)
+      );
+      saveBounties(merged);
+      setBounties(merged);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   const wallet = useMemo((): WalletLike | null => {
     if (!connected || !publicKey || !signTransaction) return null;
@@ -219,14 +253,16 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         fundBountyOnChain(w, input.id, input.rewardUi)
       );
 
-      upsertBounty({
+      const saved = {
         ...meta,
         lastTx: funded.signature,
         lastTxUrl: funded.url,
-      });
+      };
+      upsertBounty(saved);
+      if (user?.id) void syncBountyToSupabase(saved, user.id);
       refresh();
     },
-    [requireWallet, runTx, refresh]
+    [requireWallet, runTx, refresh, user?.id]
   );
 
   const submitClaim = useCallback(
@@ -313,10 +349,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTxUrl: lastTxUrl,
       };
       upsertBounty(updated);
+      if (user?.id) void syncBountyToSupabase(updated, user.id);
       refresh();
       return aiJson.report;
     },
-    [requireWallet, runTx, refresh, lastTx, lastTxUrl]
+    [requireWallet, runTx, refresh, lastTx, lastTxUrl, user?.id]
   );
 
   const accept = useCallback(

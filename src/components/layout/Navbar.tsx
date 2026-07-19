@@ -15,14 +15,18 @@ export function Navbar() {
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
   const isApp =
-    pathname?.startsWith("/app") || pathname?.startsWith("/bounties");
+    pathname?.startsWith("/app") ||
+    pathname?.startsWith("/bounties") ||
+    pathname?.startsWith("/login") ||
+    pathname?.startsWith("/signup") ||
+    pathname?.startsWith("/auth");
 
   const links = [
     { href: "/#problem", label: t("nav.problem") },
     { href: "/#how", label: t("nav.how") },
     { href: "/#ai", label: t("nav.ai") },
+    { href: "/login", label: "Đăng nhập" },
     { href: "/bounties", label: "FindBack AI" },
-    { href: "/app", label: t("nav.mvp") },
   ];
 
   useEffect(() => {
@@ -54,7 +58,7 @@ export function Navbar() {
               <QrCode size={16} weight="bold" />
             </span>
             <span className="text-[15px] font-semibold tracking-tight">
-              SafeReturn
+              FindBack AI
             </span>
           </Link>
 
@@ -72,8 +76,8 @@ export function Navbar() {
 
           <div className="flex items-center gap-2">
             <LanguageToggle size="sm" />
-            <Button href="/app" size="sm" className="hidden sm:inline-flex">
-              {t("nav.launch")}
+            <Button href="/login" size="sm" className="hidden sm:inline-flex">
+              Đăng nhập
             </Button>
             <button
               type="button"
@@ -102,8 +106,8 @@ export function Navbar() {
             ))}
             <div className="mt-6 space-y-3">
               <LanguageToggle />
-              <Button href="/app" size="lg" className="w-full" icon>
-                {t("nav.launch")}
+              <Button href="/login" size="lg" className="w-full" icon>
+                Đăng nhập
               </Button>
             </div>
           </div>

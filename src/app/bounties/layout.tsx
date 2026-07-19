@@ -4,6 +4,7 @@ import dynamic from "next/dynamic";
 import { FindBackProvider } from "@/lib/findback/provider";
 import { FindBackShell } from "@/components/findback/Shell";
 import { WalletBridge } from "@/components/wallet/WalletBridge";
+import { AuthGate } from "@/components/auth/AuthGate";
 
 const WalletProviders = dynamic(
   () =>
@@ -25,11 +26,15 @@ export default function BountiesLayout({
   children: React.ReactNode;
 }) {
   return (
-    <WalletProviders>
-      <WalletBridge />
-      <FindBackProvider>
-        <FindBackShell>{children}</FindBackShell>
-      </FindBackProvider>
-    </WalletProviders>
+    <div className="min-h-dvh bg-[#070b14]">
+      <AuthGate>
+        <WalletProviders>
+          <WalletBridge />
+          <FindBackProvider>
+            <FindBackShell>{children}</FindBackShell>
+          </FindBackProvider>
+        </WalletProviders>
+      </AuthGate>
+    </div>
   );
 }

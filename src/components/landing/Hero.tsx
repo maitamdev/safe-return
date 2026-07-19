@@ -42,17 +42,17 @@ export function Hero() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Button href="/bounties" size="lg" icon>
-            FindBack AI — Open app
+          <Button href="/login" size="lg" icon>
+            Đăng nhập / Dùng app
           </Button>
-          <Button href="/bounties/create" variant="secondary" size="lg">
-            Create bounty
+          <Button href="/signup" variant="secondary" size="lg">
+            Tạo tài khoản
           </Button>
           <Link
-            href="/app"
+            href="/bounties"
             className="text-sm font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline"
           >
-            Campus MVP
+            Vào FindBack
           </Link>
         </div>
 

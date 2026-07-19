@@ -4,9 +4,48 @@ Bạn **không cần** hiểu blockchain. Chỉ làm đúng thứ tự dưới �
 
 ---
 
+## 0) Đăng nhập (bắt buộc) — Supabase
+
+Người dùng **phải có tài khoản** (email + mật khẩu) mới vào `/bounties`.  
+Ví Phantom **không thay** đăng nhập — Phantom chỉ để **ký giao dịch** tiền thưởng.
+
+### Setup Supabase (1 lần — bạn / team)
+
+1. Vào https://supabase.com/dashboard → **New project** (free)  
+2. **Project Settings → API**  
+   - copy **Project URL**  
+   - copy **anon public** key  
+3. Dán vào `d:\HACKATHON\safereturn\.env.local`:
+
+```env
+NEXT_PUBLIC_SUPABASE_URL=https://xxxx.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJ....
+```
+
+4. Supabase → **SQL Editor** → New → dán hết file `supabase/schema.sql` → **Run**  
+5. **Authentication → Providers → Email**  
+   - Tắt **Confirm email** (tiện demo hackathon, vào app ngay)  
+6. Restart:
+
+```powershell
+cd d:\HACKATHON\safereturn
+npm run dev
+```
+
+7. Production (Vercel): Settings → Environment Variables → thêm 2 biến trên → Redeploy  
+
+### User flow
+
+1. Mở `/login` hoặc `/signup`  
+2. Đăng ký email + mật khẩu  
+3. Đăng nhập → vào `/bounties`  
+4. (Sau đó) Kết nối Phantom + nhận FIND  
+
+---
+
 ## App mở ở đâu?
 
-**Production:** https://safereturn-delta.vercel.app/bounties  
+**Production:** https://safereturn-delta.vercel.app/login  
 
 Hoặc máy bạn:
 
@@ -16,7 +55,7 @@ npm install
 npm run dev
 ```
 
-→ http://localhost:3000/bounties
+→ http://localhost:3000/login
 
 ---
 
