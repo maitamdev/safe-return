@@ -14,13 +14,14 @@ export function Navbar() {
   const [open, setOpen] = useState(false);
   const [scrolled, setScrolled] = useState(false);
   const pathname = usePathname();
-  const isApp = pathname?.startsWith("/app");
+  const isApp =
+    pathname?.startsWith("/app") || pathname?.startsWith("/bounties");
 
   const links = [
     { href: "/#problem", label: t("nav.problem") },
     { href: "/#how", label: t("nav.how") },
     { href: "/#ai", label: t("nav.ai") },
-    { href: "/#demo", label: t("nav.demo") },
+    { href: "/bounties", label: "FindBack AI" },
     { href: "/app", label: t("nav.mvp") },
   ];
 

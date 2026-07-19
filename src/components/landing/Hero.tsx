@@ -42,12 +42,18 @@ export function Hero() {
         </p>
 
         <div className="mt-8 flex flex-wrap items-center gap-3">
-          <Button href="/app" size="lg" icon>
-            {t("hero.ctaApp")}
+          <Button href="/bounties" size="lg" icon>
+            FindBack AI — Open app
           </Button>
-          <Button href="/#demo" variant="secondary" size="lg">
-            {t("hero.ctaDemo")}
+          <Button href="/bounties/create" variant="secondary" size="lg">
+            Create bounty
           </Button>
+          <Link
+            href="/app"
+            className="text-sm font-medium text-ink-muted underline-offset-4 hover:text-ink hover:underline"
+          >
+            Campus MVP
+          </Link>
         </div>
 
         <div className="mt-8 flex flex-wrap gap-x-5 gap-y-2 text-sm text-ink-muted">

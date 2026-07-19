@@ -6,9 +6,11 @@ resolution = true
 skip-lint = false
 
 [programs.localnet]
+findback = "3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna"
 safereturn_escrow = "8aPk563iNTtCP95gZ5EhdWJhTiL1cgKypcDUJikf3H6c"
 
 [programs.devnet]
+findback = "3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna"
 safereturn_escrow = "8aPk563iNTtCP95gZ5EhdWJhTiL1cgKypcDUJikf3H6c"
 
 [registry]

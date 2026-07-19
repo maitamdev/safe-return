@@ -12,7 +12,10 @@
     "solana:fund": "node scripts/fund-devnet-sol.mjs",
     "solana:smoke": "node scripts/smoke-onchain.mjs",
     "solana:balance": "solana balance",
-    "solana:address": "solana address"
+    "solana:address": "solana address",
+    "findback:deploy": "node scripts/deploy-findback.mjs",
+    "findback:setup": "node scripts/setup-findback-devnet.mjs",
+    "findback:smoke": "node scripts/smoke-findback.mjs"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

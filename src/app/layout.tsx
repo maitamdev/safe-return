@@ -17,15 +17,16 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "SafeReturn — Tìm lại. Trả về. Nhận thưởng.",
+  title: "FindBack AI — Find it. Verify it. Reward it.",
   description:
-    "Ứng dụng nhặt–mất trong campus: AI khớp đồ, escrow Solana sau bàn giao OTP.",
+    "AI-powered lost & found on Solana. AI scores claims; escrow releases only after human approval.",
   keywords: [
+    "FindBack AI",
     "SafeReturn",
     "lost and found",
-    "nhặt được mất đồ",
     "Solana",
-    "AI matching",
+    "AI claim scoring",
+    "escrow",
     "UniHackFest",
   ],
 };
