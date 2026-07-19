@@ -7,10 +7,9 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "solana:deploy": "node scripts/deploy-devnet.mjs",
-    "solana:setup": "node scripts/setup-devnet.mjs",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "solana:fund": "node scripts/fund-devnet-sol.mjs",
-    "solana:smoke": "node scripts/smoke-onchain.mjs",
     "solana:balance": "solana balance",
     "solana:address": "solana address",
     "findback:deploy": "node scripts/deploy-findback.mjs",
@@ -33,7 +32,8 @@
     "motion": "^12.42.2",
     "next": "16.2.10",
     "react": "19.2.4",
-    "react-dom": "19.2.4"
+    "react-dom": "19.2.4",
+    "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
@@ -43,6 +43,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.2.10",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^4.1.10"
   }
 }
