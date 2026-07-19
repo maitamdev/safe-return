@@ -1,140 +1,65 @@
-# FindBack AI — AI-powered Lost & Found on Solana
+# SafeReturn
 
-> FindBack AI uses AI to verify lost-item claims and Solana escrow to guarantee transparent rewards.
+SafeReturn là ứng dụng tìm đồ thất lạc dùng AI để hỗ trợ đối chiếu bằng chứng và Solana Devnet để khóa, hoàn hoặc trao thưởng minh bạch. Dự án không dùng dữ liệu bounty giả và không dùng tiền thật.
 
-**Hackathon theme:** AI × Web3 — AI analyzes evidence; humans approve; Solana moves funds.
+## Luồng sản phẩm
 
-| Layer | Role |
-|-------|------|
-| **AI Agent** | Score claims 0–100, fraud signals, ACCEPT / REVIEW / REJECT |
-| **Solana Program** | Escrow PDA + vault — no AI cannot release tokens |
-| **Phantom** | Owner / finder sign real Devnet txs |
-| **FIND token** | Devnet SPL **test** reward token (not real USDC) |
+1. Người dùng đăng nhập và ký tin nhắn để liên kết tài khoản với ví Phantom.
+2. Chủ đồ tạo bounty, ký `create_bounty` và khóa FIND vào escrow PDA.
+3. Finder nộp bằng chứng, ký `submit_claim` trên Devnet.
+4. Server đánh giá bằng AI hoặc heuristic có gắn nhãn; arbiter ký `record_ai_review`.
+5. Chủ đồ chấp nhận/từ chối, hoặc hai bên mở tranh chấp để arbiter phân xử on-chain.
 
-## Live product routes
+FIND là SPL token thử nghiệm trên Devnet, không có giá trị tiền tệ. SOL Devnet chỉ dùng trả phí giao dịch thử nghiệm.
 
-| Path | What |
-|------|------|
-| `/` | Landing |
-| `/bounties` | Browse bounties |
-| `/bounties/create` | Create + fund (Phantom) |
-| `/bounties/[id]` | Detail, AI panel, accept/reject |
-| `/bounties/[id]/claim` | Submit claim → AI review |
-| `/bounties/dashboard` | Owner dashboard |
-| `/app` | Legacy campus MVP (SafeReturn) |
+## Chạy local
 
-## One real demo flow (3 min)
-
-1. Phantom → **Devnet**
-2. Import **FIND** mint (after setup)
-3. `/bounties/create` → lock reward
-4. Other wallet → Submit claim + photo
-5. AI panel shows score + explanation
-6. Owner → **Approve & Release**
-7. Open **Solana Explorer** link (real signature)
-
-AI **never** transfers tokens. Owner signature required.
-
-## Stack
-
-- Next.js 16 + TypeScript + Tailwind
-- Solana Devnet + Anchor-style Rust program `programs/findback`
-- SPL FIND Reward Token
-- AI: OpenAI-compatible vision (`OPENAI_API_KEY`) or labeled **heuristic Demo mode**
-
-## Quick start (web)
+Yêu cầu Node.js 20+, npm và Phantom có bật Testnet Mode.
 
 ```bash
-cd safereturn
 npm install
+copy .env.example .env.local
 npm run dev
 ```
 
-Open [http://localhost:3000/bounties](http://localhost:3000/bounties).
+Sau khi tạo Supabase project:
 
-## Solana setup (Devnet)
+1. Chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) trong SQL Editor.
+2. Điền URL, anon key và service-role key vào `.env.local`.
+3. Thêm `SOLANA_KEYPAIR_JSON` của đúng arbiter/mint authority vào môi trường server.
+4. Không commit `.env.local` hoặc keypair.
+
+`NEXT_PUBLIC_SITE_URL` phải là origin thật khi deploy để metadata và link chia sẻ được tạo đúng.
+
+## Kiểm tra
 
 ```bash
-# 1) Deploy program (needs SOL on ~/.config/solana/id.json)
-npm run findback:deploy
+npm run lint
+npm test
+npm run build
+cargo test -p findback
+```
 
-# 2) Create FIND mint + mint supply to deployer
-npm run findback:setup
-# optional: airdrop FIND to your Phantom
-npm run findback:setup -- <YOUR_PHANTOM_PUBKEY>
+Smoke test Devnet có tạo giao dịch thật trên mạng thử nghiệm:
 
-# 3) End-to-end on-chain smoke
+```bash
 npm run findback:smoke
 ```
 
-### Program ID
+## Cấu trúc chính
 
-```
-3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna
-```
+- `src/app/bounties`: giao diện sản phẩm
+- `src/app/api`: API xác minh ví, AI và faucet Devnet
+- `src/lib/findback`: client Solana và state provider
+- `programs/findback`: Anchor escrow program
+- `supabase/schema.sql`: schema, RLS và RPC bảo mật
+- `.github/workflows/ci.yml`: lint, test, build và Rust test
 
-Explorer:  
-https://explorer.solana.com/address/3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna?cluster=devnet
+Program Devnet: `3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna`
+FIND mint Devnet: `9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy`
 
-### Instructions
+## Lưu ý triển khai
 
-`create_bounty` → `fund_bounty` → `submit_claim` → `record_ai_review` → `accept_claim` / `reject_claim` → `refund_after_expiry`  
-(+ `open_dispute` / `resolve_dispute` / `cancel_bounty`)
+Thay đổi trong `programs/findback` chỉ có hiệu lực sau khi build và upgrade program Devnet bằng upgrade authority. Thay đổi schema chỉ có hiệu lực sau khi chạy SQL migration. Không dùng keypair chứa tài sản Mainnet.
 
-### State machine
-
-```
-DRAFT → FUNDED → CLAIM_SUBMITTED → AI_REVIEWED → RELEASED
-FUNDED → (after deadline) → REFUNDED
-```
-
-## AI key (optional — makes scoring “live”)
-
-Add to `.env.local` (server only, never commit):
-
-```env
-OPENAI_API_KEY=sk-...
-# optional
-OPENAI_MODEL=gpt-4o-mini
-OPENAI_BASE_URL=https://api.openai.com/v1
-```
-
-Without a key, `/api/ai/review` uses **heuristic mode** and the UI labels **Demo mode** (not fake “live AI”).
-
-## Env example
-
-See `.env.example`. Important public vars:
-
-```env
-NEXT_PUBLIC_SOLANA_RPC=https://api.devnet.solana.com
-NEXT_PUBLIC_SOLANA_LIVE=1
-NEXT_PUBLIC_FINDBACK_PROGRAM_ID=3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna
-NEXT_PUBLIC_FIND_MINT=<from setup>
-NEXT_PUBLIC_ARBITER=<deployer pubkey>
-```
-
-## Token honesty
-
-**FIND** = Devnet test SPL token for demos.  
-Slide line: *“FIND is a test SPL token used for the Devnet demonstration.”*
-
-## Repo map
-
-```
-programs/findback/     # Rust program
-src/lib/findback/      # client + store + provider
-src/lib/ai/            # agent + heuristic + types
-src/app/bounties/      # product UI
-src/app/api/ai/review  # AI API
-scripts/deploy-findback.mjs
-scripts/setup-findback-devnet.mjs
-scripts/smoke-findback.mjs
-```
-
-## Slide one-liner (VI)
-
-FindBack AI dùng AI để xác minh người tìm thấy đồ và dùng Solana escrow để đảm bảo tiền thưởng được trao minh bạch, đúng người.
-
-## License
-
-MIT — hackathon MVP.
+MIT License — xem [`LICENSE`](LICENSE).
