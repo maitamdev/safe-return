@@ -144,7 +144,16 @@ if (production) {
       record("fail", "Production URL", "phải là URL HTTPS hợp lệ");
     }
   }
-  requireValue("SUPABASE_SERVICE_ROLE_KEY", { secret: true });
+  const hasSupabaseAdminKey = Boolean(
+    env.SUPABASE_SECRET_KEY?.trim() || env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
+  );
+  record(
+    hasSupabaseAdminKey ? "pass" : "fail",
+    "Supabase server key",
+    hasSupabaseAdminKey
+      ? "đã cấu hình secret key phía server (giá trị được ẩn)"
+      : "thiếu SUPABASE_SECRET_KEY hoặc SUPABASE_SERVICE_ROLE_KEY",
+  );
   const hasGroq = Boolean(env.GROQ_API_KEY?.trim());
   const hasOpenAi = Boolean(env.OPENAI_API_KEY?.trim());
   record(
@@ -224,6 +233,20 @@ const migrationContracts = [
       /notify pgrst/i,
     ],
   },
+  {
+    name: "2026072007_workflow_hardening.sql",
+    required: [
+      /rejection_pending/i,
+      /create table if not exists public\.claim_notifications/i,
+      /create table if not exists public\.api_rate_limits/i,
+      /create or replace function public\.apply_claim_workflow_action/i,
+      /create or replace function public\.sync_claim_chain_state/i,
+      /create or replace function public\.consume_api_rate_limit/i,
+      /Users read own claim notifications/i,
+      /grant execute.+service_role/is,
+      /notify pgrst/i,
+    ],
+  },
 ];
 for (const migration of migrationContracts) {
   const migrationPath = path.join(root, "supabase", "migrations", migration.name);
@@ -252,6 +275,8 @@ if (!fs.existsSync(idlPath)) {
     "record_ai_review_v2",
     "accept_claim_v2",
     "reject_claim_v2",
+    "finalize_rejection_v2",
+    "timeout_dispute_v2",
     "configure_arbitration_panel",
     "cast_arbitration_vote",
     "finalize_dispute_release",
@@ -383,21 +408,22 @@ if (supabaseUrl && anonKey) {
   try {
     const probes = await Promise.all([
       probeSupabase(supabaseUrl, anonKey, "bounties", "protocol_version,image_storage_path,image_sha256"),
-      probeSupabase(supabaseUrl, anonKey, "claims", "id,claim_pda,protocol_version,ai_input_hash,ai_report_hash"),
+      probeSupabase(supabaseUrl, anonKey, "claims", "id,claim_pda,protocol_version,ai_input_hash,ai_report_hash,dispute_deadline,resolution_deadline"),
       probeSupabase(supabaseUrl, anonKey, "safe_tags", "id,public_code,status"),
       probeSupabase(supabaseUrl, anonKey, "safe_tag_reports", "id,tag_id,status"),
       probeSupabase(supabaseUrl, anonKey, "sponsored_transactions", "request_id,wallet,signature,status"),
       probeSupabase(supabaseUrl, anonKey, "claim_messages", "id,claim_id,sender_role,kind,created_at"),
-      probeSupabase(supabaseUrl, anonKey, "claim_handovers", "claim_id,scheduled_at,status,finder_delivered_at,owner_received_at"),
+      probeSupabase(supabaseUrl, anonKey, "claim_handovers", "claim_id,scheduled_at,status,finder_delivered_at,owner_received_at,version"),
+      probeSupabase(supabaseUrl, anonKey, "claim_notifications", "id,user_id,kind,read_at,created_at"),
     ]);
     schemaV2Ready = probes[0].ready && probes[1].ready;
     safeTagReady = probes[2].ready && probes[3].ready;
     sponsorSchemaReady = probes[4].ready;
-    workflowSchemaReady = probes[5].ready && probes[6].ready;
+    workflowSchemaReady = probes[5].ready && probes[6].ready && probes[7].ready;
     record(schemaV2Ready ? "pass" : "warn", "Supabase protocol v2", schemaV2Ready ? "schema khả dụng" : `${probes[0].detail}; ${probes[1].detail}`);
     record(safeTagReady ? "pass" : "warn", "Supabase SafeTag", safeTagReady ? "schema khả dụng" : `${probes[2].detail}; ${probes[3].detail}`);
     record(sponsorSchemaReady ? "pass" : "warn", "Supabase sponsored fees", sponsorSchemaReady ? "schema khả dụng" : probes[4].detail);
-    record(workflowSchemaReady ? "pass" : "warn", "Supabase claim workflow", workflowSchemaReady ? "schema realtime khả dụng" : `${probes[5].detail}; ${probes[6].detail}`);
+    record(workflowSchemaReady ? "pass" : "warn", "Supabase claim workflow", workflowSchemaReady ? "schema realtime khả dụng" : `${probes[5].detail}; ${probes[6].detail}; ${probes[7].detail}`);
   } catch (error) {
     record("fail", "Supabase schema probe", error instanceof Error ? error.message : String(error));
   }

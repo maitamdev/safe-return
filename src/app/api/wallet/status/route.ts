@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/server";
 import { apiErrorResponse, requireApiUser } from "@/lib/server/api-security";
+import { isSupabaseAdminConfigured } from "@/lib/supabase/admin";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -7,7 +8,7 @@ export const dynamic = "force-dynamic";
 export async function GET() {
   try {
     const user = await requireApiUser();
-    const adminConfigured = Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY?.trim());
+    const adminConfigured = isSupabaseAdminConfigured();
     const supabase = await createClient();
     if (!supabase) {
       return Response.json({ ok: true, configured: false, adminConfigured, schemaReady: false, address: null, verifiedAt: null });

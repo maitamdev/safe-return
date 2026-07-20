@@ -4,7 +4,7 @@ import {
   enforceRateLimit,
   requireSameOrigin,
 } from "@/lib/server/api-security";
-import { createAdminClient } from "@/lib/supabase/admin";
+import { createAdminClient, getSupabaseAdminKey } from "@/lib/supabase/admin";
 import {
   cleanSafeTagText,
   isSafeTagCode,
@@ -44,7 +44,7 @@ export async function POST(
     const ip = requestIp(req);
     const userAgent = req.headers.get("user-agent")?.slice(0, 180) || "unknown";
     enforceRateLimit(`safe-tag-report:${ip}:${code}`, { limit: 4, windowMs: 60 * 60_000 });
-    const secret = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    const secret = getSupabaseAdminKey();
     if (!secret) throw new Error("Máy chủ chưa cấu hình kho dữ liệu SafeTag.");
     const fingerprint = reporterFingerprint({ secret, code, ip, userAgent });
 
