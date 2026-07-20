@@ -242,6 +242,7 @@ if (rpc && programId && mint) {
     );
     const loader = "BPFLoaderUpgradeab1e11111111111111111111111";
     let programDataSize = 0;
+    let deployedProgramBytes = null;
     let upgradeAuthority = null;
     if (
       programInfo?.data.length === 36 &&
@@ -253,24 +254,36 @@ if (rpc && programId && mint) {
         const hasAuthority = programDataInfo.data[12] === 1;
         const metadataSize = hasAuthority ? 45 : 13;
         programDataSize = programDataInfo.data.length - metadataSize;
+        deployedProgramBytes = programDataInfo.data.subarray(metadataSize);
         if (hasAuthority) {
           upgradeAuthority = new PublicKey(programDataInfo.data.subarray(13, 45));
         }
       }
     }
-    const localProgramSize = fs.existsSync(programBinaryPath)
-      ? fs.statSync(programBinaryPath).size
-      : 0;
+    const localProgramBytes = fs.existsSync(programBinaryPath)
+      ? fs.readFileSync(programBinaryPath)
+      : null;
+    const localProgramSize = localProgramBytes?.length || 0;
+    const bytecodeMatches = Boolean(
+      localProgramBytes &&
+      deployedProgramBytes &&
+      deployedProgramBytes.length >= localProgramBytes.length &&
+      deployedProgramBytes.subarray(0, localProgramBytes.length).equals(localProgramBytes) &&
+      deployedProgramBytes.subarray(localProgramBytes.length).every((byte) => byte === 0),
+    );
     chainV2Ready = Boolean(
       programInfo?.executable &&
       programInfo.owner.toBase58() === loader &&
       programDataSize > 0 &&
-      (!localProgramSize || programDataSize >= localProgramSize),
+      localProgramSize > 0 &&
+      bytecodeMatches,
     );
     record(
       chainV2Ready ? "pass" : "fail",
       "FindBack program",
-      chainV2Ready ? `upgradeable executable, ProgramData ${programDataSize} byte` : "program executable/ProgramData không khớp artifact local",
+      chainV2Ready
+        ? `bytecode khớp artifact local (${localProgramSize}/${programDataSize} byte)`
+        : "program executable/bytecode không khớp artifact local",
     );
     if (arbiter && upgradeAuthority) {
       record(
