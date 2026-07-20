@@ -1,6 +1,12 @@
 /** Supabase lưu metadata; Solana Devnet vẫn là nguồn sự thật của trạng thái tiền. */
 
 import { createClient } from "@/lib/supabase/client";
+import {
+  clearInvalidLocalSession,
+  isJwtTimingError,
+  repairJwtTimingSession,
+  SESSION_REAUTH_REQUIRED_MESSAGE,
+} from "@/lib/supabase/auth-recovery";
 import { privateMediaUrl } from "@/lib/media/client";
 import type { StoredMedia } from "@/lib/media/types";
 import { PROTOCOL_V2_ENABLED } from "./config";
@@ -112,8 +118,8 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
   const bountyColumns = PROTOCOL_V2_ENABLED
     ? "id,owner_wallet,title,description,category,location,reward_ui,deadline_unix,image_path,metadata_hash,status,last_tx,last_tx_url,created_at,protocol_version,image_storage_path,image_sha256,image_mime_type,image_byte_size"
     : "id,owner_wallet,title,description,category,location,reward_ui,deadline_unix,image_path,metadata_hash,status,last_tx,last_tx_url,created_at";
-  const [{ data: rows, error }, { data: claims, error: claimError }] =
-    await Promise.all([
+  const query = () =>
+    Promise.all([
       supabase
         .from("bounties")
         .select(bountyColumns)
@@ -121,6 +127,26 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
         .limit(100),
       supabase.from("claims").select("*"),
     ]);
+
+  let [bountyResult, claimResult] = await query();
+  if (isJwtTimingError(bountyResult.error) || isJwtTimingError(claimResult.error)) {
+    const repaired = await repairJwtTimingSession(supabase);
+    if (repaired) {
+      [bountyResult, claimResult] = await query();
+    }
+
+    if (
+      !repaired ||
+      isJwtTimingError(bountyResult.error) ||
+      isJwtTimingError(claimResult.error)
+    ) {
+      await clearInvalidLocalSession(supabase);
+      throw new Error(SESSION_REAUTH_REQUIRED_MESSAGE);
+    }
+  }
+
+  const { data: rows, error } = bountyResult;
+  const { data: claims, error: claimError } = claimResult;
   if (error || !rows) throw new Error(error?.message || "Không đọc được danh sách bounty.");
   if (claimError) throw new Error(claimError.message);
   const bountyRows = rows as unknown as BountyRow[];
