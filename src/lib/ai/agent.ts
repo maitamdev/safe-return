@@ -8,7 +8,9 @@ import type { AiClaimReport, AiReviewInput } from "./types";
  * Uses a live OpenAI-compatible vision model. It never fabricates a local result.
  */
 
-export const AI_PROMPT_VERSION = "safereturn-review-2026-07-20.1";
+// Bumped when the canonical input/report commitment format changed. Existing
+// v1 provenance remains readable but is not silently treated as the new hash scheme.
+export const AI_PROMPT_VERSION = "safereturn-review-2026-07-20.2";
 
 const SYSTEM = `You are SafeReturn AI, a careful lost-and-found claim reviewer.
 Compare the owner's lost-item listing with the finder's claim and evidence.

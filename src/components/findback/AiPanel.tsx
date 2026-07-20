@@ -1,6 +1,13 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { PublicKey } from "@solana/web3.js";
 import type { AiClaimReport } from "@/lib/ai/types";
+import {
+  aiModelIdentityPayload,
+  aiReportProvenancePayload,
+} from "@/lib/ai/provenance";
+import { fetchClaimV2 } from "@/lib/findback/program";
 import { Brain, CheckCircle, Fingerprint, ShieldCheck, Warning, XCircle } from "@phosphor-icons/react";
 
 const decisionCopy = { ACCEPT: "Có thể chấp nhận", REVIEW: "Cần kiểm tra thêm", REJECT: "Nên từ chối" } as const;
@@ -17,9 +24,95 @@ type AiProvenance = {
   promptVersion?: string | null;
 };
 
-export function AiReviewPanel({ report, provenance, onAccept, onReject, onDispute, busy, canDecide }: { report: AiClaimReport; provenance?: AiProvenance; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean }) {
+type ProvenanceVerification = "idle" | "legacy" | "checking" | "verified" | "mismatch" | "unavailable";
+
+type VerificationResult = {
+  key: string;
+  status: Extract<ProvenanceVerification, "verified" | "mismatch" | "unavailable">;
+};
+
+export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAccept, onReject, onDispute, busy, canDecide }: { report: AiClaimReport; provenance?: AiProvenance; bountyId?: string; finderWallet?: string; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean }) {
   const Icon = report.decision === "ACCEPT" ? CheckCircle : report.decision === "REJECT" ? XCircle : Warning;
   const tone = report.decision === "ACCEPT" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : report.decision === "REJECT" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800";
+  const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
+  const inputHash = provenance?.inputHash?.toLowerCase();
+  const reportHash = provenance?.reportHash?.toLowerCase();
+  const modelHash = provenance?.modelHash?.toLowerCase();
+  const promptVersion = provenance?.promptVersion;
+  const hasCompleteProvenance = Boolean(
+    bountyId &&
+    finderWallet &&
+    inputHash &&
+    reportHash &&
+    modelHash &&
+    promptVersion,
+  );
+  const reportPayload = report.generated_at
+    ? aiReportProvenancePayload(report)
+    : "";
+  const modelPayload = promptVersion
+    ? aiModelIdentityPayload({
+        provider: report.provider,
+        model: report.model,
+        promptVersion,
+      })
+    : "";
+  const verificationKey = hasCompleteProvenance && report.generated_at
+    ? JSON.stringify([
+        bountyId,
+        finderWallet,
+        inputHash,
+        reportHash,
+        modelHash,
+        reportPayload,
+        modelPayload,
+      ])
+    : "";
+  const verification: ProvenanceVerification = !hasCompleteProvenance
+    ? "idle"
+    : !report.generated_at
+      ? "legacy"
+      : verificationResult?.key === verificationKey
+        ? verificationResult.status
+        : "checking";
+
+  useEffect(() => {
+    if (!verificationKey || !bountyId || !finderWallet || !inputHash || !reportHash || !modelHash) return;
+
+    let cancelled = false;
+    void (async () => {
+      try {
+        const [computedReportHash, computedModelHash, chainClaim] = await Promise.all([
+          sha256Hex(reportPayload),
+          sha256Hex(modelPayload),
+          fetchClaimV2(bountyId, new PublicKey(finderWallet)),
+        ]);
+        if (cancelled) return;
+        if (!chainClaim) {
+          setVerificationResult({ key: verificationKey, status: "unavailable" });
+          return;
+        }
+        const verified =
+          computedReportHash === reportHash &&
+          computedModelHash === modelHash &&
+          bytesToHex(chainClaim.aiInputHash) === inputHash &&
+          bytesToHex(chainClaim.aiReportHash) === reportHash &&
+          bytesToHex(chainClaim.aiModelHash) === modelHash;
+        setVerificationResult({
+          key: verificationKey,
+          status: verified ? "verified" : "mismatch",
+        });
+      } catch {
+        if (!cancelled) {
+          setVerificationResult({ key: verificationKey, status: "unavailable" });
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [bountyId, finderWallet, inputHash, modelHash, modelPayload, reportHash, reportPayload, verificationKey]);
 
   return (
     <section className="app-card p-5 sm:p-7" aria-labelledby="review-title">
@@ -54,11 +147,32 @@ export function AiReviewPanel({ report, provenance, onAccept, onReject, onDisput
         <details className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-emerald-900">
             <ShieldCheck size={18} weight="fill" aria-hidden />
-            Provenance AI đã ghi lên Claim PDA
+            {verification === "verified"
+              ? "Provenance AI đã khớp Claim PDA"
+              : verification === "mismatch"
+                ? "Cảnh báo: provenance không khớp"
+                : verification === "legacy"
+                  ? "Provenance thuộc định dạng cũ"
+                : verification === "checking"
+                  ? "Đang đối chiếu provenance với Devnet"
+                  : "Provenance AI đã ghi lên Claim PDA"}
           </summary>
           <p className="mt-2 max-w-2xl text-xs leading-5 text-emerald-800">
             Ba hash dưới đây khóa đúng dữ liệu đầu vào, báo cáo đầu ra và model đã dùng. AI không có quyền tự chuyển phần thưởng.
           </p>
+          {verification === "mismatch" ? (
+            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-900" role="alert">
+              Báo cáo hoặc model hiện tại không khớp commitment trên Claim PDA. Không nên dùng kết quả này để quyết định.
+            </p>
+          ) : verification === "legacy" ? (
+            <p className="mt-3 text-xs text-ink-muted" role="status">
+              Báo cáo này được tạo trước định dạng hash canonical mới nên chỉ hiển thị commitment gốc, không gắn nhãn đã xác minh lại.
+            </p>
+          ) : verification === "unavailable" ? (
+            <p className="mt-3 text-xs text-amber-800" role="status">
+              Chưa đọc được Claim PDA từ Devnet; hãy thử lại khi RPC ổn định.
+            </p>
+          ) : null}
           <dl className="mt-4 grid gap-3 md:grid-cols-2">
             <HashRow label="Input" value={provenance.inputHash} />
             <HashRow label="Report" value={provenance.reportHash} />
@@ -100,6 +214,18 @@ export function AiReviewPanel({ report, provenance, onAccept, onReject, onDisput
       )}
     </section>
   );
+}
+
+async function sha256Hex(value: string) {
+  const digest = await crypto.subtle.digest(
+    "SHA-256",
+    new TextEncoder().encode(value),
+  );
+  return bytesToHex(new Uint8Array(digest));
+}
+
+function bytesToHex(bytes: Uint8Array) {
+  return Array.from(bytes, (byte) => byte.toString(16).padStart(2, "0")).join("");
 }
 
 function HashRow({ label, value }: { label: string; value: string }) {

@@ -426,6 +426,8 @@ export default function BountyDetailPage() {
         <div className="mt-8">
           <AiReviewPanel
             report={meta.aiReport}
+            bountyId={id}
+            finderWallet={meta.claim?.finderWallet}
             provenance={{
               inputHash: meta.claim?.aiInputHash,
               reportHash: meta.claim?.aiReportHash,
