@@ -68,7 +68,7 @@ export function LandingPage() {
           </div>
         </div>
 
-        <div className="relative min-h-[30rem] overflow-hidden rounded-2xl border border-line bg-white shadow-[0_28px_80px_rgba(34,65,51,0.13)] lg:min-h-[34rem] xl:min-h-[39rem]">
+        <div className="relative min-h-[30rem] overflow-hidden rounded-2xl border border-line bg-bg-elevated shadow-[0_28px_80px_rgba(34,65,51,0.13)] lg:min-h-[34rem] xl:min-h-[39rem]">
           <Image
             src="/images/safereturn-hero-map.png"
             alt="Bản đồ khu vực với một chiếc ví thất lạc và các điểm đánh dấu"
@@ -78,7 +78,7 @@ export function LandingPage() {
             className="object-cover"
           />
           <div className="absolute bottom-5 left-5 right-5 grid gap-3 sm:left-auto sm:w-[21rem]">
-            <div className="rounded-2xl border border-white/80 bg-white/94 p-4 shadow-[0_18px_50px_rgba(35,61,49,0.16)] backdrop-blur-md">
+            <div className="rounded-2xl border border-line bg-bg-elevated/94 p-4 shadow-[0_18px_50px_rgba(35,61,49,0.16)] backdrop-blur-md">
               <div className="flex items-center gap-3">
                 <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-soft text-forest">
                   <LockKey size={21} weight="duotone" />
@@ -98,7 +98,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="border-y border-line bg-white" aria-label="Cam kết hệ thống">
+      <section className="border-y border-line bg-bg-elevated" aria-label="Cam kết hệ thống">
         <div className="mx-auto grid max-w-7xl divide-y divide-line px-4 sm:px-6 md:grid-cols-3 md:divide-x md:divide-y-0 lg:px-8">
           <HeroFact icon={Fingerprint} title="Minh bạch" body="Mỗi giao dịch có chữ ký để kiểm tra." />
           <HeroFact icon={LockKey} title="An toàn" body="Phần thưởng được khóa bằng escrow." />
@@ -114,26 +114,25 @@ export function LandingPage() {
               Mỗi bước đều cho biết ai chịu trách nhiệm, dữ liệu nằm ở đâu và giao dịch nào cần ký.
             </p>
           </div>
-          <div className="relative mt-10 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-            {steps.map((step, index) => (
-              <article key={step.title} className="app-card relative p-5 sm:p-6">
-                <div className="flex items-center justify-between">
+          <ol className="mt-10 overflow-hidden rounded-2xl border border-line bg-bg-elevated md:grid md:grid-cols-2 xl:grid-cols-4">
+            {steps.map((step) => (
+              <li key={step.title} className="relative border-b border-line p-5 last:border-b-0 sm:p-6 md:[&:nth-child(odd)]:border-r md:[&:nth-last-child(-n+2)]:border-b-0 xl:border-b-0 xl:border-r xl:last:border-r-0">
+                <div className="flex items-center gap-4">
                   <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-mint-soft text-forest">
                     <step.icon size={23} weight="duotone" />
                   </span>
-                  <span className="font-mono text-xs font-bold text-forest">0{index + 1}</span>
                 </div>
-                <h3 className="mt-7 text-lg font-bold text-ink">{step.title}</h3>
+                <h3 className="mt-6 text-lg font-bold text-ink">{step.title}</h3>
                 <p className="mt-2 text-sm leading-6 text-ink-soft">{step.body}</p>
-              </article>
+              </li>
             ))}
-          </div>
+          </ol>
         </div>
       </section>
 
       <section id="trust" className="pb-20 sm:pb-24">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <div className="overflow-hidden rounded-2xl border border-line bg-[#eaf2ed]">
+          <div className="overflow-hidden rounded-2xl border border-line bg-bg-deep">
             <div className="grid gap-8 p-6 sm:p-8 lg:grid-cols-[0.95fr_1.05fr] lg:p-10">
               <div>
                 <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-forest text-white shadow-[0_12px_28px_rgba(8,120,74,0.22)]">
@@ -154,14 +153,14 @@ export function LandingPage() {
                   Xem program <ArrowSquareOut size={16} />
                 </a>
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="overflow-hidden rounded-2xl border border-line bg-bg-elevated">
                 <TrustItem icon={Database} title="Dữ liệu người dùng" body="Supabase lưu tin do người dùng tạo và cập nhật trạng thái theo giao dịch." />
                 <TrustItem icon={Fingerprint} title="Có thể kiểm tra" body="Chữ ký giao dịch mở trực tiếp trên Solana Explorer." />
                 <TrustItem icon={LockKey} title="Escrow an toàn" body="FIND Devnet nằm trong vault đến khi chủ đồ quyết định." />
                 <TrustItem icon={Brain} title="AI chỉ tư vấn" body="Kết quả so khớp không có quyền tự chuyển phần thưởng." />
               </div>
             </div>
-            <div className="border-t border-line bg-white/70 px-6 py-4 sm:px-8">
+            <div className="border-t border-line bg-bg-elevated/70 px-6 py-4 sm:px-8">
               <p className="break-all font-mono text-[11px] leading-5 text-ink-soft">
                 Program: {FINDBACK_PROGRAM_ID}
               </p>
@@ -170,7 +169,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section className="border-t border-line bg-white py-14">
+      <section className="border-t border-line bg-bg-elevated py-14">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-4 sm:px-6 md:flex-row md:items-center lg:px-8">
           <div>
             <h2 className="font-display text-2xl font-bold">Bắt đầu bằng tài sản Devnet miễn phí</h2>
@@ -182,7 +181,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <footer className="border-t border-line bg-white py-8">
+      <footer className="border-t border-line bg-bg-elevated py-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 text-sm text-ink-soft sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
           <p><span className="font-bold text-ink">SafeReturn.</span> Lost and found trên Solana Devnet.</p>
           <div className="flex gap-5">
@@ -209,10 +208,14 @@ function HeroFact({ icon: Icon, title, body }: { icon: typeof LockKey; title: st
 
 function TrustItem({ icon: Icon, title, body }: { icon: typeof Database; title: string; body: string }) {
   return (
-    <div className="rounded-2xl border border-line bg-white p-5 shadow-[0_12px_34px_rgba(31,62,48,0.05)]">
-      <Icon size={23} className="text-forest" weight="duotone" />
-      <h3 className="mt-5 font-bold text-ink">{title}</h3>
-      <p className="mt-2 text-sm leading-6 text-ink-soft">{body}</p>
+    <div className="grid grid-cols-[auto_1fr] gap-4 border-b border-line p-5 last:border-b-0 sm:p-6">
+      <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-mint-soft text-forest">
+        <Icon size={21} weight="duotone" />
+      </span>
+      <div>
+        <h3 className="font-bold text-ink">{title}</h3>
+        <p className="mt-1.5 text-sm leading-6 text-ink-soft">{body}</p>
+      </div>
     </div>
   );
 }

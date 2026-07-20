@@ -39,7 +39,7 @@ export function ConnectWalletButton({
     ? `absolute right-0 top-[calc(100%+0.5rem)] z-50 w-72 rounded-xl border px-3 py-2.5 text-left text-xs leading-5 shadow-[0_16px_44px_rgba(29,57,44,0.18)] ${
         dark
           ? "border-white/15 bg-[#173a2c] text-white"
-          : "border-line bg-white text-ink-soft"
+          : "border-line bg-bg-elevated text-ink-soft"
       }`
     : "max-w-72 text-right text-xs";
 

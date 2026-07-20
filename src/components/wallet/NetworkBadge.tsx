@@ -54,7 +54,7 @@ export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) 
           href={explorerAddressUrl(publicKey.toBase58())}
           target="_blank"
           rel="noreferrer"
-          className="rounded-lg border border-line bg-white px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/40 hover:text-forest"
+          className="rounded-lg border border-line bg-bg-elevated px-2.5 py-1 font-mono text-[10px] font-semibold text-ink-soft transition hover:border-forest/40 hover:text-forest"
           title="Xem trên Explorer"
         >
           {sol < 0.001 ? sol.toFixed(4) : sol.toFixed(3)} SOL

@@ -81,7 +81,7 @@ export function TrustProof({ bountyId, owner, finder }: TrustProofProps) {
 
   return (
     <section
-      className="mt-8 overflow-hidden rounded-2xl border border-emerald-200 bg-white shadow-[0_18px_48px_rgba(17,94,64,0.08)]"
+      className="mt-8 overflow-hidden rounded-2xl border border-emerald-200 bg-bg-elevated shadow-[0_18px_48px_rgba(17,94,64,0.08)]"
       aria-labelledby="trust-proof-title"
     >
       <div className="flex flex-col gap-4 border-b border-emerald-100 bg-emerald-50/70 p-5 sm:flex-row sm:items-center sm:justify-between sm:p-6">

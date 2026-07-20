@@ -58,7 +58,7 @@ export function AiReviewPanel({ report, provenance, onAccept, onReject, onDisput
             <HashRow label="Input" value={provenance.inputHash} />
             <HashRow label="Report" value={provenance.reportHash} />
             <HashRow label="Model" value={provenance.modelHash} />
-            <div className="rounded-lg border border-emerald-200 bg-white p-3">
+            <div className="rounded-lg border border-emerald-200 bg-bg-elevated p-3">
               <dt className="text-[11px] font-semibold text-emerald-700">Prompt</dt>
               <dd className="mt-1 break-all font-mono text-[11px] text-emerald-950">{provenance.promptVersion || "Không rõ"}</dd>
             </div>
@@ -99,7 +99,7 @@ export function AiReviewPanel({ report, provenance, onAccept, onReject, onDisput
 
 function HashRow({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-emerald-200 bg-white p-3">
+    <div className="rounded-lg border border-emerald-200 bg-bg-elevated p-3">
       <dt className="flex items-center gap-1.5 text-[11px] font-semibold text-emerald-700"><Fingerprint size={14} aria-hidden />{label}</dt>
       <dd className="mt-1 break-all font-mono text-[10px] leading-5 text-emerald-950">{value}</dd>
     </div>

@@ -48,7 +48,7 @@ export default function SignupPage() {
     <main className="grid min-h-[100dvh] flex-1 bg-bg lg:grid-cols-[1.05fr_0.95fr]">
       <div className="relative hidden overflow-hidden lg:block">
         <Image src="/images/safereturn-hero-map.png" alt="Bản đồ tìm đồ thất lạc của SafeReturn" fill priority sizes="55vw" className="object-cover" />
-        <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-white/80 bg-white/92 p-6 shadow-[0_20px_60px_rgba(26,58,42,0.17)] backdrop-blur-md">
+        <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-line bg-bg-elevated/92 p-6 shadow-[0_20px_60px_rgba(26,58,42,0.17)] backdrop-blur-md">
           <p className="text-lg font-bold text-ink">Không bao giờ chia sẻ seed phrase</p>
           <p className="mt-2 text-sm leading-6 text-ink-soft">SafeReturn chỉ yêu cầu chữ ký giao dịch Devnet trong cửa sổ Phantom.</p>
         </div>

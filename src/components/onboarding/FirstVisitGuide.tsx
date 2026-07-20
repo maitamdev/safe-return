@@ -169,7 +169,7 @@ export function FirstVisitGuide() {
           ref={openerRef}
           type="button"
           onClick={openGuide}
-          className="fixed bottom-4 right-4 z-30 inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-white px-3.5 text-sm font-bold text-forest shadow-[0_14px_40px_rgba(28,58,44,0.16)] transition hover:-translate-y-0.5 hover:border-forest hover:bg-mint-soft active:translate-y-0 sm:bottom-6 sm:right-6"
+          className="fixed bottom-4 right-4 z-30 inline-flex min-h-11 items-center gap-2 rounded-xl border border-line-strong bg-bg-elevated px-3.5 text-sm font-bold text-forest shadow-[0_14px_40px_rgba(28,58,44,0.16)] transition hover:-translate-y-0.5 hover:border-forest hover:bg-mint-soft active:translate-y-0 sm:bottom-6 sm:right-6"
           aria-haspopup="dialog"
         >
           <Question size={19} weight="bold" />
@@ -190,7 +190,7 @@ export function FirstVisitGuide() {
             aria-modal="true"
             aria-labelledby="first-visit-guide-title"
             aria-describedby="first-visit-guide-description"
-            className="grid max-h-[94dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-white/20 bg-white shadow-[0_32px_100px_rgba(9,31,21,0.32)] sm:max-h-[88dvh] sm:grid-cols-[17rem_minmax(0,1fr)] sm:overflow-hidden sm:rounded-2xl"
+            className="grid max-h-[94dvh] w-full max-w-4xl overflow-y-auto rounded-t-2xl border border-line bg-bg-elevated shadow-[0_32px_100px_rgba(9,31,21,0.32)] sm:max-h-[88dvh] sm:grid-cols-[17rem_minmax(0,1fr)] sm:overflow-hidden sm:rounded-2xl"
           >
             <aside className="relative overflow-hidden bg-forest p-5 text-white sm:flex sm:min-h-[36rem] sm:flex-col sm:p-7">
               <div className="flex items-center justify-between sm:block">
@@ -244,7 +244,7 @@ export function FirstVisitGuide() {
                 <button
                   type="button"
                   onClick={rememberAndClose}
-                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-white text-ink-soft transition hover:border-line-strong hover:bg-bg-deep hover:text-ink"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-line bg-bg-elevated text-ink-soft transition hover:border-line-strong hover:bg-bg-deep hover:text-ink"
                   aria-label="Đóng hướng dẫn"
                 >
                   <X size={19} weight="bold" />

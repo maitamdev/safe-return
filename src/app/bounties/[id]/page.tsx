@@ -400,7 +400,7 @@ export default function BountyDetailPage() {
             return (
               <li
                 key={item}
-                className={`rounded-xl border px-3 py-3 text-center text-xs font-bold ${done ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-line bg-white text-ink-muted"}`}
+                className={`rounded-xl border px-3 py-3 text-center text-xs font-bold ${done ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-line bg-bg-elevated text-ink-muted"}`}
               >
                 {statusLabel(item)}
               </li>

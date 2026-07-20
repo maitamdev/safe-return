@@ -72,8 +72,8 @@ export default function PublicSafeTagPage() {
   };
 
   return (
-    <main className="min-h-[100dvh] bg-[#f2f7f4] text-ink">
-      <header className="border-b border-line bg-white">
+    <main className="min-h-[100dvh] bg-bg text-ink">
+      <header className="border-b border-line bg-bg-elevated">
         <div className="mx-auto flex h-16 max-w-3xl items-center justify-between px-4 sm:px-6">
           <Link href="/" className="inline-flex items-center gap-2 font-bold text-forest">
             <span className="grid size-9 place-items-center rounded-xl bg-forest text-white">
@@ -98,9 +98,9 @@ export default function PublicSafeTagPage() {
         ) : null}
 
         {tag ? (
-          <div className="overflow-hidden rounded-2xl border border-line bg-white shadow-[0_24px_70px_rgba(27,68,49,0.1)]">
-            <section className="border-b border-line bg-[linear-gradient(135deg,#e9f7ef_0%,#f8fbf9_70%)] p-6 sm:p-9">
-              <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-white px-3 py-1.5 text-xs font-bold text-emerald-800">
+          <div className="overflow-hidden rounded-2xl border border-line bg-bg-elevated shadow-[0_24px_70px_rgba(27,68,49,0.1)]">
+            <section className="border-b border-line bg-bg-deep p-6 sm:p-9">
+              <span className="inline-flex items-center gap-2 rounded-xl border border-emerald-200 bg-bg-elevated px-3 py-1.5 text-xs font-bold text-emerald-800">
                 <Tag size={16} weight="duotone" aria-hidden /> SafeTag đang hoạt động
               </span>
               <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Bạn vừa tìm thấy {tag.label}</h1>
@@ -108,7 +108,7 @@ export default function PublicSafeTagPage() {
                 Gửi một lời nhắn để chủ sở hữu biết món đồ đang ở đâu. SafeReturn không hiển thị danh tính, ví hay thông tin liên hệ của chủ đồ trên trang này.
               </p>
               {tag.publicNote ? (
-                <div className="mt-5 rounded-xl border border-emerald-200 bg-white/80 p-4 text-sm leading-6 text-ink">
+                <div className="mt-5 rounded-xl border border-emerald-200 bg-bg-elevated/80 p-4 text-sm leading-6 text-ink">
                   {tag.publicNote}
                 </div>
               ) : null}

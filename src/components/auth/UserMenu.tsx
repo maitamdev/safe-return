@@ -61,7 +61,7 @@ export function UserMenu({ dark = false }: { dark?: boolean }) {
         className={
           dark
             ? "hidden max-w-[7rem] truncate rounded-full border border-white/15 bg-white/5 px-2.5 py-1 text-[11px] font-medium text-white/80 sm:inline"
-            : "hidden max-w-[7rem] truncate rounded-full border border-line bg-white px-2.5 py-1 text-[11px] font-medium text-ink-soft sm:inline"
+            : "hidden max-w-[7rem] truncate rounded-full border border-line bg-bg-elevated px-2.5 py-1 text-[11px] font-medium text-ink-soft sm:inline"
         }
         title={user.email || ""}
       >

@@ -219,7 +219,7 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
               <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-emerald-950">Tiến độ biểu quyết</p><a href={explorerAddressUrl(quorumCase.address)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:underline">Mở case <ArrowSquareOut size={13} /></a></div>
               <div className="mt-4 grid grid-cols-2 gap-3"><VoteMetric label="Trả thưởng" value={quorumCase.releaseVotes} /><VoteMetric label="Từ chối claim" value={quorumCase.rejectVotes} /></div>
-              <div className="mt-4 grid grid-cols-3 gap-2">{arbitrationCase.panel.arbiters.map((arbiter, index) => <div key={arbiter} className={`rounded-lg border px-2 py-2 text-center font-mono text-[10px] ${arbiter === viewer ? "border-forest bg-white text-forest" : "border-emerald-200 text-emerald-900"}`}>#{index + 1} {arbiter.slice(0, 4)}...{arbiter.slice(-4)}</div>)}</div>
+              <div className="mt-4 grid grid-cols-3 gap-2">{arbitrationCase.panel.arbiters.map((arbiter, index) => <div key={arbiter} className={`rounded-lg border px-2 py-2 text-center font-mono text-[10px] ${arbiter === viewer ? "border-forest bg-bg-elevated text-forest" : "border-emerald-200 text-emerald-900"}`}>#{index + 1} {arbiter.slice(0, 4)}...{arbiter.slice(-4)}</div>)}</div>
               {myVote ? <p className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-emerald-800"><CheckCircle size={16} weight="fill" /> Bạn đã bỏ phiếu {myVote.releaseToFinder ? "trả thưởng" : "từ chối claim"}</p> : null}
             </div>
           ) : null}
@@ -248,9 +248,9 @@ function HeaderMetric({ label, value }: { label: string; value: string }) {
 }
 
 function Evidence({ label, value }: { label: string; value: string }) {
-  return <div className="rounded-xl border border-line bg-white p-4"><p className="text-xs font-semibold text-ink-muted">{label}</p><p className="mt-2 text-sm leading-6 text-ink">{value}</p></div>;
+  return <div className="rounded-xl border border-line bg-bg-elevated p-4"><p className="text-xs font-semibold text-ink-muted">{label}</p><p className="mt-2 text-sm leading-6 text-ink">{value}</p></div>;
 }
 
 function VoteMetric({ label, value }: { label: string; value: number }) {
-  return <div className="rounded-xl border border-emerald-200 bg-white p-3 text-center"><p className="text-2xl font-bold text-emerald-900">{value}<span className="text-sm text-emerald-700">/2</span></p><p className="mt-1 text-[11px] font-semibold text-emerald-800">{label}</p></div>;
+  return <div className="rounded-xl border border-emerald-200 bg-bg-elevated p-3 text-center"><p className="text-2xl font-bold text-emerald-900">{value}<span className="text-sm text-emerald-700">/2</span></p><p className="mt-1 text-[11px] font-semibold text-emerald-800">{label}</p></div>;
 }

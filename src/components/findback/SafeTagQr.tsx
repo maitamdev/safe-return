@@ -63,7 +63,7 @@ export function SafeTagQr({ code, label }: { code: string; label: string }) {
 }
 
 function QrAction({ icon: Icon, label, onClick }: { icon: typeof Copy; label: string; onClick: () => void }) {
-  return <button type="button" onClick={onClick} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl border border-line bg-white px-2 text-[11px] font-semibold text-ink-soft hover:border-forest/40 hover:text-forest"><Icon size={17} aria-hidden /> {label}</button>;
+  return <button type="button" onClick={onClick} className="flex min-h-14 flex-col items-center justify-center gap-1 rounded-xl border border-line bg-bg-elevated px-2 text-[11px] font-semibold text-ink-soft hover:border-forest/40 hover:text-forest"><Icon size={17} aria-hidden /> {label}</button>;
 }
 
 function safeFileName(value: string) {

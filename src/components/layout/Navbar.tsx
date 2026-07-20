@@ -23,7 +23,7 @@ export function Navbar() {
   if (hide) return null;
 
   return (
-    <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-white/92 backdrop-blur-xl">
+    <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-bg-elevated/92 backdrop-blur-xl">
       <nav className="mx-auto flex h-[4.5rem] max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
         <Link href="/" className="flex items-center gap-2.5" aria-label="SafeReturn trang chủ">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-forest text-white">
@@ -55,11 +55,11 @@ export function Navbar() {
             Tạo tài khoản
           </Link>
           <details className="relative md:hidden">
-            <summary className="flex h-10 w-10 list-none items-center justify-center rounded-xl border border-line-strong bg-white text-ink [&::-webkit-details-marker]:hidden">
+            <summary className="flex h-10 w-10 list-none items-center justify-center rounded-xl border border-line-strong bg-bg-elevated text-ink [&::-webkit-details-marker]:hidden">
               <List size={20} />
               <span className="sr-only">Mở menu</span>
             </summary>
-            <div className="absolute right-0 top-12 w-64 rounded-2xl border border-line bg-white p-2 shadow-[0_24px_60px_rgba(30,54,43,0.18)]">
+            <div className="absolute right-0 top-12 w-64 rounded-2xl border border-line bg-bg-elevated p-2 shadow-[0_24px_60px_rgba(30,54,43,0.18)]">
               {links.map((link) => (
                 <Link key={link.href} href={link.href} className="block rounded-xl px-4 py-3 text-sm font-semibold text-ink-soft hover:bg-bg-deep hover:text-forest">
                   {link.label}

@@ -41,7 +41,7 @@ export function ArbitrationSetup({
       <p className="mt-3 text-xs leading-5 text-ink-soft">
         Ba ví độc lập xem bằng chứng và mỗi ví chỉ được bỏ một phiếu. Cần hai phiếu cùng quyết định mới có thể chốt tranh chấp.
       </p>
-      <div className="mt-4 rounded-xl border border-line bg-white p-3">
+      <div className="mt-4 rounded-xl border border-line bg-bg-elevated p-3">
         <p className="text-[11px] font-semibold text-ink-muted">Trọng tài chính đã cấu hình</p>
         <p className="mt-1 break-all font-mono text-[10px] leading-5 text-ink">{leadArbiter}</p>
       </div>

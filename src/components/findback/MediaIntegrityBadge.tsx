@@ -55,7 +55,7 @@ export function MediaIntegrityBadge({
 
   if (state === "checking") {
     return (
-      <div className="inline-flex items-center gap-2 rounded-xl border border-line bg-white px-3 py-2 text-xs font-semibold text-ink-soft" role="status">
+      <div className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-3 py-2 text-xs font-semibold text-ink-soft" role="status">
         <ShieldCheck size={16} aria-hidden />
         Đang đối chiếu hash với Devnet
       </div>
