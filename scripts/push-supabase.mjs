@@ -95,5 +95,8 @@ if (env.CONFIRM_SUPABASE_MIGRATE !== "1") {
 
 console.log("Đang áp dụng các migration đã review...");
 run(npx, migrationArgs);
-console.log("Migration hoàn tất. Đang kiểm tra schema từ API công khai...");
-run(process.execPath, [path.join(root, "scripts", "check-release-readiness.mjs")]);
+console.log("Migration hoàn tất. Đang bắt buộc xác minh protocol v2 và SafeTag từ API công khai...");
+run(process.execPath, [
+  path.join(root, "scripts", "check-release-readiness.mjs"),
+  "--require-v2-ready",
+]);

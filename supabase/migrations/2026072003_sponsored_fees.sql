@@ -28,3 +28,7 @@ create policy "Users read own sponsored transactions"
   using (user_id = auth.uid());
 
 revoke insert, update, delete on public.sponsored_transactions from anon, authenticated;
+
+-- Make newly-created tables/columns visible to PostgREST immediately so the
+-- release gate cannot pass against a stale schema cache.
+notify pgrst, 'reload schema';

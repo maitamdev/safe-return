@@ -34,7 +34,7 @@ Với Supabase project mới, chạy `supabase/schema.sql` trước rồi áp d�
 4. Đặt tạm `CONFIRM_SUPABASE_MIGRATE=1` trong terminal rồi chạy lại.
 5. Xóa `SUPABASE_DB_URL` khỏi máy khi không còn cần.
 
-Runner chặn connection string không thuộc project được cấu hình và không in secret ra log.
+Runner chặn connection string không thuộc project được cấu hình, không in secret ra log và chỉ báo thành công khi API công khai đã đọc được schema protocol v2/SafeTag mới.
 
 ## Kiểm thử và release gate
 
