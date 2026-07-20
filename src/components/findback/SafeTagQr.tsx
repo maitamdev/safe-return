@@ -7,6 +7,7 @@ import { Copy, DownloadSimple, Printer } from "@phosphor-icons/react";
 export function SafeTagQr({ code, label }: { code: string; label: string }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [copied, setCopied] = useState(false);
+  const [copyError, setCopyError] = useState(false);
   const url = typeof window === "undefined" ? "" : `${window.location.origin}/t/${code}`;
 
   useEffect(() => {
@@ -21,9 +22,29 @@ export function SafeTagQr({ code, label }: { code: string; label: string }) {
   }, [url]);
 
   const copy = async () => {
-    await navigator.clipboard.writeText(url);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 1600);
+    setCopyError(false);
+    try {
+      // Clipboard API is unavailable on non-secure origins (for example a
+      // local HTTP preview). Keep the QR action usable there as well.
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = url;
+        textarea.setAttribute("readonly", "");
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.select();
+        const didCopy = document.execCommand("copy");
+        textarea.remove();
+        if (!didCopy) throw new Error("copy command failed");
+      }
+      setCopied(true);
+      window.setTimeout(() => setCopied(false), 1600);
+    } catch {
+      setCopyError(true);
+    }
   };
 
   const download = () => {
@@ -58,6 +79,7 @@ export function SafeTagQr({ code, label }: { code: string; label: string }) {
         <QrAction icon={DownloadSimple} label="Tải PNG" onClick={download} />
         <QrAction icon={Printer} label="In thẻ" onClick={print} />
       </div>
+      {copyError ? <p className="mt-3 text-center text-xs text-coral" role="alert">Không thể chép link. Hãy chọn và chép link trên trình duyệt.</p> : null}
     </div>
   );
 }
