@@ -1,6 +1,11 @@
 import { PublicKey } from "@solana/web3.js";
 import { explorerTxUrl, PROTOCOL_V2_ENABLED } from "@/lib/findback/config";
-import { fetchBounty, fetchClaimV2, getConnection } from "@/lib/findback/program";
+import {
+  fetchArbitrationPanel,
+  fetchBounty,
+  fetchClaimV2,
+  getConnection,
+} from "@/lib/findback/program";
 import {
   ApiError,
   apiErrorResponse,
@@ -43,6 +48,9 @@ export async function POST(req: Request) {
     const chainClaim = useV2 && body.finderWallet
       ? await fetchClaimV2(bountyId, new PublicKey(body.finderWallet))
       : null;
+    const panel = useV2 && onchain.arbitrationMode === 1
+      ? await fetchArbitrationPanel(bountyId)
+      : null;
     if (body.claimPda && chainClaim?.address !== body.claimPda) {
       throw new ApiError(409, "Claim PDA không khớp dữ liệu đồng bộ.");
     }
@@ -50,6 +58,7 @@ export async function POST(req: Request) {
       profile.wallet_pubkey === onchain.owner ||
       profile.wallet_pubkey === onchain.finder ||
       profile.wallet_pubkey === chainClaim?.finder ||
+      panel?.arbiters.includes(profile.wallet_pubkey) ||
       (profile.is_arbiter && profile.wallet_pubkey === onchain.arbiter);
     if (!allowed) throw new ApiError(403, "Ví không phải thành viên của bounty.");
 

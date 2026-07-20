@@ -3,15 +3,21 @@ import { Keypair, PublicKey } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import idl from "../../../target/idl/findback.json";
 import {
+  ARBITRATION_PANEL_SEED,
+  ARBITRATION_VOTE_SEED,
   BOUNTY_SEED,
   CLAIM_V2_SEED,
+  DISPUTE_CASE_SEED,
   IX,
   PROGRAM_PK,
   REPUTATION_SEED,
   RETURN_ATTESTATION_SEED,
+  arbitrationPanelPda,
+  arbitrationVotePda,
   bountyPda,
   claimV2Pda,
   createBountySponsoredInstruction,
+  disputeCasePda,
   fundBountySponsoredInstruction,
   reputationPda,
   returnAttestationPda,
@@ -47,7 +53,14 @@ describe("FindBack generated IDL contract", () => {
     },
   );
 
-  it.each(["ClaimV2", "Reputation", "ReturnAttestation"])(
+  it.each([
+    "ClaimV2",
+    "Reputation",
+    "ReturnAttestation",
+    "ArbitrationPanel",
+    "DisputeCase",
+    "ArbitrationVote",
+  ])(
     "keeps the %s account discriminator deterministic",
     (name) => {
       const account = accounts.find((candidate) => candidate.name === name);
@@ -103,6 +116,39 @@ describe("FindBack generated IDL contract", () => {
         PROGRAM_PK,
       )[0],
     );
+  });
+
+  it("derives an immutable panel, case, and one vote PDA per arbiter", () => {
+    const bountyId = "quorum-pda-test";
+    const finder = Keypair.generate().publicKey;
+    const arbiterA = Keypair.generate().publicKey;
+    const arbiterB = Keypair.generate().publicKey;
+    const [bounty] = bountyPda(bountyId);
+    const [claim] = claimV2Pda(bountyId, finder);
+    const [panel] = arbitrationPanelPda(bountyId);
+    const [disputeCase] = disputeCasePda(bountyId, finder);
+    const [voteA] = arbitrationVotePda(bountyId, finder, arbiterA);
+    const [voteB] = arbitrationVotePda(bountyId, finder, arbiterB);
+
+    expect(panel).toEqual(
+      PublicKey.findProgramAddressSync(
+        [ARBITRATION_PANEL_SEED, bounty.toBuffer()],
+        PROGRAM_PK,
+      )[0],
+    );
+    expect(disputeCase).toEqual(
+      PublicKey.findProgramAddressSync(
+        [DISPUTE_CASE_SEED, claim.toBuffer()],
+        PROGRAM_PK,
+      )[0],
+    );
+    expect(voteA).toEqual(
+      PublicKey.findProgramAddressSync(
+        [ARBITRATION_VOTE_SEED, disputeCase.toBuffer(), arbiterA.toBuffer()],
+        PROGRAM_PK,
+      )[0],
+    );
+    expect(voteA.equals(voteB)).toBe(false);
   });
 
   it("keeps sponsored instructions restricted to the user and sponsor signers", () => {

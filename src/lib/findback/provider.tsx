@@ -18,11 +18,16 @@ import {
   acceptClaimOnChain,
   acceptClaimV2OnChain,
   cancelBountyOnChain,
+  castArbitrationVoteOnChain,
+  configureArbitrationPanelOnChain,
   createBountyOnChain,
   fetchBounty,
   fundBountyOnChain,
+  finalizeDisputeRejectOnChain,
+  finalizeDisputeReleaseOnChain,
   openDisputeOnChain,
   openDisputeV2OnChain,
+  openDisputeV3OnChain,
   resolveDisputeOnChain,
   resolveDisputeV2OnChain,
   refundAfterExpiryOnChain,
@@ -100,6 +105,9 @@ type FindBackCtx = {
   refund: (bountyId: string) => Promise<void>;
   cancel: (bountyId: string) => Promise<void>;
   resolveDispute: (bountyId: string, releaseToFinder: boolean, finderWallet?: string) => Promise<void>;
+  configureArbitrationPanel: (bountyId: string, arbiters: [string, string, string]) => Promise<void>;
+  voteArbitration: (bountyId: string, finderWallet: string, releaseToFinder: boolean) => Promise<void>;
+  finalizeArbitration: (bountyId: string, finderWallet: string, releaseToFinder: boolean) => Promise<void>;
   fetchOnChain: (bountyId: string) => Promise<OnChainBounty | null>;
 };
 
@@ -651,9 +659,13 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
       if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
       const result = useV2
-        ? await runTx("open_dispute_v2", () =>
-            openDisputeV2OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
-          )
+        ? onchain?.arbitrationMode === 1
+          ? await runTx("open_dispute_v3", () =>
+              openDisputeV3OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
+            )
+          : await runTx("open_dispute_v2", () =>
+              openDisputeV2OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
+            )
         : await runTx("open_dispute", () => openDisputeOnChain(w, bountyId));
       const updated = { ...meta, status: "Disputed", lastTx: result.signature, lastTxUrl: result.url };
       await syncBountyStateToSupabase(updated, targetClaim);
@@ -709,6 +721,9 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
         : meta.claim;
       const useV2 = PROTOCOL_V2_ENABLED && onchain.protocolVersion >= 2;
+      if (useV2 && onchain.arbitrationMode === 1) {
+        throw new Error("Bounty này dùng hội đồng 2/3. Hãy bỏ phiếu trên trang Phân xử.");
+      }
       if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
       const result = useV2
         ? await runTx("resolve_dispute_v2", () =>
@@ -727,7 +742,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           });
       const updated = {
         ...meta,
-        status: releaseToFinder ? "Released" : "Refunded",
+        status: releaseToFinder ? "Released" : useV2 ? "Funded" : "Refunded",
         lastTx: result.signature,
         lastTxUrl: result.url,
       };
@@ -736,6 +751,74 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       await refresh();
     },
     [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+  );
+
+  const configureArbitrationPanel = useCallback(
+    async (bountyId: string, arbiters: [string, string, string]) => {
+      const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
+      const parsed = arbiters.map((address) => new PublicKey(address)) as [
+        PublicKey,
+        PublicKey,
+        PublicKey,
+      ];
+      if (new Set(parsed.map((address) => address.toBase58())).size !== 3) {
+        throw new Error("Ba trọng tài phải là ba ví khác nhau.");
+      }
+      if (parsed.some((address) => address.equals(w.publicKey))) {
+        throw new Error("Chủ bounty không thể nằm trong hội đồng phân xử.");
+      }
+      await runTx("configure_arbitration_panel", () =>
+        configureArbitrationPanelOnChain(w, bountyId, parsed)
+      );
+    },
+    [requireWallet, runTx]
+  );
+
+  const voteArbitration = useCallback(
+    async (bountyId: string, finderWallet: string, releaseToFinder: boolean) => {
+      const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
+      await runTx("cast_arbitration_vote", () =>
+        castArbitrationVoteOnChain(
+          w,
+          bountyId,
+          new PublicKey(finderWallet),
+          releaseToFinder
+        )
+      );
+    },
+    [requireWallet, runTx]
+  );
+
+  const finalizeArbitration = useCallback(
+    async (bountyId: string, finderWallet: string, releaseToFinder: boolean) => {
+      const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
+      const meta = currentBounty(bountyId);
+      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      const targetClaim = meta.claims?.find(
+        (claim) => claim.finderWallet === finderWallet
+      ) || meta.claim;
+      const finder = new PublicKey(finderWallet);
+      const result = releaseToFinder
+        ? await runTx("finalize_dispute_release", () =>
+            finalizeDisputeReleaseOnChain(w, bountyId, finder)
+          )
+        : await runTx("finalize_dispute_reject", () =>
+            finalizeDisputeRejectOnChain(w, bountyId, finder)
+          );
+      const updated = {
+        ...meta,
+        status: releaseToFinder ? "Released" : "Funded",
+        lastTx: result.signature,
+        lastTxUrl: result.url,
+      };
+      await syncBountyStateToSupabase(updated, targetClaim);
+      upsertInMemory(updated);
+      await refresh();
+    },
+    [currentBounty, refresh, requireWallet, runTx, upsertInMemory]
   );
 
   const value: FindBackCtx = {
@@ -761,6 +844,9 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     refund,
     cancel,
     resolveDispute,
+    configureArbitrationPanel,
+    voteArbitration,
+    finalizeArbitration,
     fetchOnChain: fetchBounty,
   };
 

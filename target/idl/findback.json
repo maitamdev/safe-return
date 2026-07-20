@@ -813,6 +813,243 @@
       "args": []
     },
     {
+      "name": "cast_arbitration_vote",
+      "discriminator": [
+        240,
+        213,
+        221,
+        193,
+        161,
+        207,
+        1,
+        252
+      ],
+      "accounts": [
+        {
+          "name": "arbiter",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "panel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  98,
+                  105,
+                  116,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  97,
+                  110,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "panel.bounty",
+                "account": "ArbitrationPanel"
+              }
+            ]
+          },
+          "relations": [
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "dispute_case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dispute_case.claim",
+                "account": "DisputeCase"
+              }
+            ]
+          }
+        },
+        {
+          "name": "claim"
+        },
+        {
+          "name": "vote",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  98,
+                  105,
+                  116,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  118,
+                  111,
+                  116,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "dispute_case"
+              },
+              {
+                "kind": "account",
+                "path": "arbiter"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "release_to_finder",
+          "type": "bool"
+        }
+      ]
+    },
+    {
+      "name": "configure_arbitration_panel",
+      "discriminator": [
+        103,
+        173,
+        78,
+        35,
+        189,
+        128,
+        231,
+        69
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true,
+          "relations": [
+            "bounty"
+          ]
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "panel",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  98,
+                  105,
+                  116,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  97,
+                  110,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "arbiters",
+          "type": {
+            "array": [
+              "pubkey",
+              3
+            ]
+          }
+        },
+        {
+          "name": "quorum",
+          "type": "u8"
+        }
+      ]
+    },
+    {
       "name": "create_bounty",
       "discriminator": [
         122,
@@ -1013,6 +1250,523 @@
           }
         }
       ]
+    },
+    {
+      "name": "finalize_dispute_reject",
+      "discriminator": [
+        171,
+        128,
+        196,
+        66,
+        131,
+        203,
+        114,
+        117
+      ],
+      "accounts": [
+        {
+          "name": "finalizer",
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          },
+          "relations": [
+            "claim",
+            "panel",
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              },
+              {
+                "kind": "account",
+                "path": "claim.finder",
+                "account": "ClaimV2"
+              }
+            ]
+          },
+          "relations": [
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "panel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  98,
+                  105,
+                  116,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  97,
+                  110,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          },
+          "relations": [
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "dispute_case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "finalize_dispute_release",
+      "discriminator": [
+        34,
+        134,
+        74,
+        54,
+        225,
+        183,
+        18,
+        47
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "finder"
+        },
+        {
+          "name": "mint",
+          "relations": [
+            "bounty"
+          ]
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          },
+          "relations": [
+            "claim",
+            "panel",
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              },
+              {
+                "kind": "account",
+                "path": "claim.finder",
+                "account": "ClaimV2"
+              }
+            ]
+          },
+          "relations": [
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "panel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  98,
+                  105,
+                  116,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  97,
+                  110,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          },
+          "relations": [
+            "dispute_case"
+          ]
+        },
+        {
+          "name": "dispute_case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "vault_authority"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "finder_token",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "finder"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "mint"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "token_program",
+          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+        },
+        {
+          "name": "associated_token_program",
+          "address": "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "fund_bounty",
@@ -1680,6 +2434,150 @@
               }
             ]
           }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "open_dispute_v3",
+      "discriminator": [
+        226,
+        175,
+        136,
+        76,
+        202,
+        96,
+        200,
+        102
+      ],
+      "accounts": [
+        {
+          "name": "signer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          },
+          "relations": [
+            "claim",
+            "panel"
+          ]
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  99,
+                  108,
+                  97,
+                  105,
+                  109,
+                  95,
+                  118,
+                  50
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              },
+              {
+                "kind": "account",
+                "path": "claim.finder",
+                "account": "ClaimV2"
+              }
+            ]
+          }
+        },
+        {
+          "name": "panel",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  114,
+                  98,
+                  105,
+                  116,
+                  114,
+                  97,
+                  116,
+                  105,
+                  111,
+                  110,
+                  95,
+                  112,
+                  97,
+                  110,
+                  101,
+                  108
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "bounty"
+              }
+            ]
+          }
+        },
+        {
+          "name": "dispute_case",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  100,
+                  105,
+                  115,
+                  112,
+                  117,
+                  116,
+                  101,
+                  95,
+                  99,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "claim"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
         }
       ],
       "args": []
@@ -2896,6 +3794,32 @@
   ],
   "accounts": [
     {
+      "name": "ArbitrationPanel",
+      "discriminator": [
+        127,
+        28,
+        248,
+        19,
+        204,
+        212,
+        112,
+        66
+      ]
+    },
+    {
+      "name": "ArbitrationVote",
+      "discriminator": [
+        250,
+        100,
+        186,
+        28,
+        204,
+        26,
+        41,
+        91
+      ]
+    },
+    {
       "name": "Bounty",
       "discriminator": [
         237,
@@ -2919,6 +3843,19 @@
         160,
         222,
         63
+      ]
+    },
+    {
+      "name": "DisputeCase",
+      "discriminator": [
+        164,
+        200,
+        54,
+        239,
+        94,
+        76,
+        51,
+        130
       ]
     },
     {
@@ -2960,6 +3897,32 @@
         245,
         199,
         222
+      ]
+    },
+    {
+      "name": "ArbitrationPanelConfigured",
+      "discriminator": [
+        191,
+        243,
+        129,
+        214,
+        143,
+        134,
+        2,
+        31
+      ]
+    },
+    {
+      "name": "ArbitrationVoteCast",
+      "discriminator": [
+        165,
+        230,
+        250,
+        68,
+        108,
+        54,
+        7,
+        140
       ]
     },
     {
@@ -3145,6 +4108,32 @@
       ]
     },
     {
+      "name": "QuorumDisputeFinalized",
+      "discriminator": [
+        99,
+        114,
+        57,
+        95,
+        40,
+        26,
+        109,
+        228
+      ]
+    },
+    {
+      "name": "QuorumDisputeOpened",
+      "discriminator": [
+        117,
+        43,
+        32,
+        14,
+        167,
+        224,
+        172,
+        244
+      ]
+    },
+    {
       "name": "SettlementAttested",
       "discriminator": [
         239,
@@ -3263,6 +4252,46 @@
       "code": 6020,
       "name": "SettlementNotFinal",
       "msg": "Settlement is not final"
+    },
+    {
+      "code": 6021,
+      "name": "QuorumArbitrationRequired",
+      "msg": "This bounty requires 2-of-3 quorum arbitration"
+    },
+    {
+      "code": 6022,
+      "name": "InvalidQuorum",
+      "msg": "Arbitration quorum must be 2-of-3"
+    },
+    {
+      "code": 6023,
+      "name": "InvalidArbiter",
+      "msg": "Arbiter address is invalid"
+    },
+    {
+      "code": 6024,
+      "name": "DuplicateArbiter",
+      "msg": "Arbiters must be distinct wallets"
+    },
+    {
+      "code": 6025,
+      "name": "PartyCannotArbitrate",
+      "msg": "A bounty party cannot arbitrate its own case"
+    },
+    {
+      "code": 6026,
+      "name": "LeadArbiterRequired",
+      "msg": "The original lead arbiter must remain on the panel"
+    },
+    {
+      "code": 6027,
+      "name": "CaseAlreadyResolved",
+      "msg": "This arbitration case is already resolved"
+    },
+    {
+      "code": 6028,
+      "name": "QuorumNotReached",
+      "msg": "The arbitration quorum has not reached this decision"
     }
   ],
   "types": [
@@ -3295,6 +4324,132 @@
                 32
               ]
             }
+          }
+        ]
+      }
+    },
+    {
+      "name": "ArbitrationPanel",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "arbiters",
+            "type": {
+              "array": [
+                "pubkey",
+                3
+              ]
+            }
+          },
+          {
+            "name": "quorum",
+            "type": "u8"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ArbitrationPanelConfigured",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "panel",
+            "type": "pubkey"
+          },
+          {
+            "name": "arbiters",
+            "type": {
+              "array": [
+                "pubkey",
+                3
+              ]
+            }
+          },
+          {
+            "name": "quorum",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ArbitrationVote",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute_case",
+            "type": "pubkey"
+          },
+          {
+            "name": "arbiter",
+            "type": "pubkey"
+          },
+          {
+            "name": "release_to_finder",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "voted_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ArbitrationVoteCast",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute_case",
+            "type": "pubkey"
+          },
+          {
+            "name": "vote",
+            "type": "pubkey"
+          },
+          {
+            "name": "arbiter",
+            "type": "pubkey"
+          },
+          {
+            "name": "release_to_finder",
+            "type": "bool"
+          },
+          {
+            "name": "release_votes",
+            "type": "u8"
+          },
+          {
+            "name": "reject_votes",
+            "type": "u8"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
           }
         ]
       }
@@ -3404,6 +4559,13 @@
             "docs": [
               "0/1 are legacy single-claim accounts; 2 uses finder-scoped ClaimV2 PDAs.",
               "Existing accounts have zeroed padding here, so upgrades remain readable."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "arbitration_mode",
+            "docs": [
+              "0 = legacy single arbiter, 1 = configured 2-of-3 panel."
             ],
             "type": "u8"
           }
@@ -3848,6 +5010,57 @@
       }
     },
     {
+      "name": "DisputeCase",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "panel",
+            "type": "pubkey"
+          },
+          {
+            "name": "release_votes",
+            "type": "u8"
+          },
+          {
+            "name": "reject_votes",
+            "type": "u8"
+          },
+          {
+            "name": "decision",
+            "docs": [
+              "0 = open, 1 = release, 2 = reject."
+            ],
+            "type": "u8"
+          },
+          {
+            "name": "finalized",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "created_at",
+            "type": "i64"
+          },
+          {
+            "name": "resolved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "DisputeOpened",
       "type": {
         "kind": "struct",
@@ -3871,6 +5084,46 @@
           {
             "name": "release_to_finder",
             "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumDisputeFinalized",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "dispute_case",
+            "type": "pubkey"
+          },
+          {
+            "name": "decision",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "QuorumDisputeOpened",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "bounty",
+            "type": "pubkey"
+          },
+          {
+            "name": "claim",
+            "type": "pubkey"
+          },
+          {
+            "name": "dispute_case",
+            "type": "pubkey"
+          },
+          {
+            "name": "opened_by",
+            "type": "pubkey"
           }
         ]
       }

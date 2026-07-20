@@ -5,7 +5,7 @@ import {
   evidenceIntegrityPayloadV2,
   metadataIntegrityPayloadV2,
 } from "@/lib/findback/integrity";
-import { fetchBounty, fetchClaimV2 } from "@/lib/findback/program";
+import { fetchArbitrationPanel, fetchBounty, fetchClaimV2 } from "@/lib/findback/program";
 import type { MediaPurpose, StoredMedia } from "@/lib/media/types";
 import {
   ApiError,
@@ -101,9 +101,16 @@ export async function GET(req: Request) {
       if (claimError) throw new Error(claimError.message);
       if (!claim) throw new ApiError(404, "Không tìm thấy claim.");
 
+      const panel = onchain.arbitrationMode === 1
+        ? await fetchArbitrationPanel(bountyId)
+        : null;
+      const isPanelArbiter = Boolean(
+        profile.wallet_pubkey && panel?.arbiters.includes(profile.wallet_pubkey)
+      );
       const isParticipant =
         claim.finder_id === user.id ||
         listing.owner_id === user.id ||
+        isPanelArbiter ||
         (profile.is_arbiter && profile.wallet_pubkey === onchain.arbiter);
       if (!isParticipant) {
         throw new ApiError(403, "Chỉ chủ bounty, finder và arbiter được xem bằng chứng riêng tư.");

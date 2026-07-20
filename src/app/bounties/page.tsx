@@ -109,7 +109,18 @@ export default function BrowseBountiesPage() {
         </div>
       ) : filtered.length > 0 ? (
         <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-          {filtered.map((bounty) => <BountyCard key={bounty.id} b={bounty} status={bounty.status || (bounty.aiReport ? "AiReviewed" : bounty.claim ? "ClaimSubmitted" : "Draft")} />)}
+          {filtered.map((bounty) => {
+            const claims = bounty.claims?.length ? bounty.claims : bounty.claim ? [bounty.claim] : [];
+            const hasDispute = claims.some((claim) => claim.status?.replaceAll("_", "").toLowerCase() === "disputed");
+            const derivedStatus = bounty.status === "Funded" && claims.length
+              ? hasDispute
+                ? "Disputed"
+                : claims.some((claim) => claim.aiReport)
+                  ? "AiReviewed"
+                  : "ClaimSubmitted"
+              : bounty.status || "Draft";
+            return <BountyCard key={bounty.id} b={bounty} status={derivedStatus} />;
+          })}
         </div>
       ) : (
         <div className="app-card mt-6 flex flex-col items-center px-5 py-12 text-center sm:py-14">

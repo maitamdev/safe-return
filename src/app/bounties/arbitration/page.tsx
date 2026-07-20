@@ -1,83 +1,256 @@
 "use client";
 
+import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
+import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { Gavel, ShieldWarning } from "@phosphor-icons/react";
+import { PublicKey } from "@solana/web3.js";
+import {
+  ArrowSquareOut,
+  CheckCircle,
+  Gavel,
+  Scales,
+  ShieldCheck,
+  UsersThree,
+} from "@phosphor-icons/react";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
-import { ARBITER, FIND_SYMBOL } from "@/lib/findback/config";
+import { MediaIntegrityBadge } from "@/components/findback/MediaIntegrityBadge";
+import { FIND_SYMBOL, explorerAddressUrl } from "@/lib/findback/config";
+import {
+  fetchArbitrationVote,
+  type OnChainArbitrationPanel,
+  type OnChainArbitrationVote,
+  type OnChainDisputeCase,
+} from "@/lib/findback/program";
 import { useFindBack } from "@/lib/findback/provider";
+import type { AiClaimReport } from "@/lib/ai/types";
+
+type ArbitrationCase = {
+  bountyId: string;
+  title: string;
+  bountyLocation: string;
+  rewardUi: number;
+  ownerWallet: string;
+  finderWallet: string;
+  claimId: string;
+  description: string;
+  foundLocation: string;
+  foundAt: string;
+  aiReport: AiClaimReport | null;
+  imageUrl: string | null;
+  mode: "single" | "quorum";
+  panel: OnChainArbitrationPanel | null;
+  disputeCase: OnChainDisputeCase | null;
+};
 
 export default function ArbitrationPage() {
   const { publicKey } = useWallet();
-  const { bounties, loadingBounties, resolveDispute, txState } = useFindBack();
+  const { txState } = useFindBack();
+  const [cases, setCases] = useState<ArbitrationCase[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const address = publicKey?.toBase58();
-  const isArbiter = address === ARBITER;
-  const disputed = bounties.filter((bounty) => bounty.status === "Disputed");
+
+  const load = useCallback(async () => {
+    if (!address) {
+      setCases([]);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    try {
+      const response = await fetch("/api/arbitration/cases", { cache: "no-store" });
+      const json = (await response.json().catch(() => ({}))) as {
+        cases?: ArbitrationCase[];
+        error?: string;
+      };
+      if (!response.ok) throw new Error(json.error || "Không đọc được hàng chờ phân xử.");
+      setCases(json.cases || []);
+      setError(null);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Không đọc được hàng chờ phân xử.");
+    } finally {
+      setLoading(false);
+    }
+  }, [address]);
+
+  useEffect(() => {
+    const first = window.setTimeout(() => void load(), 0);
+    const interval = window.setInterval(() => void load(), 45_000);
+    return () => {
+      window.clearTimeout(first);
+      window.clearInterval(interval);
+    };
+  }, [load]);
 
   return (
     <div>
-      <div className="rounded-3xl bg-forest px-6 py-8 text-white sm:px-9">
-        <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-white/12">
-          <Gavel size={24} weight="fill" />
+      <section className="overflow-hidden rounded-2xl border border-emerald-800 bg-[#073f2b] text-white shadow-[0_24px_70px_rgba(7,63,43,0.18)]">
+        <div className="grid gap-8 p-6 sm:p-9 lg:grid-cols-[1fr_auto] lg:items-end">
+          <div>
+            <span className="inline-flex items-center gap-2 rounded-xl border border-white/15 bg-white/8 px-3 py-1.5 text-xs font-bold text-emerald-50">
+              <UsersThree size={17} weight="duotone" /> Hội đồng độc lập 2/3
+            </span>
+            <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Trung tâm phân xử</h1>
+            <p className="mt-3 max-w-2xl text-sm leading-7 text-white/72">
+              Mỗi trọng tài ký một phiếu riêng trên Solana. Chỉ khi hai trong ba ví đồng thuận, giao dịch mới có thể trả thưởng hoặc từ chối claim.
+            </p>
+          </div>
+          <div className="grid grid-cols-2 gap-3 text-center">
+            <HeaderMetric label="Vụ được giao" value={loading ? "..." : String(cases.length)} />
+            <HeaderMetric label="Ngưỡng quyết định" value="2 / 3" />
+          </div>
         </div>
-        <h1 className="mt-5 text-3xl font-bold tracking-tight">Trung tâm phân xử</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-white/75">
-          Arbiter xem bằng chứng riêng của hai bên rồi ký quyết định cuối cùng trên Solana Devnet. AI chỉ hỗ trợ đối chiếu, không tự chuyển tiền.
-        </p>
-      </div>
+      </section>
 
-      {!address && (
+      {!address ? (
         <section className="app-card mt-7 p-6">
-          <h2 className="font-bold">Kết nối ví arbiter</h2>
-          <p className="mt-2 mb-4 text-sm text-ink-soft">Cần đúng ví arbiter đã ghi trong bounty.</p>
+          <h2 className="font-bold">Kết nối ví trọng tài</h2>
+          <p className="mb-4 mt-2 text-sm leading-6 text-ink-soft">Hệ thống chỉ trả về các vụ mà địa chỉ ví hiện tại nằm trong panel on-chain.</p>
           <ConnectWalletButton size="md" />
         </section>
-      )}
+      ) : null}
 
-      {address && !isArbiter && (
-        <section className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-5 text-amber-950">
-          <div className="flex items-start gap-3">
-            <ShieldWarning size={22} className="mt-0.5 shrink-0" />
-            <div>
-              <h2 className="font-bold">Ví hiện tại không phải arbiter</h2>
-              <p className="mt-1 break-all text-sm leading-6">Arbiter Devnet: {ARBITER}</p>
-            </div>
-          </div>
-        </section>
-      )}
+      {error ? <p className="mt-7 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{error}</p> : null}
 
-      <section className="mt-8">
+      <section className="mt-8" aria-labelledby="queue-title">
         <div className="flex items-end justify-between gap-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.18em] text-forest">Hàng chờ</p>
-            <h2 className="mt-2 text-2xl font-bold">Bounty đang tranh chấp</h2>
+            <p className="text-xs font-bold uppercase tracking-[0.15em] text-forest">Hàng chờ riêng của ví</p>
+            <h2 id="queue-title" className="mt-2 text-2xl font-bold">Bằng chứng cần xem xét</h2>
           </div>
-          <span className="rounded-full border border-line bg-white px-3 py-1.5 text-xs font-bold text-ink-soft">
-            {loadingBounties ? "Đang tải" : `${disputed.length} vụ`}
-          </span>
+          <button type="button" onClick={() => void load()} disabled={loading || txState === "pending"} className="text-xs font-bold text-forest hover:underline">{loading ? "Đang tải" : "Làm mới"}</button>
         </div>
 
-        <div className="mt-5 grid gap-4">
-          {disputed.map((bounty) => (
-            <article key={bounty.id} className="app-card p-5 sm:p-6">
-              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-                <div>
-                  <p className="text-xs font-bold uppercase tracking-[0.16em] text-rose-700">Đang tranh chấp</p>
-                  <h3 className="mt-2 text-lg font-bold">{bounty.title}</h3>
-                  <p className="mt-2 text-sm text-ink-soft">{bounty.location} · {bounty.rewardUi} {FIND_SYMBOL}</p>
-                  {bounty.aiReport && <p className="mt-2 text-sm text-ink-soft">AI: {bounty.aiReport.score}/100 · {bounty.aiReport.decision}</p>}
-                </div>
-                <div className="grid gap-2 sm:grid-cols-2">
-                  <button type="button" disabled={!isArbiter || txState === "pending"} onClick={() => void resolveDispute(bounty.id, true)} className="app-button-primary">Trả FIND cho finder</button>
-                  <button type="button" disabled={!isArbiter || txState === "pending"} onClick={() => void resolveDispute(bounty.id, false)} className="app-button-secondary">Hoàn FIND cho owner</button>
-                </div>
-              </div>
-            </article>
+        <div className="mt-5 grid gap-5">
+          {cases.map((arbitrationCase) => (
+            <CaseCard key={`${arbitrationCase.bountyId}-${arbitrationCase.finderWallet}`} arbitrationCase={arbitrationCase} viewer={address || ""} reload={load} />
           ))}
-          {!loadingBounties && disputed.length === 0 && (
-            <div className="app-card p-8 text-center text-sm text-ink-soft">Chưa có tranh chấp nào trong dữ liệu bạn được phép xem.</div>
-          )}
+          {!loading && address && cases.length === 0 ? (
+            <div className="app-card p-9 text-center">
+              <ShieldCheck size={36} className="mx-auto text-forest" weight="duotone" />
+              <h3 className="mt-4 font-bold">Không có vụ nào chờ ví này</h3>
+              <p className="mt-2 text-sm text-ink-soft">Đây là dữ liệu thật theo panel và trạng thái claim trên Devnet.</p>
+            </div>
+          ) : null}
         </div>
       </section>
     </div>
   );
+}
+
+function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: ArbitrationCase; viewer: string; reload: () => Promise<void> }) {
+  const { voteArbitration, finalizeArbitration, resolveDispute, txState } = useFindBack();
+  const [myVote, setMyVote] = useState<OnChainArbitrationVote | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const quorumCase = arbitrationCase.disputeCase;
+  const isQuorum = arbitrationCase.mode === "quorum" && Boolean(arbitrationCase.panel && quorumCase);
+
+  useEffect(() => {
+    if (!isQuorum || !viewer) return;
+    let cancelled = false;
+    fetchArbitrationVote(
+      arbitrationCase.bountyId,
+      new PublicKey(arbitrationCase.finderWallet),
+      new PublicKey(viewer)
+    ).then((vote) => {
+      if (!cancelled) setMyVote(vote);
+    }).catch(() => {
+      if (!cancelled) setMyVote(null);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [arbitrationCase.bountyId, arbitrationCase.finderWallet, isQuorum, viewer]);
+
+  const run = async (action: () => Promise<void>) => {
+    setBusy(true);
+    setError(null);
+    try {
+      await action();
+      await reload();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "Giao dịch phân xử thất bại.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const locked = busy || txState === "pending";
+  const report = arbitrationCase.aiReport;
+  const decision = quorumCase?.decision ?? 0;
+
+  return (
+    <article className="app-card overflow-hidden">
+      <div className="grid lg:grid-cols-[300px_1fr]">
+        <div className="border-b border-line bg-bg-deep lg:border-b-0 lg:border-r">
+          {arbitrationCase.imageUrl ? (
+            <Image unoptimized src={arbitrationCase.imageUrl} alt="Ảnh bằng chứng riêng tư của claim" width={720} height={720} className="aspect-square h-full min-h-64 w-full object-cover" />
+          ) : (
+            <div className="grid min-h-64 place-items-center p-6 text-center text-sm text-ink-muted"><div><Scales size={34} className="mx-auto text-forest" /><p className="mt-3">Claim không gửi ảnh. Chỉ đánh giá từ mô tả văn bản.</p></div></div>
+          )}
+        </div>
+        <div className="p-5 sm:p-7">
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-[0.14em] text-rose-700">Đang tranh chấp</p>
+              <h3 className="mt-2 text-xl font-bold">{arbitrationCase.title}</h3>
+              <p className="mt-1 text-sm text-ink-soft">{arbitrationCase.bountyLocation} | {arbitrationCase.rewardUi} {FIND_SYMBOL}</p>
+            </div>
+            <span className="rounded-lg border border-line bg-bg-deep px-2.5 py-1 text-xs font-bold text-ink-soft">{isQuorum ? "Panel 2/3" : "Trọng tài đơn"}</span>
+          </div>
+
+          <div className="mt-5 grid gap-4 sm:grid-cols-2">
+            <Evidence label="Mô tả của người tìm thấy" value={arbitrationCase.description} />
+            <Evidence label="Nơi và lúc tìm thấy" value={`${arbitrationCase.foundLocation || "Không cung cấp"}${arbitrationCase.foundAt ? ` | ${arbitrationCase.foundAt}` : ""}`} />
+          </div>
+          <div className="mt-4"><MediaIntegrityBadge purpose="claim" bountyId={arbitrationCase.bountyId} claimId={arbitrationCase.claimId} /></div>
+
+          {report ? (
+            <div className="mt-5 rounded-xl border border-line bg-bg-deep p-4">
+              <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-xs font-bold uppercase tracking-[0.12em] text-ink-muted">AI tham khảo</p><span className="font-mono text-sm font-bold text-forest">{report.score}/100</span></div>
+              <p className="mt-2 text-sm font-semibold text-ink">{report.decision}</p>
+              <p className="mt-2 text-xs leading-5 text-ink-soft">AI không có phiếu và không thể chuyển tiền.</p>
+            </div>
+          ) : null}
+
+          {isQuorum && arbitrationCase.panel && quorumCase ? (
+            <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
+              <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-emerald-950">Tiến độ biểu quyết</p><a href={explorerAddressUrl(quorumCase.address)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:underline">Mở case <ArrowSquareOut size={13} /></a></div>
+              <div className="mt-4 grid grid-cols-2 gap-3"><VoteMetric label="Trả thưởng" value={quorumCase.releaseVotes} /><VoteMetric label="Từ chối claim" value={quorumCase.rejectVotes} /></div>
+              <div className="mt-4 grid grid-cols-3 gap-2">{arbitrationCase.panel.arbiters.map((arbiter, index) => <div key={arbiter} className={`rounded-lg border px-2 py-2 text-center font-mono text-[10px] ${arbiter === viewer ? "border-forest bg-white text-forest" : "border-emerald-200 text-emerald-900"}`}>#{index + 1} {arbiter.slice(0, 4)}...{arbiter.slice(-4)}</div>)}</div>
+              {myVote ? <p className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-emerald-800"><CheckCircle size={16} weight="fill" /> Bạn đã bỏ phiếu {myVote.releaseToFinder ? "trả thưởng" : "từ chối claim"}</p> : null}
+            </div>
+          ) : null}
+
+          <div className="mt-6 border-t border-line pt-5">
+            {isQuorum && decision === 0 && !myVote ? (
+              <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => voteArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, true))} className="app-button-primary"><CheckCircle size={17} /> Phiếu trả FIND</button><button type="button" disabled={locked} onClick={() => void run(() => voteArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, false))} className="app-button-secondary">Phiếu từ chối claim</button></div>
+            ) : null}
+            {isQuorum && decision !== 0 && !quorumCase?.finalized ? (
+              <button type="button" disabled={locked} onClick={() => void run(() => finalizeArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, decision === 1))} className="app-button-primary w-full"><Gavel size={17} /> Thi hành quyết định {decision === 1 ? "trả thưởng" : "từ chối claim"}</button>
+            ) : null}
+            {!isQuorum ? (
+              <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, true, arbitrationCase.finderWallet))} className="app-button-primary">Trả FIND cho finder</button><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, false, arbitrationCase.finderWallet))} className="app-button-secondary">Từ chối claim</button></div>
+            ) : null}
+            {error ? <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-900" role="alert">{error}</p> : null}
+          </div>
+          <Link href={`/bounties/${arbitrationCase.bountyId}`} className="mt-5 inline-flex items-center gap-1.5 text-xs font-bold text-forest hover:underline">Mở hồ sơ bounty <ArrowSquareOut size={13} /></Link>
+        </div>
+      </div>
+    </article>
+  );
+}
+
+function HeaderMetric({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl border border-white/15 bg-white/8 px-4 py-3"><p className="text-xl font-bold">{value}</p><p className="mt-1 text-[11px] text-white/65">{label}</p></div>;
+}
+
+function Evidence({ label, value }: { label: string; value: string }) {
+  return <div className="rounded-xl border border-line bg-white p-4"><p className="text-xs font-semibold text-ink-muted">{label}</p><p className="mt-2 text-sm leading-6 text-ink">{value}</p></div>;
+}
+
+function VoteMetric({ label, value }: { label: string; value: number }) {
+  return <div className="rounded-xl border border-emerald-200 bg-white p-3 text-center"><p className="text-2xl font-bold text-emerald-900">{value}<span className="text-sm text-emerald-700">/2</span></p><p className="mt-1 text-[11px] font-semibold text-emerald-800">{label}</p></div>;
 }

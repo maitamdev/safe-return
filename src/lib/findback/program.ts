@@ -32,6 +32,9 @@ export const VAULT_SEED = Buffer.from("vault");
 export const CLAIM_V2_SEED = Buffer.from("claim_v2");
 export const REPUTATION_SEED = Buffer.from("reputation");
 export const RETURN_ATTESTATION_SEED = Buffer.from("return_attestation");
+export const ARBITRATION_PANEL_SEED = Buffer.from("arbitration_panel");
+export const DISPUTE_CASE_SEED = Buffer.from("dispute_case");
+export const ARBITRATION_VOTE_SEED = Buffer.from("arbitration_vote");
 
 /** sha256("global:<name>")[0..8] */
 export const IX = {
@@ -55,6 +58,11 @@ export const IX = {
   create_bounty_sponsored: Buffer.from([60, 19, 90, 70, 98, 64, 136, 4]),
   fund_bounty_sponsored: Buffer.from([84, 28, 214, 201, 200, 21, 52, 48]),
   submit_claim_v2_sponsored: Buffer.from([88, 167, 40, 12, 141, 217, 243, 23]),
+  configure_arbitration_panel: Buffer.from([103, 173, 78, 35, 189, 128, 231, 69]),
+  open_dispute_v3: Buffer.from([226, 175, 136, 76, 202, 96, 200, 102]),
+  cast_arbitration_vote: Buffer.from([240, 213, 221, 193, 161, 207, 1, 252]),
+  finalize_dispute_release: Buffer.from([34, 134, 74, 54, 225, 183, 18, 47]),
+  finalize_dispute_reject: Buffer.from([171, 128, 196, 66, 131, 203, 114, 117]),
 } as const;
 
 const CLAIM_V2_DISCRIMINATOR = Buffer.from([91, 3, 14, 101, 67, 160, 222, 63]);
@@ -64,6 +72,15 @@ const REPUTATION_DISCRIMINATOR = Buffer.from([
 ]);
 const RETURN_ATTESTATION_DISCRIMINATOR = Buffer.from([
   186, 34, 108, 39, 171, 28, 141, 60,
+]);
+const ARBITRATION_PANEL_DISCRIMINATOR = Buffer.from([
+  127, 28, 248, 19, 204, 212, 112, 66,
+]);
+const DISPUTE_CASE_DISCRIMINATOR = Buffer.from([
+  164, 200, 54, 239, 94, 76, 51, 130,
+]);
+const ARBITRATION_VOTE_DISCRIMINATOR = Buffer.from([
+  250, 100, 186, 28, 204, 26, 41, 91,
 ]);
 
 export type WalletLike = {
@@ -119,6 +136,7 @@ export type OnChainBounty = {
   createdAt: number;
   updatedAt: number;
   protocolVersion: number;
+  arbitrationMode: number;
 };
 
 export type ClaimV2StatusName =
@@ -166,6 +184,35 @@ export type OnChainReturnAttestation = {
   rewardAmount: bigint;
   aiScore: number;
   settledAt: number;
+};
+
+export type OnChainArbitrationPanel = {
+  address: string;
+  bounty: string;
+  arbiters: [string, string, string];
+  quorum: number;
+  createdAt: number;
+};
+
+export type OnChainDisputeCase = {
+  address: string;
+  bounty: string;
+  claim: string;
+  panel: string;
+  releaseVotes: number;
+  rejectVotes: number;
+  decision: 0 | 1 | 2;
+  finalized: boolean;
+  createdAt: number;
+  resolvedAt: number;
+};
+
+export type OnChainArbitrationVote = {
+  address: string;
+  disputeCase: string;
+  arbiter: string;
+  releaseToFinder: boolean;
+  votedAt: number;
 };
 
 export function getConnection(commitment: Commitment = "confirmed") {
@@ -225,6 +272,37 @@ export function returnAttestationPda(
   return PublicKey.findProgramAddressSync(
     [RETURN_ATTESTATION_SEED, bounty.toBuffer(), claim.toBuffer()],
     PROGRAM_PK,
+  );
+}
+
+export function arbitrationPanelPda(bountyId: string): [PublicKey, number] {
+  const [bounty] = bountyPda(bountyId);
+  return PublicKey.findProgramAddressSync(
+    [ARBITRATION_PANEL_SEED, bounty.toBuffer()],
+    PROGRAM_PK
+  );
+}
+
+export function disputeCasePda(
+  bountyId: string,
+  finder: PublicKey
+): [PublicKey, number] {
+  const [claim] = claimV2Pda(bountyId, finder);
+  return PublicKey.findProgramAddressSync(
+    [DISPUTE_CASE_SEED, claim.toBuffer()],
+    PROGRAM_PK
+  );
+}
+
+export function arbitrationVotePda(
+  bountyId: string,
+  finder: PublicKey,
+  arbiter: PublicKey
+): [PublicKey, number] {
+  const [disputeCase] = disputeCasePda(bountyId, finder);
+  return PublicKey.findProgramAddressSync(
+    [ARBITRATION_VOTE_SEED, disputeCase.toBuffer(), arbiter.toBuffer()],
+    PROGRAM_PK
   );
 }
 
@@ -799,6 +877,155 @@ export async function openDisputeV2OnChain(
   return sendIx(wallet, [ix], "open_dispute_v2");
 }
 
+export async function configureArbitrationPanelOnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  arbiters: [PublicKey, PublicKey, PublicKey]
+) {
+  const [bounty] = bountyPda(bountyId);
+  const [panel] = arbitrationPanelPda(bountyId);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: panel, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      IX.configure_arbitration_panel,
+      ...arbiters.map((arbiter) => arbiter.toBuffer()),
+      Buffer.from([2]),
+    ]),
+  });
+  const result = await sendIx(wallet, [ix], "configure_arbitration_panel");
+  return { ...result, panelPda: panel.toBase58() };
+}
+
+export async function openDisputeV3OnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  finder: PublicKey
+) {
+  const [bounty] = bountyPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  const [panel] = arbitrationPanelPda(bountyId);
+  const [disputeCase] = disputeCasePda(bountyId, finder);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: claim, isSigner: false, isWritable: true },
+      { pubkey: panel, isSigner: false, isWritable: false },
+      { pubkey: disputeCase, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from(IX.open_dispute_v3),
+  });
+  const result = await sendIx(wallet, [ix], "open_dispute_v3");
+  return { ...result, disputeCasePda: disputeCase.toBase58() };
+}
+
+export async function castArbitrationVoteOnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  finder: PublicKey,
+  releaseToFinder: boolean
+) {
+  const [panel] = arbitrationPanelPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  const [disputeCase] = disputeCasePda(bountyId, finder);
+  const [vote] = arbitrationVotePda(bountyId, finder, wallet.publicKey);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: panel, isSigner: false, isWritable: false },
+      { pubkey: disputeCase, isSigner: false, isWritable: true },
+      { pubkey: claim, isSigner: false, isWritable: false },
+      { pubkey: vote, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.concat([
+      IX.cast_arbitration_vote,
+      Buffer.from([releaseToFinder ? 1 : 0]),
+    ]),
+  });
+  return sendIx(wallet, [ix], "cast_arbitration_vote");
+}
+
+export async function finalizeDisputeReleaseOnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  finder: PublicKey
+) {
+  const mint = requireMint();
+  const onChainBounty = await fetchBounty(bountyId);
+  if (!onChainBounty) throw new Error("Không đọc được bounty từ Solana Devnet.");
+  const owner = new PublicKey(onChainBounty.owner);
+  const [bounty] = bountyPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  const [panel] = arbitrationPanelPda(bountyId);
+  const [disputeCase] = disputeCasePda(bountyId, finder);
+  const [vaultAuthority] = vaultAuthorityPda(bountyId);
+  const vaultToken = getAssociatedTokenAddressSync(mint, vaultAuthority, true);
+  const finderToken = getAssociatedTokenAddressSync(mint, finder, true);
+  const settleIx = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: finder, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: claim, isSigner: false, isWritable: true },
+      { pubkey: panel, isSigner: false, isWritable: false },
+      { pubkey: disputeCase, isSigner: false, isWritable: true },
+      { pubkey: vaultAuthority, isSigner: false, isWritable: false },
+      { pubkey: vaultToken, isSigner: false, isWritable: true },
+      { pubkey: finderToken, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: ASSOCIATED_TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data: Buffer.from(IX.finalize_dispute_release),
+  });
+  const attestIx = attestSettlementInstruction({
+    payer: wallet.publicKey,
+    owner,
+    finder,
+    bountyId,
+  });
+  return sendIx(
+    wallet,
+    [settleIx, attestIx],
+    "finalize_dispute_release + attest_settlement"
+  );
+}
+
+export async function finalizeDisputeRejectOnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  finder: PublicKey
+) {
+  const [bounty] = bountyPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  const [panel] = arbitrationPanelPda(bountyId);
+  const [disputeCase] = disputeCasePda(bountyId, finder);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: claim, isSigner: false, isWritable: true },
+      { pubkey: panel, isSigner: false, isWritable: false },
+      { pubkey: disputeCase, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.from(IX.finalize_dispute_reject),
+  });
+  return sendIx(wallet, [ix], "finalize_dispute_reject");
+}
+
 export async function cancelBountyOnChain(
   wallet: WalletLike,
   bountyId: string,
@@ -952,7 +1179,8 @@ export function decodeBountyAccount(data: Buffer): OnChainBounty | null {
     o += 8;
     const updatedAt = Number(data.readBigInt64LE(o));
     o += 8;
-    const protocolVersion = data[o] ?? 0;
+    const protocolVersion = data[o++] ?? 0;
+    const arbitrationMode = data[o] ?? 0;
 
     return {
       address: "",
@@ -974,6 +1202,7 @@ export function decodeBountyAccount(data: Buffer): OnChainBounty | null {
       createdAt,
       updatedAt,
       protocolVersion,
+      arbitrationMode,
     };
   } catch {
     return null;
@@ -1108,6 +1337,132 @@ export function decodeReturnAttestationAccount(
   } catch {
     return null;
   }
+}
+
+export function decodeArbitrationPanelAccount(
+  data: Buffer
+): OnChainArbitrationPanel | null {
+  try {
+    if (
+      data.length < 146 ||
+      !data.subarray(0, 8).equals(ARBITRATION_PANEL_DISCRIMINATOR)
+    ) return null;
+    let offset = 8;
+    const readPublicKey = () => {
+      const value = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+      offset += 32;
+      return value;
+    };
+    const bounty = readPublicKey();
+    const arbiters = [readPublicKey(), readPublicKey(), readPublicKey()] as [string, string, string];
+    const quorum = data[offset++];
+    offset += 1;
+    const createdAt = Number(data.readBigInt64LE(offset));
+    return { address: "", bounty, arbiters, quorum, createdAt };
+  } catch {
+    return null;
+  }
+}
+
+export function decodeDisputeCaseAccount(data: Buffer): OnChainDisputeCase | null {
+  try {
+    if (
+      data.length < 125 ||
+      !data.subarray(0, 8).equals(DISPUTE_CASE_DISCRIMINATOR)
+    ) return null;
+    let offset = 8;
+    const readPublicKey = () => {
+      const value = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+      offset += 32;
+      return value;
+    };
+    const bounty = readPublicKey();
+    const claim = readPublicKey();
+    const panel = readPublicKey();
+    const releaseVotes = data[offset++];
+    const rejectVotes = data[offset++];
+    const decision = data[offset++] as 0 | 1 | 2;
+    const finalized = data[offset++] === 1;
+    offset += 1;
+    const createdAt = Number(data.readBigInt64LE(offset));
+    offset += 8;
+    const resolvedAt = Number(data.readBigInt64LE(offset));
+    return {
+      address: "",
+      bounty,
+      claim,
+      panel,
+      releaseVotes,
+      rejectVotes,
+      decision,
+      finalized,
+      createdAt,
+      resolvedAt,
+    };
+  } catch {
+    return null;
+  }
+}
+
+export function decodeArbitrationVoteAccount(
+  data: Buffer
+): OnChainArbitrationVote | null {
+  try {
+    if (
+      data.length < 82 ||
+      !data.subarray(0, 8).equals(ARBITRATION_VOTE_DISCRIMINATOR)
+    ) return null;
+    let offset = 8;
+    const disputeCase = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+    offset += 32;
+    const arbiter = new PublicKey(data.subarray(offset, offset + 32)).toBase58();
+    offset += 32;
+    const releaseToFinder = data[offset++] === 1;
+    offset += 1;
+    const votedAt = Number(data.readBigInt64LE(offset));
+    return { address: "", disputeCase, arbiter, releaseToFinder, votedAt };
+  } catch {
+    return null;
+  }
+}
+
+export async function fetchArbitrationPanel(
+  bountyId: string
+): Promise<OnChainArbitrationPanel | null> {
+  const [pda] = arbitrationPanelPda(bountyId);
+  const info = await getConnection().getAccountInfo(pda, "confirmed");
+  if (!info?.data) return null;
+  const decoded = decodeArbitrationPanelAccount(Buffer.from(info.data));
+  if (!decoded) return null;
+  decoded.address = pda.toBase58();
+  return decoded;
+}
+
+export async function fetchDisputeCase(
+  bountyId: string,
+  finder: PublicKey
+): Promise<OnChainDisputeCase | null> {
+  const [pda] = disputeCasePda(bountyId, finder);
+  const info = await getConnection().getAccountInfo(pda, "confirmed");
+  if (!info?.data) return null;
+  const decoded = decodeDisputeCaseAccount(Buffer.from(info.data));
+  if (!decoded) return null;
+  decoded.address = pda.toBase58();
+  return decoded;
+}
+
+export async function fetchArbitrationVote(
+  bountyId: string,
+  finder: PublicKey,
+  arbiter: PublicKey
+): Promise<OnChainArbitrationVote | null> {
+  const [pda] = arbitrationVotePda(bountyId, finder, arbiter);
+  const info = await getConnection().getAccountInfo(pda, "confirmed");
+  if (!info?.data) return null;
+  const decoded = decodeArbitrationVoteAccount(Buffer.from(info.data));
+  if (!decoded) return null;
+  decoded.address = pda.toBase58();
+  return decoded;
 }
 
 export async function fetchReputation(

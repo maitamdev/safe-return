@@ -19,6 +19,7 @@ import { useFindBack } from "@/lib/findback/provider";
 import { AiReviewPanel } from "@/components/findback/AiPanel";
 import { MediaIntegrityBadge } from "@/components/findback/MediaIntegrityBadge";
 import { TrustProof } from "@/components/findback/TrustProof";
+import { ArbitrationSetup } from "@/components/findback/ArbitrationSetup";
 import { statusBadge, statusLabel } from "@/components/findback/BountyCard";
 import {
   FIND_SYMBOL,
@@ -114,9 +115,14 @@ export default function BountyDetailPage() {
     currentClaim || (walletAddress && onchain?.finder === walletAddress),
   );
   const chainStatus = onchain?.status || meta.status || "Draft";
+  const hasDisputedClaim = claims.some(
+    (claim) => claim.status?.replaceAll("_", "").toLowerCase() === "disputed",
+  );
   const status =
     meta.protocolVersion === 2 && chainStatus === "Funded" && claims.length > 0
-      ? claims.some((claim) => claim.aiReport)
+      ? hasDisputedClaim
+        ? "Disputed"
+        : claims.some((claim) => claim.aiReport)
         ? "AiReviewed"
         : "ClaimSubmitted"
       : chainStatus;
@@ -271,6 +277,12 @@ export default function BountyDetailPage() {
             {onchain && onchain.aiScore > 0 && (
               <ChainRow label="Điểm đã ghi" value={`${onchain.aiScore}/100`} />
             )}
+            {onchain?.protocolVersion && onchain.protocolVersion >= 2 ? (
+              <ChainRow
+                label="Phân xử"
+                value={onchain.arbitrationMode === 1 ? "Hội đồng 2/3" : "Một trọng tài"}
+              />
+            ) : null}
           </dl>
           {chainError && (
             <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
@@ -363,6 +375,17 @@ export default function BountyDetailPage() {
                 </button>
               )}
           </div>
+          {isOwner &&
+          onchain &&
+          onchain.protocolVersion >= 2 &&
+          onchain.arbitrationMode === 0 &&
+          ["Draft", "Funded"].includes(onchain.status) ? (
+            <ArbitrationSetup
+              bountyId={id}
+              leadArbiter={onchain.arbiter}
+              onConfigured={reloadChain}
+            />
+          ) : null}
         </aside>
       </div>
 

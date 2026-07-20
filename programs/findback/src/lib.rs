@@ -17,6 +17,9 @@ pub const VAULT_SEED: &[u8] = b"vault";
 pub const CLAIM_V2_SEED: &[u8] = b"claim_v2";
 pub const REPUTATION_SEED: &[u8] = b"reputation";
 pub const RETURN_ATTESTATION_SEED: &[u8] = b"return_attestation";
+pub const ARBITRATION_PANEL_SEED: &[u8] = b"arbitration_panel";
+pub const DISPUTE_CASE_SEED: &[u8] = b"dispute_case";
+pub const ARBITRATION_VOTE_SEED: &[u8] = b"arbitration_vote";
 pub const MAX_ID_LEN: usize = 32;
 
 #[program]
@@ -486,6 +489,10 @@ pub mod findback {
             ctx.accounts.bounty.protocol_version >= 2,
             FbError::ProtocolVersionMismatch
         );
+        require!(
+            ctx.accounts.bounty.arbitration_mode == 0,
+            FbError::QuorumArbitrationRequired
+        );
         let claim = &mut ctx.accounts.claim;
         require!(
             ctx.accounts.signer.key() == ctx.accounts.bounty.owner
@@ -578,6 +585,7 @@ pub mod findback {
         let b = &mut ctx.accounts.bounty;
         let claim = &mut ctx.accounts.claim;
         require!(b.protocol_version >= 2, FbError::ProtocolVersionMismatch);
+        require!(b.arbitration_mode == 0, FbError::QuorumArbitrationRequired);
         require!(
             claim.status == ClaimV2Status::Disputed,
             FbError::InvalidClaimStatus
@@ -636,6 +644,256 @@ pub mod findback {
             });
         }
         claim.updated_at = now;
+        Ok(())
+    }
+
+    pub fn configure_arbitration_panel(
+        ctx: Context<ConfigureArbitrationPanel>,
+        arbiters: [Pubkey; 3],
+        quorum: u8,
+    ) -> Result<()> {
+        require!(quorum == 2, FbError::InvalidQuorum);
+        require!(
+            arbiters.iter().all(|arbiter| *arbiter != Pubkey::default()),
+            FbError::InvalidArbiter
+        );
+        require!(
+            arbiters[0] != arbiters[1] && arbiters[0] != arbiters[2] && arbiters[1] != arbiters[2],
+            FbError::DuplicateArbiter
+        );
+        require!(
+            arbiters
+                .iter()
+                .all(|arbiter| *arbiter != ctx.accounts.owner.key()),
+            FbError::PartyCannotArbitrate
+        );
+        require!(
+            arbiters.contains(&ctx.accounts.bounty.arbiter),
+            FbError::LeadArbiterRequired
+        );
+        require!(
+            ctx.accounts.bounty.protocol_version >= 2,
+            FbError::ProtocolVersionMismatch
+        );
+        require!(
+            matches!(
+                ctx.accounts.bounty.status,
+                BountyStatus::Draft | BountyStatus::Funded
+            ),
+            FbError::InvalidStatus
+        );
+
+        let panel = &mut ctx.accounts.panel;
+        panel.bounty = ctx.accounts.bounty.key();
+        panel.arbiters = arbiters;
+        panel.quorum = quorum;
+        panel.bump = ctx.bumps.panel;
+        panel.created_at = Clock::get()?.unix_timestamp;
+        ctx.accounts.bounty.arbitration_mode = 1;
+        ctx.accounts.bounty.updated_at = panel.created_at;
+        emit!(ArbitrationPanelConfigured {
+            bounty: panel.bounty,
+            panel: panel.key(),
+            arbiters,
+            quorum,
+        });
+        Ok(())
+    }
+
+    pub fn open_dispute_v3(ctx: Context<OpenDisputeV3>) -> Result<()> {
+        let bounty = &ctx.accounts.bounty;
+        let claim = &mut ctx.accounts.claim;
+        require!(
+            bounty.protocol_version >= 2,
+            FbError::ProtocolVersionMismatch
+        );
+        require!(
+            bounty.arbitration_mode == 1,
+            FbError::QuorumArbitrationRequired
+        );
+        require!(
+            ctx.accounts.signer.key() == bounty.owner || ctx.accounts.signer.key() == claim.finder,
+            FbError::Unauthorized
+        );
+        require!(
+            matches!(
+                claim.status,
+                ClaimV2Status::Submitted | ClaimV2Status::AiReviewed
+            ),
+            FbError::InvalidClaimStatus
+        );
+        let now = Clock::get()?.unix_timestamp;
+        claim.status = ClaimV2Status::Disputed;
+        claim.updated_at = now;
+        let case = &mut ctx.accounts.dispute_case;
+        case.bounty = bounty.key();
+        case.claim = claim.key();
+        case.panel = ctx.accounts.panel.key();
+        case.release_votes = 0;
+        case.reject_votes = 0;
+        case.decision = 0;
+        case.finalized = false;
+        case.bump = ctx.bumps.dispute_case;
+        case.created_at = now;
+        case.resolved_at = 0;
+        emit!(QuorumDisputeOpened {
+            bounty: bounty.key(),
+            claim: claim.key(),
+            dispute_case: case.key(),
+            opened_by: ctx.accounts.signer.key(),
+        });
+        Ok(())
+    }
+
+    pub fn cast_arbitration_vote(
+        ctx: Context<CastArbitrationVote>,
+        release_to_finder: bool,
+    ) -> Result<()> {
+        let panel = &ctx.accounts.panel;
+        require!(
+            panel.arbiters.contains(&ctx.accounts.arbiter.key()),
+            FbError::Unauthorized
+        );
+        require_keys_neq!(
+            ctx.accounts.claim.finder,
+            ctx.accounts.arbiter.key(),
+            FbError::PartyCannotArbitrate
+        );
+        let case = &mut ctx.accounts.dispute_case;
+        require!(
+            case.decision == 0 && !case.finalized,
+            FbError::CaseAlreadyResolved
+        );
+        if release_to_finder {
+            case.release_votes = case
+                .release_votes
+                .checked_add(1)
+                .ok_or(FbError::MathOverflow)?;
+        } else {
+            case.reject_votes = case
+                .reject_votes
+                .checked_add(1)
+                .ok_or(FbError::MathOverflow)?;
+        }
+        if case.release_votes >= panel.quorum {
+            case.decision = 1;
+            case.resolved_at = Clock::get()?.unix_timestamp;
+        } else if case.reject_votes >= panel.quorum {
+            case.decision = 2;
+            case.resolved_at = Clock::get()?.unix_timestamp;
+        }
+
+        let vote = &mut ctx.accounts.vote;
+        vote.dispute_case = case.key();
+        vote.arbiter = ctx.accounts.arbiter.key();
+        vote.release_to_finder = release_to_finder;
+        vote.bump = ctx.bumps.vote;
+        vote.voted_at = Clock::get()?.unix_timestamp;
+        emit!(ArbitrationVoteCast {
+            dispute_case: case.key(),
+            vote: vote.key(),
+            arbiter: vote.arbiter,
+            release_to_finder,
+            release_votes: case.release_votes,
+            reject_votes: case.reject_votes,
+            decision: case.decision,
+        });
+        Ok(())
+    }
+
+    pub fn finalize_dispute_release(ctx: Context<FinalizeDisputeRelease>) -> Result<()> {
+        let bounty_key = ctx.accounts.bounty.key();
+        let claim_key = ctx.accounts.claim.key();
+        let case = &mut ctx.accounts.dispute_case;
+        require!(
+            case.decision == 1 && !case.finalized,
+            FbError::QuorumNotReached
+        );
+        let bounty = &mut ctx.accounts.bounty;
+        let claim = &mut ctx.accounts.claim;
+        require!(
+            bounty.status == BountyStatus::Funded,
+            FbError::InvalidStatus
+        );
+        require!(
+            claim.status == ClaimV2Status::Disputed,
+            FbError::InvalidClaimStatus
+        );
+        require_keys_eq!(
+            claim.finder,
+            ctx.accounts.finder.key(),
+            FbError::FinderMismatch
+        );
+        require!(
+            bounty.amount_funded >= bounty.reward_amount,
+            FbError::NotFullyFunded
+        );
+
+        let amount = bounty.reward_amount;
+        let id_bytes = bounty.bounty_id.as_bytes();
+        let seeds: &[&[u8]] = &[VAULT_SEED, id_bytes, &[bounty.vault_bump]];
+        let signer = &[seeds];
+        let cpi = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            Transfer {
+                from: ctx.accounts.vault_token.to_account_info(),
+                to: ctx.accounts.finder_token.to_account_info(),
+                authority: ctx.accounts.vault_authority.to_account_info(),
+            },
+            signer,
+        );
+        token::transfer(cpi, amount)?;
+        bounty.amount_funded = bounty
+            .amount_funded
+            .checked_sub(amount)
+            .ok_or(FbError::MathOverflow)?;
+        bounty.finder = claim.finder;
+        bounty.evidence_hash = claim.evidence_hash;
+        bounty.ai_score = claim.ai_score;
+        bounty.ai_risk = claim.ai_risk;
+        bounty.ai_decision = claim.ai_decision;
+        bounty.ai_explanation_hash = claim.ai_report_hash;
+        bounty.status = BountyStatus::Released;
+        let now = Clock::get()?.unix_timestamp;
+        bounty.updated_at = now;
+        claim.status = ClaimV2Status::Settled;
+        claim.updated_at = now;
+        case.finalized = true;
+        emit!(ClaimV2Settled {
+            bounty: bounty_key,
+            claim: claim_key,
+            finder: claim.finder,
+            amount,
+            via_arbitration: true,
+        });
+        emit!(QuorumDisputeFinalized {
+            dispute_case: case.key(),
+            decision: 1,
+        });
+        Ok(())
+    }
+
+    pub fn finalize_dispute_reject(ctx: Context<FinalizeDisputeReject>) -> Result<()> {
+        let case = &mut ctx.accounts.dispute_case;
+        require!(
+            case.decision == 2 && !case.finalized,
+            FbError::QuorumNotReached
+        );
+        require!(
+            ctx.accounts.claim.status == ClaimV2Status::Disputed,
+            FbError::InvalidClaimStatus
+        );
+        ctx.accounts.claim.status = ClaimV2Status::Rejected;
+        ctx.accounts.claim.updated_at = Clock::get()?.unix_timestamp;
+        case.finalized = true;
+        emit!(ClaimV2Rejected {
+            bounty: ctx.accounts.bounty.key(),
+            claim: ctx.accounts.claim.key(),
+        });
+        emit!(QuorumDisputeFinalized {
+            dispute_case: case.key(),
+            decision: 2,
+        });
         Ok(())
     }
 
@@ -755,6 +1013,8 @@ pub struct Bounty {
     /// 0/1 are legacy single-claim accounts; 2 uses finder-scoped ClaimV2 PDAs.
     /// Existing accounts have zeroed padding here, so upgrades remain readable.
     pub protocol_version: u8,
+    /// 0 = legacy single arbiter, 1 = configured 2-of-3 panel.
+    pub arbitration_mode: u8,
 }
 
 impl Bounty {
@@ -839,6 +1099,51 @@ pub struct ReturnAttestation {
     pub ai_score: u8,
     pub settled_at: i64,
     pub bump: u8,
+}
+
+#[account]
+pub struct ArbitrationPanel {
+    pub bounty: Pubkey,
+    pub arbiters: [Pubkey; 3],
+    pub quorum: u8,
+    pub bump: u8,
+    pub created_at: i64,
+}
+
+impl ArbitrationPanel {
+    pub const SPACE: usize = 8 + 32 + 32 * 3 + 1 + 1 + 8 + 32;
+}
+
+#[account]
+pub struct DisputeCase {
+    pub bounty: Pubkey,
+    pub claim: Pubkey,
+    pub panel: Pubkey,
+    pub release_votes: u8,
+    pub reject_votes: u8,
+    /// 0 = open, 1 = release, 2 = reject.
+    pub decision: u8,
+    pub finalized: bool,
+    pub bump: u8,
+    pub created_at: i64,
+    pub resolved_at: i64,
+}
+
+impl DisputeCase {
+    pub const SPACE: usize = 8 + 32 * 3 + 1 * 5 + 8 * 2 + 32;
+}
+
+#[account]
+pub struct ArbitrationVote {
+    pub dispute_case: Pubkey,
+    pub arbiter: Pubkey,
+    pub release_to_finder: bool,
+    pub bump: u8,
+    pub voted_at: i64,
+}
+
+impl ArbitrationVote {
+    pub const SPACE: usize = 8 + 32 * 2 + 1 + 1 + 8 + 16;
 }
 
 impl ReturnAttestation {
@@ -1340,6 +1645,179 @@ pub struct AttestSettlement<'info> {
     pub system_program: Program<'info, System>,
 }
 
+#[derive(Accounts)]
+pub struct ConfigureArbitrationPanel<'info> {
+    #[account(mut)]
+    pub owner: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump,
+        has_one = owner
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        init,
+        payer = owner,
+        space = ArbitrationPanel::SPACE,
+        seeds = [ARBITRATION_PANEL_SEED, bounty.key().as_ref()],
+        bump
+    )]
+    pub panel: Account<'info, ArbitrationPanel>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct OpenDisputeV3<'info> {
+    #[account(mut)]
+    pub signer: Signer<'info>,
+    #[account(
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        mut,
+        seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), claim.finder.as_ref()],
+        bump = claim.bump,
+        has_one = bounty
+    )]
+    pub claim: Account<'info, ClaimV2>,
+    #[account(
+        seeds = [ARBITRATION_PANEL_SEED, bounty.key().as_ref()],
+        bump = panel.bump,
+        has_one = bounty
+    )]
+    pub panel: Account<'info, ArbitrationPanel>,
+    #[account(
+        init,
+        payer = signer,
+        space = DisputeCase::SPACE,
+        seeds = [DISPUTE_CASE_SEED, claim.key().as_ref()],
+        bump
+    )]
+    pub dispute_case: Account<'info, DisputeCase>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct CastArbitrationVote<'info> {
+    #[account(mut)]
+    pub arbiter: Signer<'info>,
+    #[account(
+        seeds = [ARBITRATION_PANEL_SEED, panel.bounty.as_ref()],
+        bump = panel.bump
+    )]
+    pub panel: Account<'info, ArbitrationPanel>,
+    #[account(
+        mut,
+        seeds = [DISPUTE_CASE_SEED, dispute_case.claim.as_ref()],
+        bump = dispute_case.bump,
+        has_one = panel
+    )]
+    pub dispute_case: Account<'info, DisputeCase>,
+    #[account(address = dispute_case.claim)]
+    pub claim: Account<'info, ClaimV2>,
+    #[account(
+        init,
+        payer = arbiter,
+        space = ArbitrationVote::SPACE,
+        seeds = [ARBITRATION_VOTE_SEED, dispute_case.key().as_ref(), arbiter.key().as_ref()],
+        bump
+    )]
+    pub vote: Account<'info, ArbitrationVote>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeDisputeRelease<'info> {
+    #[account(mut)]
+    pub payer: Signer<'info>,
+    /// CHECK: constrained to the finder stored in ClaimV2.
+    pub finder: UncheckedAccount<'info>,
+    pub mint: Account<'info, Mint>,
+    #[account(
+        mut,
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump,
+        has_one = mint
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        mut,
+        seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), claim.finder.as_ref()],
+        bump = claim.bump,
+        has_one = bounty
+    )]
+    pub claim: Account<'info, ClaimV2>,
+    #[account(
+        seeds = [ARBITRATION_PANEL_SEED, bounty.key().as_ref()],
+        bump = panel.bump,
+        has_one = bounty
+    )]
+    pub panel: Account<'info, ArbitrationPanel>,
+    #[account(
+        mut,
+        seeds = [DISPUTE_CASE_SEED, claim.key().as_ref()],
+        bump = dispute_case.bump,
+        has_one = bounty,
+        has_one = claim,
+        has_one = panel
+    )]
+    pub dispute_case: Account<'info, DisputeCase>,
+    /// CHECK: PDA authority verified by seeds.
+    #[account(seeds = [VAULT_SEED, bounty.bounty_id.as_bytes()], bump = bounty.vault_bump)]
+    pub vault_authority: UncheckedAccount<'info>,
+    #[account(
+        mut,
+        associated_token::mint = mint,
+        associated_token::authority = vault_authority
+    )]
+    pub vault_token: Account<'info, TokenAccount>,
+    #[account(
+        init_if_needed,
+        payer = payer,
+        associated_token::mint = mint,
+        associated_token::authority = finder
+    )]
+    pub finder_token: Account<'info, TokenAccount>,
+    pub token_program: Program<'info, Token>,
+    pub associated_token_program: Program<'info, AssociatedToken>,
+    pub system_program: Program<'info, System>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeDisputeReject<'info> {
+    pub finalizer: Signer<'info>,
+    #[account(
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        mut,
+        seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), claim.finder.as_ref()],
+        bump = claim.bump,
+        has_one = bounty
+    )]
+    pub claim: Account<'info, ClaimV2>,
+    #[account(
+        seeds = [ARBITRATION_PANEL_SEED, bounty.key().as_ref()],
+        bump = panel.bump,
+        has_one = bounty
+    )]
+    pub panel: Account<'info, ArbitrationPanel>,
+    #[account(
+        mut,
+        seeds = [DISPUTE_CASE_SEED, claim.key().as_ref()],
+        bump = dispute_case.bump,
+        has_one = bounty,
+        has_one = claim,
+        has_one = panel
+    )]
+    pub dispute_case: Account<'info, DisputeCase>,
+}
+
 #[event]
 pub struct BountyCreated {
     pub bounty: Pubkey,
@@ -1426,6 +1904,39 @@ pub struct SettlementAttested {
 }
 
 #[event]
+pub struct ArbitrationPanelConfigured {
+    pub bounty: Pubkey,
+    pub panel: Pubkey,
+    pub arbiters: [Pubkey; 3],
+    pub quorum: u8,
+}
+
+#[event]
+pub struct QuorumDisputeOpened {
+    pub bounty: Pubkey,
+    pub claim: Pubkey,
+    pub dispute_case: Pubkey,
+    pub opened_by: Pubkey,
+}
+
+#[event]
+pub struct ArbitrationVoteCast {
+    pub dispute_case: Pubkey,
+    pub vote: Pubkey,
+    pub arbiter: Pubkey,
+    pub release_to_finder: bool,
+    pub release_votes: u8,
+    pub reject_votes: u8,
+    pub decision: u8,
+}
+
+#[event]
+pub struct QuorumDisputeFinalized {
+    pub dispute_case: Pubkey,
+    pub decision: u8,
+}
+
+#[event]
 pub struct ClaimAccepted {
     pub bounty: Pubkey,
     pub finder: Pubkey,
@@ -1503,6 +2014,22 @@ pub enum FbError {
     ProtocolVersionMismatch,
     #[msg("Settlement is not final")]
     SettlementNotFinal,
+    #[msg("This bounty requires 2-of-3 quorum arbitration")]
+    QuorumArbitrationRequired,
+    #[msg("Arbitration quorum must be 2-of-3")]
+    InvalidQuorum,
+    #[msg("Arbiter address is invalid")]
+    InvalidArbiter,
+    #[msg("Arbiters must be distinct wallets")]
+    DuplicateArbiter,
+    #[msg("A bounty party cannot arbitrate its own case")]
+    PartyCannotArbitrate,
+    #[msg("The original lead arbiter must remain on the panel")]
+    LeadArbiterRequired,
+    #[msg("This arbitration case is already resolved")]
+    CaseAlreadyResolved,
+    #[msg("The arbitration quorum has not reached this decision")]
+    QuorumNotReached,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -1546,6 +2073,7 @@ fn initialize_bounty(
     bounty.created_at = now;
     bounty.updated_at = now;
     bounty.protocol_version = 2;
+    bounty.arbitration_mode = 0;
 
     emit!(BountyCreated {
         bounty: bounty.key(),

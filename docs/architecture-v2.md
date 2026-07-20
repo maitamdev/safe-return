@@ -31,8 +31,9 @@ claims use a separate PDA so old bounty accounts do not need reallocating.
 Bounty PDA      = ["bounty", bounty_id]
 ClaimV2 PDA     = ["claim_v2", bounty_pubkey, finder_pubkey]
 Reputation PDA  = ["reputation", wallet_pubkey]
-Arbitration PDA = ["arbitration", claim_v2_pubkey]
-Vote PDA        = ["vote", arbitration_pubkey, arbiter_pubkey]
+Panel PDA       = ["arbitration_panel", bounty_pubkey]
+Dispute PDA     = ["dispute_case", claim_v2_pubkey]
+Vote PDA        = ["arbitration_vote", dispute_pubkey, arbiter_pubkey]
 ```
 
 ### ClaimV2
@@ -44,7 +45,7 @@ Vote PDA        = ["vote", arbitration_pubkey, arbiter_pubkey]
 - `ai_input_hash`: exact input bundle reviewed by AI
 - `ai_model_hash`: provider/model/prompt version commitment
 - `score`, `risk`, `decision`
-- `status`: Submitted, AiReviewed, Rejected, Disputed, Selected, Settled
+- `status`: Submitted, AiReviewed, Rejected, Disputed, Settled
 - `created_at`, `updated_at`, `bump`
 
 One wallet can create at most one claim for a bounty. Different wallets can
@@ -59,6 +60,18 @@ claim concurrently. Rejecting one claim never resets or deletes other claims.
 - AI state never authorizes a token transfer.
 - Refund transfers the full remaining vault balance after expiry.
 - Every mutable PDA is verified with canonical seeds and bump constraints.
+
+### Arbitration quorum
+
+- The bounty owner can configure one immutable panel before a dispute begins.
+- A panel contains three distinct wallets, includes the configured lead arbiter,
+  excludes the bounty owner, and always requires two matching votes.
+- Each vote is a finder-scoped PDA, so an arbiter can vote only once per case.
+- A finder who is also on the panel cannot vote on their own claim.
+- Reaching quorum records a decision but does not implicitly trust the caller;
+  finalization rechecks the case, claim, panel, bounty, mint and escrow PDAs.
+- Finalization is permissionless after quorum so no privileged server or single
+  arbiter can censor an already-authorized result.
 
 ## Canonical content commitments
 

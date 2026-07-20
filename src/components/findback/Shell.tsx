@@ -107,6 +107,11 @@ function transactionLabel(ix: string | null) {
     create_bounty_sponsored: "bounty được tài trợ phí",
     fund_bounty_sponsored: "escrow được tài trợ phí",
     submit_claim_v2_sponsored: "claim được tài trợ phí",
+    configure_arbitration_panel: "cấu hình hội đồng phân xử",
+    open_dispute_v3: "yêu cầu hội đồng phân xử",
+    cast_arbitration_vote: "phiếu phân xử on-chain",
+    finalize_dispute_release: "quyết định trả thưởng 2/3",
+    finalize_dispute_reject: "quyết định từ chối claim 2/3",
   };
   return ix ? labels[ix] ?? ix : "giao dịch";
 }
