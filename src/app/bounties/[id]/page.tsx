@@ -33,6 +33,7 @@ import {
   type OnChainBounty,
 } from "@/lib/findback/program";
 import type { ClaimMeta } from "@/lib/findback/store";
+import { workflowStatusLabel } from "@/lib/findback/workflow";
 
 const flow = ["Draft", "Funded", "ClaimSubmitted", "AiReviewed", "Released"];
 
@@ -49,6 +50,8 @@ export default function BountyDetailPage() {
     accept,
     reject,
     dispute,
+    finalizeRejection,
+    timeoutDispute,
     refund,
     cancel,
     txState,
@@ -61,6 +64,12 @@ export default function BountyDetailPage() {
   const [chainError, setChainError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [nowUnix, setNowUnix] = useState(() => Date.now() / 1000);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => setNowUnix(Date.now() / 1000), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -106,7 +115,7 @@ export default function BountyDetailPage() {
       ? [meta.claim]
       : [];
   const activeClaims = claims.filter((claim) =>
-    ["claim_submitted", "ai_reviewed", "disputed", "ClaimSubmitted", "AiReviewed", "Disputed"].includes(
+    ["claim_submitted", "ai_reviewed", "ClaimSubmitted", "AiReviewed"].includes(
       claim.status || "claim_submitted",
     ),
   );
@@ -331,7 +340,9 @@ export default function BountyDetailPage() {
             )}
             {isOwner &&
               onchain &&
-              ["Funded", "ClaimSubmitted", "AiReviewed"].includes(status) && (
+              onchain.status === "Funded" &&
+              nowUnix > onchain.deadline &&
+              onchain.activeClaims === 0 && (
                 <button
                   type="button"
                   disabled={busy || txState === "pending"}
@@ -341,6 +352,13 @@ export default function BountyDetailPage() {
                   Yêu cầu hoàn tiền khi hết hạn
                 </button>
               )}
+            {isOwner &&
+            onchain?.status === "Funded" &&
+            nowUnix <= onchain.deadline ? (
+              <p className="rounded-xl border border-line bg-bg-deep px-3 py-2 text-xs leading-5 text-ink-muted">
+                Escrow chỉ được hoàn sau ngày hết hạn và khi không còn bằng chứng đang xử lý.
+              </p>
+            ) : null}
           </div>
           {isOwner &&
           onchain &&
@@ -410,6 +428,12 @@ export default function BountyDetailPage() {
           onAccept={(claim) => void run(() => accept(id, claim.finderWallet))}
           onReject={(claim) => void run(() => reject(id, claim.finderWallet))}
           onDispute={(claim) => void run(() => dispute(id, claim.finderWallet))}
+          onFinalizeRejection={(claim) =>
+            void run(() => finalizeRejection(id, claim.finderWallet!))
+          }
+          onTimeoutDispute={(claim) =>
+            void run(() => timeoutDispute(id, claim.finderWallet!))
+          }
         />
       )}
       {error && (
@@ -434,6 +458,8 @@ function ClaimsSection({
   onAccept,
   onReject,
   onDispute,
+  onFinalizeRejection,
+  onTimeoutDispute,
 }: {
   bountyId: string;
   claims: ClaimMeta[];
@@ -444,6 +470,8 @@ function ClaimsSection({
   onAccept: (claim: ClaimMeta) => void;
   onReject: (claim: ClaimMeta) => void;
   onDispute: (claim: ClaimMeta) => void;
+  onFinalizeRejection: (claim: ClaimMeta) => void;
+  onTimeoutDispute: (claim: ClaimMeta) => void;
 }) {
   return (
     <section className="mt-10" aria-labelledby="claims-title">
@@ -487,7 +515,11 @@ function ClaimsSection({
                     </span>
                   </span>
                   <span className="rounded-lg border border-line bg-bg-deep px-2.5 py-1 text-xs font-bold text-ink-soft">
-                    {claim.aiReport ? "AI đã đánh giá" : "Đang chờ kiểm tra"}
+                    {claim.workflowStatus
+                      ? workflowStatusLabel(claim.workflowStatus)
+                      : claim.aiReport
+                        ? "AI đã đánh giá"
+                        : "Đang chờ kiểm tra"}
                   </span>
                 </div>
                 <p className="mt-4 text-sm leading-6 text-ink">
@@ -565,6 +597,10 @@ function ClaimsSection({
                     onAccept={() => onAccept(claim)}
                     onReject={() => onReject(claim)}
                     onDispute={() => onDispute(claim)}
+                    disputeDeadline={claim.disputeDeadline}
+                    resolutionDeadline={claim.resolutionDeadline}
+                    onFinalizeRejection={() => onFinalizeRejection(claim)}
+                    onTimeoutDispute={() => onTimeoutDispute(claim)}
                   />
                 ) : (
                   <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">Bằng chứng cũ chưa có mã riêng nên chưa thể mở trao đổi realtime.</p>

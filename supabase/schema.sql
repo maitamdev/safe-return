@@ -111,6 +111,16 @@ create table if not exists public.claims (
   updated_at timestamptz not null default now()
 );
 alter table public.claims add column if not exists workflow_status text not null default 'awaiting_review';
+alter table public.claims add column if not exists dispute_deadline timestamptz;
+alter table public.claims add column if not exists resolution_deadline timestamptz;
+alter table public.claims drop constraint if exists claims_workflow_status_check;
+alter table public.claims add constraint claims_workflow_status_check check (
+  workflow_status in (
+    'awaiting_review', 'more_info_requested', 'handover_proposed',
+    'handover_scheduled', 'finder_delivered', 'settled', 'rejected',
+    'rejection_pending', 'disputed'
+  )
+);
 create index if not exists claims_finder_idx on public.claims (finder_id);
 create unique index if not exists claims_bounty_finder_unique on public.claims (bounty_id, finder_wallet);
 alter table public.claims enable row level security;
@@ -151,9 +161,48 @@ create table if not exists public.claim_handovers (
   accepted_at timestamptz,
   finder_delivered_at timestamptz,
   owner_received_at timestamptz,
+  version bigint not null default 0,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.claim_handovers add column if not exists version bigint not null default 0;
+
+create table if not exists public.claim_notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users (id) on delete cascade,
+  claim_id uuid references public.claims (id) on delete cascade,
+  bounty_id text references public.bounties (id) on delete cascade,
+  kind text not null check (kind in (
+    'claim_submitted', 'message', 'info_requested', 'handover_proposed',
+    'handover_accepted', 'handover_cancelled', 'finder_delivered',
+    'rejection_pending', 'disputed', 'settled', 'rejected'
+  )),
+  title text not null check (char_length(title) between 1 and 120),
+  body text not null default '' check (char_length(body) <= 300),
+  dedupe_key text,
+  read_at timestamptz,
+  created_at timestamptz not null default now()
+);
+alter table public.claim_notifications add column if not exists dedupe_key text;
+create unique index if not exists claim_notifications_dedupe_idx
+  on public.claim_notifications (dedupe_key) where dedupe_key is not null;
+create index if not exists claim_notifications_user_created_idx
+  on public.claim_notifications (user_id, created_at desc);
+create index if not exists claim_notifications_user_unread_idx
+  on public.claim_notifications (user_id, created_at desc) where read_at is null;
+alter table public.claim_notifications enable row level security;
+drop policy if exists "Users read own claim notifications" on public.claim_notifications;
+create policy "Users read own claim notifications" on public.claim_notifications
+  for select to authenticated using (user_id = auth.uid());
+revoke insert, update, delete on public.claim_notifications from authenticated;
+grant select on public.claim_notifications to authenticated;
+
+create table if not exists public.api_rate_limits (
+  bucket_key text primary key,
+  request_count integer not null,
+  reset_at timestamptz not null
+);
+revoke all on public.api_rate_limits from anon, authenticated;
 
 create index if not exists claim_messages_claim_created_idx on public.claim_messages (claim_id, created_at);
 create index if not exists claim_handovers_bounty_idx on public.claim_handovers (bounty_id, updated_at desc);
@@ -184,6 +233,7 @@ alter table public.bounties replica identity full;
 alter table public.claims replica identity full;
 alter table public.claim_messages replica identity full;
 alter table public.claim_handovers replica identity full;
+alter table public.claim_notifications replica identity full;
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
@@ -210,6 +260,12 @@ begin
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'claim_handovers'
     ) then
       alter publication supabase_realtime add table public.claim_handovers;
+    end if;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'claim_notifications'
+    ) then
+      alter publication supabase_realtime add table public.claim_notifications;
     end if;
   end if;
 end;

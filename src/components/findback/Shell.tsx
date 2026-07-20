@@ -19,6 +19,7 @@ import { TokenBalances } from "@/components/wallet/TokenBalances";
 import { UserMenu } from "@/components/auth/UserMenu";
 import { useFindBack } from "@/lib/findback/provider";
 import { cn } from "@/lib/cn";
+import { NotificationsButton } from "@/components/findback/NotificationsButton";
 
 const nav = [
   { href: "/bounties", label: "Danh sách", icon: MagnifyingGlass },
@@ -35,16 +36,26 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let cancelled = false;
-    fetch("/api/arbitration/cases", { cache: "no-store" })
-      .then(async (response) => response.ok ? response.json() as Promise<{ canArbitrate?: boolean }> : null)
-      .then((result) => {
-        if (!cancelled) setCanArbitrate(Boolean(result?.canArbitrate));
-      })
-      .catch(() => {
-        if (!cancelled) setCanArbitrate(false);
-      });
-    return () => { cancelled = true; };
-  }, []);
+    const load = () => {
+      fetch("/api/arbitration/cases", { cache: "no-store" })
+        .then(async (response) => response.ok ? response.json() as Promise<{ canArbitrate?: boolean }> : null)
+        .then((result) => {
+          if (!cancelled) setCanArbitrate(Boolean(result?.canArbitrate));
+        })
+        .catch(() => {
+          if (!cancelled) setCanArbitrate(false);
+        });
+    };
+    load();
+    const onWalletVerified = () => load();
+    window.addEventListener("safereturn:wallet-verified", onWalletVerified);
+    const poll = window.setInterval(load, 30_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(poll);
+      window.removeEventListener("safereturn:wallet-verified", onWalletVerified);
+    };
+  }, [pathname]);
 
   const visibleNav = nav.filter((item) => item.href !== "/bounties/arbitration" || canArbitrate);
 
@@ -60,7 +71,7 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
             </div>
           </Link>
 
-          <nav className="mx-auto hidden shrink-0 items-center gap-0.5 lg:flex" aria-label="Điều hướng chính">
+          <nav className="mx-auto hidden shrink-0 items-center gap-0.5 xl:flex" aria-label="Điều hướng chính">
             {visibleNav.map((item) => {
               const active = item.href === "/bounties" ? pathname === item.href : item.href !== "/" && pathname.startsWith(item.href);
               return (
@@ -77,11 +88,12 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
               <NetworkBadge showBalance={false} />
               <TokenBalances />
             </div>
+            <NotificationsButton />
             <UserMenu />
             <ConnectWalletButton compact />
           </div>
         </div>
-        <div className="border-t border-line bg-bg-elevated lg:hidden">
+        <div className="border-t border-line bg-bg-elevated xl:hidden">
           <div className="mx-auto flex max-w-[1440px] items-center justify-between gap-3 px-4 py-2 sm:px-6 lg:px-8">
             <NetworkBadge showBalance={false} />
             <TokenBalances />
@@ -99,7 +111,7 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
 
       <main className="mx-auto w-full max-w-7xl px-4 py-6 pb-24 sm:px-6 md:py-10 lg:px-8 lg:pb-12">{children}</main>
 
-      <nav className={`fixed inset-x-0 bottom-0 z-30 grid ${canArbitrate ? "grid-cols-5" : "grid-cols-4"} border-t border-line bg-bg-elevated/98 px-1 py-1.5 shadow-[0_-8px_30px_rgba(28,52,41,0.08)] backdrop-blur-lg lg:hidden`} aria-label="Điều hướng di động">
+      <nav className={`fixed inset-x-0 bottom-0 z-30 grid ${canArbitrate ? "grid-cols-5" : "grid-cols-4"} border-t border-line bg-bg-elevated/98 px-1 py-1.5 shadow-[0_-8px_30px_rgba(28,52,41,0.08)] backdrop-blur-lg xl:hidden`} aria-label="Điều hướng di động">
         {visibleNav.map((item) => {
           const active = item.href === "/bounties" ? pathname === item.href : item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
           return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold", active ? "bg-mint-soft text-forest" : "text-ink-muted")}><item.icon size={20} weight={active ? "fill" : "regular"} />{item.label}</Link>;

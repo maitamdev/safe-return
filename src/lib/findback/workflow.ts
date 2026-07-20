@@ -6,6 +6,7 @@ export const CLAIM_WORKFLOW_STATUSES = [
   "finder_delivered",
   "settled",
   "rejected",
+  "rejection_pending",
   "disputed",
 ] as const;
 
@@ -63,7 +64,9 @@ export function cleanWorkflowText(value: unknown, maxLength: number) {
 }
 
 export function canMutateWorkflow(status: ClaimWorkflowStatus) {
-  return !(["settled", "rejected", "disputed"] as ClaimWorkflowStatus[]).includes(status);
+  return !(
+    ["settled", "rejected", "rejection_pending", "disputed"] as ClaimWorkflowStatus[]
+  ).includes(status);
 }
 
 export function workflowStatusLabel(status: ClaimWorkflowStatus) {
@@ -75,6 +78,7 @@ export function workflowStatusLabel(status: ClaimWorkflowStatus) {
     finder_delivered: "Người tìm thấy đã xác nhận giao",
     settled: "Đã nhận đồ và trả thưởng",
     rejected: "Bằng chứng đã bị từ chối",
+    rejection_pending: "Đang trong thời hạn phản hồi",
     disputed: "Đang được phân xử",
   };
   return labels[status];

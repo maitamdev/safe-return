@@ -34,6 +34,10 @@ type Props = {
   onAccept: () => void;
   onReject: () => void;
   onDispute: () => void;
+  disputeDeadline?: number | null;
+  resolutionDeadline?: number | null;
+  onFinalizeRejection: () => void;
+  onTimeoutDispute: () => void;
 };
 
 type ConfirmAction = "reward" | "reject" | "dispute" | null;
@@ -49,6 +53,10 @@ export function ClaimWorkflowPanel({
   onAccept,
   onReject,
   onDispute,
+  disputeDeadline,
+  resolutionDeadline,
+  onFinalizeRejection,
+  onTimeoutDispute,
 }: Props) {
   const [workflow, setWorkflow] = useState<ClaimWorkflow | null>(null);
   const [loading, setLoading] = useState(true);
@@ -60,6 +68,7 @@ export function ClaimWorkflowPanel({
   const [meetingLocation, setMeetingLocation] = useState("");
   const [note, setNote] = useState("");
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
     try {
@@ -110,6 +119,11 @@ export function ClaimWorkflowPanel({
     };
   }, [claimId, load]);
 
+  useEffect(() => {
+    const timer = window.setInterval(() => setNow(Date.now()), 30_000);
+    return () => window.clearInterval(timer);
+  }, []);
+
   const mutate = useCallback(
     async (action: ClaimWorkflowAction) => {
       setActionBusy(true);
@@ -148,10 +162,15 @@ export function ClaimWorkflowPanel({
       setError("Hãy chọn thời gian và nhập địa điểm hẹn.");
       return;
     }
+    const parsedSchedule = new Date(scheduledAt);
+    if (!Number.isFinite(parsedSchedule.getTime())) {
+      setError("Thời gian hẹn không hợp lệ.");
+      return;
+    }
     if (
       await mutate({
         action: "propose_handover",
-        scheduledAt,
+        scheduledAt: parsedSchedule.toISOString(),
         meetingLocation: meetingLocation.trim(),
         note: note.trim(),
       })
@@ -181,6 +200,10 @@ export function ClaimWorkflowPanel({
     (!chainStatus || ["claim_submitted", "ai_reviewed", "ClaimSubmitted", "AiReviewed"].includes(chainStatus));
   const active = workflow ? canMutateWorkflow(workflow.status) && chainActive : false;
   const locked = busy || actionBusy;
+  const rejectionExpired = Boolean(disputeDeadline && now > disputeDeadline);
+  const resolutionExpired = Boolean(
+    resolutionDeadline && now > resolutionDeadline,
+  );
 
   const statusTone = useMemo(() => {
     if (!workflow) return "border-line bg-bg-deep text-ink-soft";
@@ -210,7 +233,7 @@ export function ClaimWorkflowPanel({
 
       {error ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-900" role="alert">{error}</p> : null}
 
-      {workflow && active ? (
+      {workflow ? (
         <>
           <section className="mt-5" aria-labelledby={`handover-${claimId}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -218,7 +241,7 @@ export function ClaimWorkflowPanel({
                 <h3 id={`handover-${claimId}`} className="text-sm font-bold">Hẹn giao đồ an toàn</h3>
                 <p className="mt-1 text-xs leading-5 text-ink-muted">Lịch hẹn chỉ hiển thị cho hai bên.</p>
               </div>
-              {(!handover || handover.status === "cancelled") && !showProposal ? (
+              {active && (!handover || handover.status === "cancelled") && !showProposal ? (
                 <button type="button" disabled={locked} onClick={() => setShowProposal(true)} className="app-button-secondary min-h-10 py-2 text-xs">
                   <CalendarBlank size={16} aria-hidden /> Đề xuất lịch hẹn
                 </button>
@@ -242,11 +265,11 @@ export function ClaimWorkflowPanel({
                 </dl>
                 {handover.note ? <p className="mt-3 text-xs leading-5 text-ink-soft">{handover.note}</p> : null}
                 <div className="mt-4 flex flex-wrap gap-2">
-                  {canAcceptProposal ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "accept_handover" })} className="app-button-primary min-h-10 py-2 text-xs"><CheckCircle size={16} aria-hidden /> Xác nhận lịch này</button> : null}
+                  {active && canAcceptProposal ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "accept_handover" })} className="app-button-primary min-h-10 py-2 text-xs"><CheckCircle size={16} aria-hidden /> Xác nhận lịch này</button> : null}
                   {handover.status === "proposed" && handover.proposedByMe ? <span className="inline-flex min-h-10 items-center text-xs font-semibold text-amber-800">Đang chờ bên còn lại xác nhận</span> : null}
-                  {canMarkDelivered ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "mark_delivered" })} className="app-button-primary min-h-10 py-2 text-xs"><Package size={16} aria-hidden /> Tôi đã giao đồ</button> : null}
+                  {active && canMarkDelivered ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "mark_delivered" })} className="app-button-primary min-h-10 py-2 text-xs"><Package size={16} aria-hidden /> Tôi đã giao đồ</button> : null}
                   {handover.status === "accepted" && !handover.finderDeliveredAt && workflow.role === "owner" ? <span className="inline-flex min-h-10 items-center text-xs font-semibold text-ink-soft">Chờ người tìm thấy xác nhận giao đồ</span> : null}
-                  {!handover.finderDeliveredAt ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "cancel_handover" })} className="app-button-secondary min-h-10 py-2 text-xs">Hủy lịch</button> : null}
+                  {active && !handover.finderDeliveredAt ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "cancel_handover" })} className="app-button-secondary min-h-10 py-2 text-xs">Hủy lịch</button> : null}
                 </div>
               </div>
             ) : null}
@@ -265,21 +288,55 @@ export function ClaimWorkflowPanel({
                   <div key={item.id} className={`flex ${item.mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-5 ${item.mine ? "bg-forest text-white" : "border border-line bg-bg-deep text-ink"}`}><p>{item.body}</p><time className={`mt-1 block text-[10px] ${item.mine ? "text-white/70" : "text-ink-muted"}`}>{formatTime(item.createdAt)}</time></div></div>
                 )) : <p className="py-5 text-center text-xs text-ink-muted">Chưa có tin nhắn. Hãy trao đổi trước khi hẹn giao đồ.</p>}
               </div>
-              <div className="mt-3 flex gap-2"><label className="sr-only" htmlFor={`message-${claimId}`}>Tin nhắn riêng</label><textarea id={`message-${claimId}`} className="app-input min-h-11 flex-1 resize-none py-2.5 text-sm" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1200} placeholder="Nhập tin nhắn riêng" /><button type="button" disabled={locked || !message.trim()} onClick={() => void sendMessage()} className="app-button-primary min-h-11 shrink-0 px-4" aria-label="Gửi tin nhắn"><PaperPlaneTilt size={18} aria-hidden /></button></div>
+              {active ? (
+                <div className="mt-3 flex gap-2"><label className="sr-only" htmlFor={`message-${claimId}`}>Tin nhắn riêng</label><textarea id={`message-${claimId}`} className="app-input min-h-11 flex-1 resize-none py-2.5 text-sm" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1200} placeholder="Nhập tin nhắn riêng" /><button type="button" disabled={locked || !message.trim()} onClick={() => void sendMessage()} className="app-button-primary min-h-11 shrink-0 px-4" aria-label="Gửi tin nhắn"><PaperPlaneTilt size={18} aria-hidden /></button></div>
+              ) : (
+                <p className="mt-3 text-xs leading-5 text-ink-muted">Cuộc trao đổi đã đóng. Lịch sử vẫn được giữ để hai bên đối chiếu.</p>
+              )}
             </div>
           </details>
 
-          <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {active ? <div className="mt-5 grid gap-2 sm:grid-cols-2">
             {!hasAiReport && chainActive ? <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full"><Robot size={17} aria-hidden /> Kiểm tra bằng AI</button> : null}
             {workflow.role === "owner" && ["awaiting_review", "more_info_requested"].includes(workflow.status) ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "request_info" })} className="app-button-secondary w-full"><ChatCircleText size={17} aria-hidden /> Yêu cầu bổ sung</button> : null}
             {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> Đã nhận đúng đồ, trả {rewardUi} FIND</button> : null}
             {workflow.role === "owner" && chainActive && !handover?.finderDeliveredAt ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
-          </div>
+          </div> : null}
 
-          <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70">
+          {active ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70">
             <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold text-amber-900"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất?</span></summary>
             <div className="border-t border-amber-200 p-4"><p className="text-xs leading-5 text-amber-900">Chỉ mở tranh chấp khi hai bên bất đồng về việc giao đồ hoặc trả thưởng. Phần thưởng sẽ tiếp tục bị khóa để trọng tài xem xét.</p><button type="button" disabled={locked || !chainActive} onClick={() => setConfirmAction("dispute")} className="app-button-secondary mt-3 min-h-10 border-amber-300 py-2 text-xs text-amber-950"><Gavel size={16} aria-hidden /> Mở tranh chấp</button></div>
-          </details>
+          </details> : null}
+
+          {workflow.status === "rejection_pending" ? (
+            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+              <p className="text-sm font-bold">Chủ đồ đã yêu cầu từ chối bằng chứng</p>
+              <p className="mt-1 text-xs leading-5">
+                Người tìm thấy có thể mở tranh chấp trước {formatDeadline(disputeDeadline)}.
+                Sau thời điểm đó, bất kỳ bên nào cũng có thể hoàn tất việc từ chối trên Devnet.
+              </p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                {workflow.role === "finder" && !rejectionExpired ? (
+                  <button type="button" disabled={locked} onClick={onDispute} className="app-button-secondary min-h-10 py-2 text-xs"><Gavel size={16} aria-hidden /> Mở tranh chấp</button>
+                ) : null}
+                {rejectionExpired ? (
+                  <button type="button" disabled={locked} onClick={onFinalizeRejection} className="app-button-primary min-h-10 py-2 text-xs"><CheckCircle size={16} aria-hidden /> Hoàn tất từ chối</button>
+                ) : null}
+              </div>
+            </div>
+          ) : null}
+
+          {workflow.status === "disputed" ? (
+            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-950">
+              <p className="text-sm font-bold">Phần thưởng đang được khóa để phân xử</p>
+              <p className="mt-1 text-xs leading-5">
+                Hạn xử lý: {formatDeadline(resolutionDeadline)}. Nếu hội đồng không đưa ra quyết định đúng hạn, claim được từ chối và tin được mở lại.
+              </p>
+              {resolutionExpired ? (
+                <button type="button" disabled={locked} onClick={onTimeoutDispute} className="app-button-secondary mt-3 min-h-10 py-2 text-xs"><Clock size={16} aria-hidden /> Kết thúc tranh chấp quá hạn</button>
+              ) : null}
+            </div>
+          ) : null}
         </>
       ) : null}
 
@@ -297,12 +354,21 @@ export function ClaimWorkflowPanel({
 function nextStepCopy(workflow: ClaimWorkflow) {
   if (workflow.status === "settled") return "FIND đã được chuyển từ escrow và bằng chứng hoàn trả đã được ghi trên Solana.";
   if (workflow.status === "rejected") return "Tin vẫn tiếp tục nhận bằng chứng khác cho đến khi hết hạn.";
+  if (workflow.status === "rejection_pending") return "Phần thưởng vẫn được khóa trong thời hạn để người tìm thấy phản hồi hoặc mở tranh chấp.";
   if (workflow.status === "disputed") return "Hai bên chờ trọng tài được phân công đưa ra quyết định.";
   if (workflow.status === "finder_delivered") return workflow.role === "owner" ? "Kiểm tra đồ trực tiếp, sau đó xác nhận nhận đồ để trả thưởng." : "Chờ chủ đồ kiểm tra và ký giao dịch trả thưởng.";
   if (workflow.status === "handover_scheduled") return "Gặp tại nơi công cộng và chỉ xác nhận sau khi việc giao đồ thật sự diễn ra.";
   if (workflow.status === "handover_proposed") return workflow.handover?.proposedByMe ? "Bên còn lại chưa xác nhận đề xuất." : "Kiểm tra thời gian, địa điểm rồi xác nhận hoặc trao đổi lại.";
   if (workflow.status === "more_info_requested") return workflow.role === "finder" ? "Chủ đồ cần thêm thông tin. Hãy trả lời trong trao đổi riêng." : "Đang chờ người tìm thấy bổ sung thông tin.";
   return workflow.role === "owner" ? "Đối chiếu bằng chứng, trao đổi riêng rồi đề xuất lịch giao đồ." : "Chờ chủ đồ kiểm tra. Bạn có thể chủ động nhắn tin hoặc đề xuất lịch giao.";
+}
+
+function formatDeadline(value?: number | null) {
+  if (!value || !Number.isFinite(value)) return "chưa xác định";
+  return new Intl.DateTimeFormat("vi-VN", {
+    dateStyle: "medium",
+    timeStyle: "short",
+  }).format(new Date(value));
 }
 
 function confirmTitle(action: Exclude<ConfirmAction, null>, rewardUi: number) {

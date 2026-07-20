@@ -54,9 +54,6 @@ export async function GET(req: Request) {
       ]);
     if (profileError) throw new Error(profileError.message);
     if (listingError) throw new Error(listingError.message);
-    if (!profile?.wallet_pubkey || !profile.wallet_verified_at) {
-      throw new ApiError(403, "Hãy xác minh ví trước khi xem ảnh trong Evidence Vault.");
-    }
     if (!listing) throw new ApiError(404, "Không tìm thấy bounty.");
 
     const onchain = await fetchBounty(bountyId);
@@ -91,6 +88,9 @@ export async function GET(req: Request) {
         throw new ApiError(409, "Metadata ảnh không khớp commitment trên Devnet.");
       }
     } else {
+      if (!profile?.wallet_pubkey || !profile.wallet_verified_at) {
+        throw new ApiError(403, "Hãy xác minh ví trước khi xem bằng chứng riêng tư.");
+      }
       if (!claimId) throw new ApiError(400, "Thiếu mã claim cần xem.");
       const { data: claim, error: claimError } = await admin
         .from("claims")

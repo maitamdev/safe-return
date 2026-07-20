@@ -16,10 +16,12 @@ describe("claim workflow helpers", () => {
     expect(canMutateWorkflow("finder_delivered")).toBe(true);
     expect(canMutateWorkflow("settled")).toBe(false);
     expect(canMutateWorkflow("rejected")).toBe(false);
+    expect(canMutateWorkflow("rejection_pending")).toBe(false);
     expect(canMutateWorkflow("disputed")).toBe(false);
   });
 
   it("uses plain Vietnamese labels", () => {
     expect(workflowStatusLabel("handover_scheduled")).toBe("Đã thống nhất lịch giao đồ");
+    expect(workflowStatusLabel("rejection_pending")).toBe("Đang trong thời hạn phản hồi");
   });
 });
