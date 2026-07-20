@@ -1,6 +1,7 @@
 import type { PublicSafeTag } from "@/lib/tags/types";
 import { ApiError, apiErrorResponse, enforceRateLimit } from "@/lib/server/api-security";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { isSafeTagCode, requestIp } from "@/lib/tags/security";
 
 export const runtime = "nodejs";
 
@@ -10,10 +11,10 @@ export async function GET(
 ) {
   try {
     const { code } = await context.params;
-    if (!/^[A-Za-z0-9_-]{20,32}$/.test(code)) {
+    if (!isSafeTagCode(code)) {
       throw new ApiError(404, "SafeTag không hợp lệ.");
     }
-    enforceRateLimit(`safe-tag-public:${clientIp(req)}:${code}`, {
+    enforceRateLimit(`safe-tag-public:${requestIp(req)}:${code}`, {
       limit: 40,
       windowMs: 60_000,
     });
@@ -37,8 +38,4 @@ export async function GET(
   } catch (error) {
     return apiErrorResponse(error);
   }
-}
-
-function clientIp(req: Request) {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || "unknown";
 }

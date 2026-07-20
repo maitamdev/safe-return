@@ -1,5 +1,5 @@
-import { randomBytes } from "node:crypto";
 import type { SafeTag, SafeTagReportStatus, SafeTagStatus } from "@/lib/tags/types";
+import { cleanSafeTagText, createSafeTagCode } from "@/lib/tags/security";
 import {
   ApiError,
   apiErrorResponse,
@@ -68,8 +68,8 @@ export async function POST(req: Request) {
     const user = await requireApiUser();
     enforceRateLimit(`safe-tag-create:${user.id}`, { limit: 8, windowMs: 60_000 });
     const body = (await req.json()) as { label?: string; publicNote?: string };
-    const label = cleanText(body.label, 80);
-    const publicNote = cleanText(body.publicNote, 240);
+    const label = cleanSafeTagText(body.label, 80);
+    const publicNote = cleanSafeTagText(body.publicNote, 240);
     if (!label) throw new ApiError(400, "Hãy nhập tên đồ vật cho SafeTag.");
 
     const admin = createAdminClient();
@@ -98,7 +98,7 @@ export async function POST(req: Request) {
     const row = {
       owner_id: user.id,
       owner_wallet: profile.wallet_pubkey,
-      public_code: randomBytes(18).toString("base64url"),
+      public_code: createSafeTagCode(),
       label,
       public_note: publicNote,
       status: "active" satisfies SafeTagStatus,
@@ -174,10 +174,6 @@ export async function PATCH(req: Request) {
   } catch (error) {
     return apiErrorResponse(error);
   }
-}
-
-function cleanText(value: unknown, max: number) {
-  return typeof value === "string" ? value.trim().replace(/\s+/g, " ").slice(0, max) : "";
 }
 
 function toSafeTag(tag: TagRow, reports: ReportRow[]): SafeTag {
