@@ -21,6 +21,7 @@ import {
   castArbitrationVoteOnChain,
   configureArbitrationPanelOnChain,
   createBountyOnChain,
+  createBountyV2OnChain,
   fetchBounty,
   fundBountyOnChain,
   finalizeDisputeRejectOnChain,
@@ -363,8 +364,8 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
                 metadataHashHex,
               })
             )
-          : await runTx("create_bounty", () =>
-              createBountyOnChain(w, {
+          : await runTx(useV2 ? "create_bounty_v2" : "create_bounty", () =>
+              (useV2 ? createBountyV2OnChain : createBountyOnChain)(w, {
                 bountyId: input.id,
                 rewardUi: input.rewardUi,
                 deadlineUnix,

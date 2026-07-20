@@ -25,6 +25,7 @@ import {
   toAtomic,
   explorerTxUrl,
 } from "./config";
+import { withRpcReadRetry } from "@/lib/solana/rpc-read";
 
 export const PROGRAM_PK = new PublicKey(FINDBACK_PROGRAM_ID);
 export const BOUNTY_SEED = Buffer.from("bounty");
@@ -39,6 +40,7 @@ export const ARBITRATION_VOTE_SEED = Buffer.from("arbitration_vote");
 /** sha256("global:<name>")[0..8] */
 export const IX = {
   create_bounty: Buffer.from([122, 90, 14, 143, 8, 125, 200, 2]),
+  create_bounty_v2: Buffer.from([251, 239, 2, 223, 130, 60, 86, 29]),
   fund_bounty: Buffer.from([36, 148, 139, 239, 172, 37, 58, 255]),
   submit_claim: Buffer.from([163, 108, 111, 46, 220, 82, 77, 212]),
   record_ai_review: Buffer.from([124, 116, 24, 236, 214, 167, 231, 54]),
@@ -215,8 +217,24 @@ export type OnChainArbitrationVote = {
   votedAt: number;
 };
 
+const CONNECTIONS = new Map<Commitment, Connection>();
+
 export function getConnection(commitment: Commitment = "confirmed") {
-  return new Connection(SOLANA_RPC, commitment);
+  const existing = CONNECTIONS.get(commitment);
+  if (existing) return existing;
+  const connection = new Connection(SOLANA_RPC, {
+    commitment,
+    disableRetryOnRateLimit: false,
+    confirmTransactionInitialTimeout: 60_000,
+  });
+  CONNECTIONS.set(commitment, connection);
+  return connection;
+}
+
+async function readAccountInfo(address: PublicKey) {
+  return withRpcReadRetry(() =>
+    getConnection().getAccountInfo(address, "confirmed"),
+  );
 }
 
 export function requireMint(): PublicKey {
@@ -519,7 +537,7 @@ async function ensureAtaIx(
   mint: PublicKey,
 ): Promise<TransactionInstruction | null> {
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
-  const info = await connection.getAccountInfo(ata);
+  const info = await withRpcReadRetry(() => connection.getAccountInfo(ata));
   if (info) return null;
   return createAssociatedTokenAccountInstruction(payer, ata, owner, mint);
 }
@@ -557,6 +575,41 @@ export async function createBountyOnChain(
     data,
   });
   return sendIx(wallet, [ix], "create_bounty");
+}
+
+export async function createBountyV2OnChain(
+  wallet: WalletLike,
+  args: {
+    bountyId: string;
+    rewardUi: number;
+    deadlineUnix: number;
+    metadataHash: Uint8Array;
+  },
+) {
+  const mint = requireMint();
+  const arbiter = requireArbiter();
+  const [bounty] = bountyPda(args.bountyId);
+  const [vaultAuth] = vaultAuthorityPda(args.bountyId);
+  const data = Buffer.concat([
+    IX.create_bounty_v2,
+    encodeString(args.bountyId),
+    encodeU64(toAtomic(args.rewardUi)),
+    encodeI64(args.deadlineUnix),
+    encodeBytes32(args.metadataHash),
+  ]);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: arbiter, isSigner: false, isWritable: false },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: vaultAuth, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+  return sendIx(wallet, [ix], "create_bounty_v2");
 }
 
 export async function fundBountyOnChain(
@@ -1430,7 +1483,7 @@ export async function fetchArbitrationPanel(
   bountyId: string
 ): Promise<OnChainArbitrationPanel | null> {
   const [pda] = arbitrationPanelPda(bountyId);
-  const info = await getConnection().getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeArbitrationPanelAccount(Buffer.from(info.data));
   if (!decoded) return null;
@@ -1443,7 +1496,7 @@ export async function fetchDisputeCase(
   finder: PublicKey
 ): Promise<OnChainDisputeCase | null> {
   const [pda] = disputeCasePda(bountyId, finder);
-  const info = await getConnection().getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeDisputeCaseAccount(Buffer.from(info.data));
   if (!decoded) return null;
@@ -1457,7 +1510,7 @@ export async function fetchArbitrationVote(
   arbiter: PublicKey
 ): Promise<OnChainArbitrationVote | null> {
   const [pda] = arbitrationVotePda(bountyId, finder, arbiter);
-  const info = await getConnection().getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeArbitrationVoteAccount(Buffer.from(info.data));
   if (!decoded) return null;
@@ -1468,9 +1521,8 @@ export async function fetchArbitrationVote(
 export async function fetchReputation(
   wallet: PublicKey,
 ): Promise<OnChainReputation | null> {
-  const connection = getConnection();
   const [pda] = reputationPda(wallet);
-  const info = await connection.getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeReputationAccount(Buffer.from(info.data));
   if (!decoded) return null;
@@ -1482,9 +1534,8 @@ export async function fetchReturnAttestation(
   bountyId: string,
   finder: PublicKey,
 ): Promise<OnChainReturnAttestation | null> {
-  const connection = getConnection();
   const [pda] = returnAttestationPda(bountyId, finder);
-  const info = await connection.getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeReturnAttestationAccount(Buffer.from(info.data));
   if (!decoded) return null;
@@ -1496,9 +1547,8 @@ export async function fetchClaimV2(
   bountyId: string,
   finder: PublicKey,
 ): Promise<OnChainClaimV2 | null> {
-  const connection = getConnection();
   const [pda] = claimV2Pda(bountyId, finder);
-  const info = await connection.getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeClaimV2Account(Buffer.from(info.data));
   if (!decoded) return null;
@@ -1511,13 +1561,15 @@ export async function fetchClaimsV2ForBounty(
 ): Promise<OnChainClaimV2[]> {
   const connection = getConnection();
   const [bounty] = bountyPda(bountyId);
-  const accounts = await connection.getProgramAccounts(PROGRAM_PK, {
-    commitment: "confirmed",
-    filters: [
-      { dataSize: CLAIM_V2_ACCOUNT_SIZE },
-      { memcmp: { offset: 8, bytes: bounty.toBase58() } },
-    ],
-  });
+  const accounts = await withRpcReadRetry(() =>
+    connection.getProgramAccounts(PROGRAM_PK, {
+      commitment: "confirmed",
+      filters: [
+        { dataSize: CLAIM_V2_ACCOUNT_SIZE },
+        { memcmp: { offset: 8, bytes: bounty.toBase58() } },
+      ],
+    }),
+  );
   return accounts.flatMap(({ pubkey, account }) => {
     const decoded = decodeClaimV2Account(Buffer.from(account.data));
     if (!decoded) return [];
@@ -1529,9 +1581,8 @@ export async function fetchClaimsV2ForBounty(
 export async function fetchBounty(
   bountyId: string,
 ): Promise<OnChainBounty | null> {
-  const connection = getConnection();
   const [pda] = bountyPda(bountyId);
-  const info = await connection.getAccountInfo(pda, "confirmed");
+  const info = await readAccountInfo(pda);
   if (!info?.data) return null;
   const decoded = decodeBountyAccount(Buffer.from(info.data));
   if (!decoded) return null;

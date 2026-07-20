@@ -1252,6 +1252,107 @@
       ]
     },
     {
+      "name": "create_bounty_v2",
+      "docs": [
+        "Creates a multi-claim bounty while keeping the original instruction",
+        "backward compatible with protocol-v1 clients already in production."
+      ],
+      "discriminator": [
+        251,
+        239,
+        2,
+        223,
+        130,
+        60,
+        86,
+        29
+      ],
+      "accounts": [
+        {
+          "name": "owner",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "arbiter"
+        },
+        {
+          "name": "mint"
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  98,
+                  111,
+                  117,
+                  110,
+                  116,
+                  121
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "bounty_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "vault_authority",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "arg",
+                "path": "bounty_id"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "bounty_id",
+          "type": "string"
+        },
+        {
+          "name": "reward_amount",
+          "type": "u64"
+        },
+        {
+          "name": "deadline",
+          "type": "i64"
+        },
+        {
+          "name": "metadata_hash",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
       "name": "finalize_dispute_reject",
       "discriminator": [
         171,

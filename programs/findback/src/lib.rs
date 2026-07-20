@@ -44,6 +44,31 @@ pub mod findback {
             metadata_hash,
             ctx.bumps.bounty,
             ctx.bumps.vault_authority,
+            1,
+        )
+    }
+
+    /// Creates a multi-claim bounty while keeping the original instruction
+    /// backward compatible with protocol-v1 clients already in production.
+    pub fn create_bounty_v2(
+        ctx: Context<CreateBounty>,
+        bounty_id: String,
+        reward_amount: u64,
+        deadline: i64,
+        metadata_hash: [u8; 32],
+    ) -> Result<()> {
+        initialize_bounty(
+            &mut ctx.accounts.bounty,
+            ctx.accounts.owner.key(),
+            ctx.accounts.arbiter.key(),
+            ctx.accounts.mint.key(),
+            bounty_id,
+            reward_amount,
+            deadline,
+            metadata_hash,
+            ctx.bumps.bounty,
+            ctx.bumps.vault_authority,
+            2,
         )
     }
 
@@ -67,6 +92,7 @@ pub mod findback {
             metadata_hash,
             ctx.bumps.bounty,
             ctx.bumps.vault_authority,
+            2,
         )
     }
 
@@ -2044,12 +2070,17 @@ fn initialize_bounty(
     metadata_hash: [u8; 32],
     bump: u8,
     vault_bump: u8,
+    protocol_version: u8,
 ) -> Result<()> {
     require!(
         !bounty_id.is_empty() && bounty_id.len() <= MAX_ID_LEN,
         FbError::InvalidId
     );
     require!(reward_amount > 0, FbError::ZeroReward);
+    require!(
+        matches!(protocol_version, 1 | 2),
+        FbError::ProtocolVersionMismatch
+    );
     let now = Clock::get()?.unix_timestamp;
     require!(deadline > now, FbError::InvalidDeadline);
 
@@ -2072,7 +2103,7 @@ fn initialize_bounty(
     bounty.vault_bump = vault_bump;
     bounty.created_at = now;
     bounty.updated_at = now;
-    bounty.protocol_version = 2;
+    bounty.protocol_version = protocol_version;
     bounty.arbitration_mode = 0;
 
     emit!(BountyCreated {

@@ -16,7 +16,9 @@
     "solana:address": "solana address",
     "findback:deploy": "node scripts/deploy-findback.mjs",
     "findback:setup": "node scripts/setup-findback-devnet.mjs",
-    "findback:smoke": "node scripts/smoke-findback.mjs"
+    "findback:smoke": "node scripts/smoke-findback.mjs",
+    "release:check": "node scripts/check-release-readiness.mjs",
+    "release:check:v2": "node scripts/check-release-readiness.mjs --require-v2-ready"
   },
   "dependencies": {
     "@phosphor-icons/react": "^2.1.10",

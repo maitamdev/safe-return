@@ -2,8 +2,12 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
-import { getAssociatedTokenAddressSync, getAccount } from "@solana/spl-token";
+import {
+  getAssociatedTokenAddressSync,
+  unpackAccount,
+} from "@solana/spl-token";
 import { PublicKey } from "@solana/web3.js";
+import { withRpcReadRetry } from "@/lib/solana/rpc-read";
 import {
   FIND_MINT,
   FIND_SYMBOL,
@@ -12,53 +16,82 @@ import {
   explorerTokensUrl,
 } from "@/lib/findback/config";
 
+type BalanceSnapshot = { sol: number; find: number; fetchedAt: number };
+const balanceCache = new Map<string, BalanceSnapshot>();
+const balanceRequests = new Map<string, Promise<BalanceSnapshot>>();
+
+async function loadBalances(
+  connection: ReturnType<typeof useConnection>["connection"],
+  publicKey: PublicKey,
+  force = false,
+) {
+  const key = publicKey.toBase58();
+  const cached = balanceCache.get(key);
+  if (!force && cached && Date.now() - cached.fetchedAt < 45_000) return cached;
+  const pending = balanceRequests.get(key);
+  if (pending) return pending;
+
+  const request = withRpcReadRetry(async () => {
+    const mint = new PublicKey(FIND_MINT);
+    const ata = getAssociatedTokenAddressSync(mint, publicKey);
+    const [walletInfo, tokenInfo] = await connection.getMultipleAccountsInfo(
+      [publicKey, ata],
+      "confirmed",
+    );
+    const snapshot = {
+      sol: (walletInfo?.lamports ?? 0) / 1e9,
+      find: tokenInfo
+        ? Number(unpackAccount(ata, tokenInfo).amount) / 10 ** FIND_DECIMALS
+        : 0,
+      fetchedAt: Date.now(),
+    };
+    balanceCache.set(key, snapshot);
+    return snapshot;
+  }).finally(() => balanceRequests.delete(key));
+  balanceRequests.set(key, request);
+  return request;
+}
+
 /** Live SOL + FIND balances with Explorer links (Devnet). */
 export function TokenBalances({ dark = false }: { dark?: boolean }) {
   const { connection } = useConnection();
   const { publicKey } = useWallet();
   const [sol, setSol] = useState<number | null>(null);
   const [find, setFind] = useState<number | null>(null);
-  const [tick, setTick] = useState(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (force = false) => {
     if (!publicKey) {
       setSol(null);
       setFind(null);
       return;
     }
     try {
-      const lamports = await connection.getBalance(publicKey, "confirmed");
-      setSol(lamports / 1e9);
+      const balances = await loadBalances(connection, publicKey, force);
+      setSol(balances.sol);
+      setFind(balances.find);
     } catch {
-      setSol(null);
-    }
-    try {
-      const mint = new PublicKey(FIND_MINT);
-      const ata = getAssociatedTokenAddressSync(mint, publicKey);
-      const acct = await getAccount(connection, ata, "confirmed");
-      setFind(Number(acct.amount) / 10 ** FIND_DECIMALS);
-    } catch {
-      // ATA not created yet = 0 FIND
-      setFind(0);
+      // Preserve the last known values while the public Devnet RPC is busy.
     }
   }, [connection, publicKey]);
 
   useEffect(() => {
     const first = window.setTimeout(() => void refresh(), 0);
     if (!publicKey) return () => window.clearTimeout(first);
-    const id = setInterval(() => void refresh(), 12_000);
+    const id = setInterval(() => {
+      if (document.visibilityState === "visible") void refresh();
+    }, 60_000);
     return () => {
       window.clearTimeout(first);
       clearInterval(id);
     };
-  }, [publicKey, refresh, tick]);
+  }, [publicKey, refresh]);
 
   // Allow parent to force refresh via custom event
   useEffect(() => {
-    const onFunded = () => setTick((t) => t + 1);
+    const onFunded = () => void refresh(true);
     window.addEventListener("safereturn:funded", onFunded);
     return () => window.removeEventListener("safereturn:funded", onFunded);
-  }, []);
+  }, [refresh]);
 
   if (!publicKey) return null;
 
