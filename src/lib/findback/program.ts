@@ -231,6 +231,15 @@ export function getConnection(commitment: Commitment = "confirmed") {
   return connection;
 }
 
+export async function fetchSignatureStatus(signature: string) {
+  const response = await withRpcReadRetry(() =>
+    getConnection().getSignatureStatuses([signature], {
+      searchTransactionHistory: true,
+    }),
+  );
+  return response.value[0];
+}
+
 async function readAccountInfo(address: PublicKey) {
   return withRpcReadRetry(() =>
     getConnection().getAccountInfo(address, "confirmed"),

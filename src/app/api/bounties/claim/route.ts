@@ -5,7 +5,11 @@ import {
   evidenceIntegrityPayload,
   evidenceIntegrityPayloadV2,
 } from "@/lib/findback/integrity";
-import { fetchBounty, fetchClaimV2, getConnection } from "@/lib/findback/program";
+import {
+  fetchBounty,
+  fetchClaimV2,
+  fetchSignatureStatus,
+} from "@/lib/findback/program";
 import type { BountyMeta } from "@/lib/findback/store";
 import {
   ApiError,
@@ -79,7 +83,7 @@ export async function POST(req: Request) {
         });
       }
       if (body.signature) {
-        const status = (await getConnection().getSignatureStatuses([body.signature])).value[0];
+        const status = await fetchSignatureStatus(body.signature);
         if (!status || status.err) {
           throw new ApiError(409, "Giao dịch chưa được Devnet xác nhận.");
         }
@@ -151,7 +155,7 @@ export async function POST(req: Request) {
     if (!isParticipant) throw new ApiError(403, "Ví không phải thành viên của claim.");
 
     if (body.signature) {
-      const status = (await getConnection().getSignatureStatuses([body.signature])).value[0];
+      const status = await fetchSignatureStatus(body.signature);
       if (!status || status.err) throw new ApiError(409, "Giao dịch chưa được Devnet xác nhận.");
     }
     const txUrl = body.signature ? explorerTxUrl(body.signature) : null;

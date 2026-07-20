@@ -4,7 +4,7 @@ import {
   fetchArbitrationPanel,
   fetchBounty,
   fetchClaimV2,
-  getConnection,
+  fetchSignatureStatus,
 } from "@/lib/findback/program";
 import {
   ApiError,
@@ -64,7 +64,7 @@ export async function POST(req: Request) {
 
     let lastTx: string | null = null;
     if (body.signature) {
-      const status = (await getConnection().getSignatureStatuses([body.signature])).value[0];
+      const status = await fetchSignatureStatus(body.signature);
       if (!status || status.err) throw new ApiError(409, "Giao dịch chưa được Devnet xác nhận.");
       lastTx = body.signature;
     }

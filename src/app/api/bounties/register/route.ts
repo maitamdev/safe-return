@@ -4,7 +4,7 @@ import {
   metadataIntegrityPayload,
   metadataIntegrityPayloadV2,
 } from "@/lib/findback/integrity";
-import { fetchBounty, getConnection } from "@/lib/findback/program";
+import { fetchBounty, fetchSignatureStatus } from "@/lib/findback/program";
 import type { BountyMeta } from "@/lib/findback/store";
 import {
   ApiError,
@@ -113,7 +113,7 @@ export async function POST(req: Request) {
 
     let signature: string | null = null;
     if (bounty.lastTx) {
-      const txStatus = (await getConnection().getSignatureStatuses([bounty.lastTx])).value[0];
+      const txStatus = await fetchSignatureStatus(bounty.lastTx);
       if (!txStatus || txStatus.err) {
         throw new ApiError(409, "Giao dịch tạo bounty chưa được Devnet xác nhận.");
       }

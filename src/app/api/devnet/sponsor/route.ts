@@ -4,6 +4,7 @@ import {
   createBountySponsoredInstruction,
   claimV2Pda,
   fetchBounty,
+  fetchSignatureStatus,
   fundBountySponsoredInstruction,
   getConnection,
   submitClaimV2SponsoredInstruction,
@@ -174,7 +175,7 @@ export async function PATCH(req: Request) {
     if (readError) throw new Error(readError.message);
     if (!prepared) throw new ApiError(404, "Không tìm thấy lượt tài trợ này.");
 
-    const status = (await getConnection().getSignatureStatuses([body.signature!])).value[0];
+    const status = await fetchSignatureStatus(body.signature!);
     const confirmed = Boolean(status && !status.err && ["confirmed", "finalized"].includes(status.confirmationStatus || ""));
     const nextStatus = status?.err ? "failed" : confirmed ? "confirmed" : "submitted";
     const { error } = await admin
