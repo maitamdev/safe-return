@@ -15,7 +15,13 @@ function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
-  const [error, setError] = useState<string | null>(params.get("error") === "auth" ? "Liên kết xác nhận không hợp lệ hoặc đã hết hạn." : null);
+  const [error, setError] = useState<string | null>(
+    params.get("error") === "auth"
+      ? "Liên kết xác nhận không hợp lệ hoặc đã hết hạn."
+      : params.get("reason") === "session_expired"
+        ? "Phiên đăng nhập cũ không còn hợp lệ và đã được làm sạch. Vui lòng đăng nhập lại."
+        : null,
+  );
 
   const submit = async (event: FormEvent) => {
     event.preventDefault();

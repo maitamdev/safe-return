@@ -3,10 +3,12 @@
 import { createClient } from "@/lib/supabase/client";
 import {
   clearInvalidLocalSession,
+  getSupabaseAuthStorageKey,
   isJwtTimingError,
   repairJwtTimingSession,
   SESSION_REAUTH_REQUIRED_MESSAGE,
 } from "@/lib/supabase/auth-recovery";
+import { getSupabaseEnv } from "@/lib/supabase/config";
 import { privateMediaUrl } from "@/lib/media/client";
 import type { StoredMedia } from "@/lib/media/types";
 import { PROTOCOL_V2_ENABLED } from "./config";
@@ -140,7 +142,8 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
       isJwtTimingError(bountyResult.error) ||
       isJwtTimingError(claimResult.error)
     ) {
-      await clearInvalidLocalSession(supabase);
+      const storageKey = getSupabaseAuthStorageKey(getSupabaseEnv().url);
+      await clearInvalidLocalSession(supabase, storageKey);
       throw new Error(SESSION_REAUTH_REQUIRED_MESSAGE);
     }
   }

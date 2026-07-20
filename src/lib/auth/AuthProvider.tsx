@@ -11,7 +11,11 @@ import {
 } from "react";
 import type { Session, User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/client";
-import { isSupabaseConfigured } from "@/lib/supabase/config";
+import { getSupabaseEnv, isSupabaseConfigured } from "@/lib/supabase/config";
+import {
+  getSupabaseAuthStorageKey,
+  getValidatedAuthSession,
+} from "@/lib/supabase/auth-recovery";
 
 type AuthCtx = {
   user: User | null;
@@ -37,16 +41,27 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!supabase) return;
 
     let mounted = true;
-    supabase.auth.getSession().then(({ data }) => {
-      if (!mounted) return;
-      setSession(data.session);
-      setUser(data.session?.user ?? null);
-      setLoading(false);
-    });
+    const storageKey = getSupabaseAuthStorageKey(getSupabaseEnv().url);
+    void getValidatedAuthSession(supabase, storageKey)
+      .then((validated) => {
+        if (!mounted) return;
+        setSession(validated?.session ?? null);
+        setUser(validated?.user ?? null);
+      })
+      .catch(() => {
+        if (!mounted) return;
+        setSession(null);
+        setUser(null);
+      })
+      .finally(() => {
+        if (mounted) setLoading(false);
+      });
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, next) => {
+    } = supabase.auth.onAuthStateChange((event, next) => {
+      // Initial cookies are validated by getValidatedAuthSession above.
+      if (event === "INITIAL_SESSION") return;
       setSession(next);
       setUser(next?.user ?? null);
       setLoading(false);
