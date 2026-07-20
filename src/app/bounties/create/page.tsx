@@ -11,7 +11,7 @@ import { FIND_SYMBOL } from "@/lib/findback/config";
 import { optimizeImage } from "@/lib/images/optimize";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 
-const steps = ["Thông tin đồ vật", "Địa điểm và hạn", "Phần thưởng", "Xác nhận"];
+const steps = ["Thông tin đồ vật", "Địa điểm và thời hạn", "Phần thưởng", "Xác nhận"];
 
 export default function CreateBountyPage() {
   const router = useRouter();
@@ -47,7 +47,7 @@ export default function CreateBountyPage() {
   const validateStep = () => {
     if (step === 0 && (!title.trim() || description.trim().length < 20)) return "Hãy nhập tên đồ và mô tả ít nhất 20 ký tự.";
     if (step === 1 && !location.trim()) return "Hãy nhập khu vực làm mất đồ.";
-    if (step === 1 && (days < 1 || days > 60)) return "Hạn nhận claim phải từ 1 đến 60 ngày.";
+    if (step === 1 && (days < 1 || days > 60)) return "Thời hạn nhận thông tin phải từ 1 đến 60 ngày.";
     if (step === 2 && (!Number.isFinite(rewardUi) || rewardUi <= 0)) return "Phần thưởng phải lớn hơn 0 FIND.";
     return null;
   };
@@ -120,14 +120,14 @@ export default function CreateBountyPage() {
         {step === 1 && (
           <div className="space-y-5">
             <Field label="Khu vực làm mất" hint="Đủ cụ thể để người tìm lọc tin, nhưng không đăng địa chỉ nhà riêng."><input className="app-input" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Ví dụ: Thư viện tầng 2, cơ sở Thủ Đức" maxLength={180} /></Field>
-            <Field label="Thời gian nhận claim"><div className="flex items-center gap-3"><input type="number" min={1} max={60} className="app-input max-w-32" value={days} onChange={(event) => setDays(Number(event.target.value))} /><span className="text-sm text-ink-soft">ngày kể từ lúc tạo</span></div></Field>
+            <Field label="Cho phép gửi thông tin trong" hint="Trong thời gian này, người tìm thấy đồ có thể gửi bằng chứng cho bạn. Khi hết hạn mà chưa trao thưởng, bạn có thể yêu cầu nhận lại FIND."><div className="flex items-center gap-3"><input type="number" min={1} max={60} className="app-input max-w-32" value={days} onChange={(event) => setDays(Number(event.target.value))} aria-label="Số ngày nhận thông tin từ người tìm thấy" /><span className="text-sm text-ink-soft">ngày sau khi đăng tin</span></div></Field>
           </div>
         )}
 
         {step === 2 && (
           <div className="space-y-5">
             <Field label={`Phần thưởng bằng ${FIND_SYMBOL}`} hint="FIND là SPL token thử nghiệm trên Devnet, chỉ dùng trong smart contract và không có giá trị tiền tệ."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Phantom sẽ yêu cầu ký giao dịch tạo bounty và giao dịch chuyển FIND vào vault. SOL Devnet chỉ được dùng để trả phí mạng.</p></div></div>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Phantom chỉ yêu cầu ký một lần. Giao dịch sẽ đồng thời đăng tin và khóa FIND trong vault. SOL Devnet chỉ dùng để trả phí mạng.</p></div></div>
           </div>
         )}
 
@@ -135,9 +135,9 @@ export default function CreateBountyPage() {
           <div>
             <h2 className="text-xl font-bold">Kiểm tra trước khi ký</h2>
             <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Summary label="Đồ vật" value={title} /><Summary label="Loại" value={category} /><Summary label="Khu vực" value={location} /><Summary label="Hạn nhận claim" value={`${days} ngày`} /><Summary label="Phần thưởng" value={`${rewardUi} ${FIND_SYMBOL}`} /><Summary label="Ví" value={connected ? "Đã kết nối Devnet" : "Chưa kết nối"} />
+              <Summary label="Đồ vật" value={title} /><Summary label="Loại" value={category} /><Summary label="Khu vực" value={location} /><Summary label="Nhận thông tin trong" value={`${days} ngày sau khi đăng`} /><Summary label="Phần thưởng" value={`${rewardUi} ${FIND_SYMBOL}`} /><Summary label="Ví" value={connected ? "Đã kết nối Devnet" : "Chưa kết nối"} />
             </dl>
-            {!connected && <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="mb-3 text-sm text-amber-900">Kết nối ví để hoàn tất hai giao dịch Devnet.</p><ConnectWalletButton size="md" /></div>}
+            {!connected && <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="mb-3 text-sm text-amber-900">Kết nối ví để ký một giao dịch Devnet.</p><ConnectWalletButton size="md" /></div>}
           </div>
         )}
 
@@ -145,7 +145,7 @@ export default function CreateBountyPage() {
 
         <div className="mt-7 flex items-center justify-between gap-3 border-t border-line pt-5">
           <button type="button" disabled={step === 0 || busy} onClick={() => { setError(null); setStep((current) => Math.max(0, current - 1)); }} className="app-button-secondary">Quay lại</button>
-          {step < 3 ? <button type="button" onClick={next} className="app-button-primary">Tiếp tục</button> : <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary">{busy ? "Đang xử lý giao dịch" : <><Check size={17} weight="bold" />Tạo và khóa thưởng</>}</button>}
+          {step < 3 ? <button type="button" onClick={next} className="app-button-primary">Tiếp tục</button> : <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary">{busy ? "Đang chờ Phantom" : <><Check size={17} weight="bold" />Đăng tin và khóa thưởng</>}</button>}
         </div>
       </div>
     </div>

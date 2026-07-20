@@ -20,6 +20,7 @@ import {
   cancelBountyOnChain,
   castArbitrationVoteOnChain,
   configureArbitrationPanelOnChain,
+  createAndFundBountyOnChain,
   createBountyOnChain,
   createBountyV2OnChain,
   fetchBounty,
@@ -352,9 +353,38 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         metadataHashHex,
       };
 
+      const useSponsoredCreate = SPONSORED_FEES_ENABLED && useV2;
+      if (!existing && !useSponsoredCreate) {
+        const createdAndFunded = await runTx(
+          useV2 ? "create_and_fund_bounty_v2" : "create_and_fund_bounty",
+          () =>
+            createAndFundBountyOnChain(
+              w,
+              {
+                bountyId: input.id,
+                rewardUi: input.rewardUi,
+                deadlineUnix,
+                metadataHash,
+              },
+              useV2,
+            ),
+        );
+        const saved = {
+          ...meta,
+          status: "Funded" as const,
+          lastTx: createdAndFunded.signature,
+          lastTxUrl: createdAndFunded.url,
+        };
+        if (!user?.id) throw new Error("Phiên đăng nhập đã hết hạn.");
+        await syncBountyToSupabase(saved);
+        upsertInMemory(saved);
+        await refresh();
+        return;
+      }
+
       const created = existing
         ? null
-        : SPONSORED_FEES_ENABLED && useV2
+        : useSponsoredCreate
           ? await runTx("create_bounty_sponsored", () =>
               sendSponsoredTransaction(w, {
                 action: "create_bounty",

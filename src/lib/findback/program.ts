@@ -560,21 +560,24 @@ function createAtaIx(
   );
 }
 
-export async function createBountyOnChain(
-  wallet: WalletLike,
-  args: {
-    bountyId: string;
-    rewardUi: number;
-    deadlineUnix: number;
-    metadataHash: Uint8Array;
-  },
-) {
+type CreateBountyArgs = {
+  bountyId: string;
+  rewardUi: number;
+  deadlineUnix: number;
+  metadataHash: Uint8Array;
+};
+
+function createBountyInstruction(
+  owner: PublicKey,
+  args: CreateBountyArgs,
+  useV2: boolean,
+): TransactionInstruction {
   const mint = requireMint();
   const arbiter = requireArbiter();
   const [bounty] = bountyPda(args.bountyId);
   const [vaultAuth] = vaultAuthorityPda(args.bountyId);
   const data = Buffer.concat([
-    IX.create_bounty,
+    useV2 ? IX.create_bounty_v2 : IX.create_bounty,
     encodeString(args.bountyId),
     encodeU64(toAtomic(args.rewardUi)),
     encodeI64(args.deadlineUnix),
@@ -583,7 +586,7 @@ export async function createBountyOnChain(
   const ix = new TransactionInstruction({
     programId: PROGRAM_PK,
     keys: [
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: owner, isSigner: true, isWritable: true },
       { pubkey: arbiter, isSigner: false, isWritable: false },
       { pubkey: mint, isSigner: false, isWritable: false },
       { pubkey: bounty, isSigner: false, isWritable: true },
@@ -592,42 +595,84 @@ export async function createBountyOnChain(
     ],
     data,
   });
-  return sendIx(wallet, [ix], "create_bounty");
+  return ix;
+}
+
+function fundBountyInstruction(
+  owner: PublicKey,
+  bountyId: string,
+  amountUi: number,
+): TransactionInstruction {
+  const mint = requireMint();
+  const [bounty] = bountyPda(bountyId);
+  const [vaultAuth] = vaultAuthorityPda(bountyId);
+  const ownerAta = getAssociatedTokenAddressSync(mint, owner);
+  const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
+  const data = Buffer.concat([IX.fund_bounty, encodeU64(toAtomic(amountUi))]);
+  return new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: owner, isSigner: true, isWritable: true },
+      { pubkey: mint, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: vaultAuth, isSigner: false, isWritable: false },
+      { pubkey: ownerAta, isSigner: false, isWritable: true },
+      { pubkey: vaultAta, isSigner: false, isWritable: true },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      {
+        pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
+        isSigner: false,
+        isWritable: false,
+      },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    data,
+  });
+}
+
+export function buildCreateAndFundBountyInstructions(
+  owner: PublicKey,
+  args: CreateBountyArgs,
+  useV2: boolean,
+): TransactionInstruction[] {
+  return [
+    createBountyInstruction(owner, args, useV2),
+    fundBountyInstruction(owner, args.bountyId, args.rewardUi),
+  ];
+}
+
+export async function createBountyOnChain(
+  wallet: WalletLike,
+  args: CreateBountyArgs,
+) {
+  return sendIx(
+    wallet,
+    [createBountyInstruction(wallet.publicKey, args, false)],
+    "create_bounty",
+  );
 }
 
 export async function createBountyV2OnChain(
   wallet: WalletLike,
-  args: {
-    bountyId: string;
-    rewardUi: number;
-    deadlineUnix: number;
-    metadataHash: Uint8Array;
-  },
+  args: CreateBountyArgs,
 ) {
-  const mint = requireMint();
-  const arbiter = requireArbiter();
-  const [bounty] = bountyPda(args.bountyId);
-  const [vaultAuth] = vaultAuthorityPda(args.bountyId);
-  const data = Buffer.concat([
-    IX.create_bounty_v2,
-    encodeString(args.bountyId),
-    encodeU64(toAtomic(args.rewardUi)),
-    encodeI64(args.deadlineUnix),
-    encodeBytes32(args.metadataHash),
-  ]);
-  const ix = new TransactionInstruction({
-    programId: PROGRAM_PK,
-    keys: [
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      { pubkey: arbiter, isSigner: false, isWritable: false },
-      { pubkey: mint, isSigner: false, isWritable: false },
-      { pubkey: bounty, isSigner: false, isWritable: true },
-      { pubkey: vaultAuth, isSigner: false, isWritable: false },
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-    ],
-    data,
-  });
-  return sendIx(wallet, [ix], "create_bounty_v2");
+  return sendIx(
+    wallet,
+    [createBountyInstruction(wallet.publicKey, args, true)],
+    "create_bounty_v2",
+  );
+}
+
+export async function createAndFundBountyOnChain(
+  wallet: WalletLike,
+  args: CreateBountyArgs,
+  useV2: boolean,
+) {
+  return sendIx(
+    wallet,
+    buildCreateAndFundBountyInstructions(wallet.publicKey, args, useV2),
+    useV2 ? "create_and_fund_bounty_v2" : "create_and_fund_bounty",
+  );
 }
 
 export async function fundBountyOnChain(
@@ -635,35 +680,11 @@ export async function fundBountyOnChain(
   bountyId: string,
   amountUi: number,
 ) {
-  const mint = requireMint();
-  const [bounty] = bountyPda(bountyId);
-  const [vaultAuth] = vaultAuthorityPda(bountyId);
-  const ownerAta = getAssociatedTokenAddressSync(mint, wallet.publicKey);
-  const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
-
-  const data = Buffer.concat([IX.fund_bounty, encodeU64(toAtomic(amountUi))]);
-  const ixs = [
-    new TransactionInstruction({
-      programId: PROGRAM_PK,
-      keys: [
-        { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-        { pubkey: mint, isSigner: false, isWritable: false },
-        { pubkey: bounty, isSigner: false, isWritable: true },
-        { pubkey: vaultAuth, isSigner: false, isWritable: false },
-        { pubkey: ownerAta, isSigner: false, isWritable: true },
-        { pubkey: vaultAta, isSigner: false, isWritable: true },
-        { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
-        {
-          pubkey: ASSOCIATED_TOKEN_PROGRAM_ID,
-          isSigner: false,
-          isWritable: false,
-        },
-        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-      ],
-      data,
-    }),
-  ];
-  return sendIx(wallet, ixs, "fund_bounty");
+  return sendIx(
+    wallet,
+    [fundBountyInstruction(wallet.publicKey, bountyId, amountUi)],
+    "fund_bounty",
+  );
 }
 
 export async function submitClaimOnChain(

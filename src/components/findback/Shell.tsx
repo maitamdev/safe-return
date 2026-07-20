@@ -94,6 +94,8 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
 
 function transactionLabel(ix: string | null) {
   const labels: Record<string, string> = {
+    create_and_fund_bounty: "giao dịch đăng tin và khóa thưởng",
+    create_and_fund_bounty_v2: "giao dịch đăng tin và khóa thưởng",
     create_bounty: "giao dịch tạo bounty",
     fund_bounty: "giao dịch khóa thưởng",
     submit_claim: "bằng chứng lên chuỗi",

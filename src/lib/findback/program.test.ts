@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { Keypair, PublicKey } from "@solana/web3.js";
+import { Keypair, PublicKey, Transaction } from "@solana/web3.js";
 import { describe, expect, it } from "vitest";
 import idl from "../../../target/idl/findback.json";
 import {
@@ -15,6 +15,7 @@ import {
   arbitrationPanelPda,
   arbitrationVotePda,
   bountyPda,
+  buildCreateAndFundBountyInstructions,
   claimV2Pda,
   createBountySponsoredInstruction,
   disputeCasePda,
@@ -93,6 +94,35 @@ describe("FindBack generated IDL contract", () => {
         )[0],
       ),
     ).toBe(true);
+  });
+
+  it("packs bounty creation and funding into one wallet signature", () => {
+    const owner = Keypair.generate().publicKey;
+    const instructions = buildCreateAndFundBountyInstructions(
+      owner,
+      {
+        bountyId: "one-signature-bounty",
+        rewardUi: 10,
+        deadlineUnix: 2_000_000_000,
+        metadataHash: new Uint8Array(32).fill(7),
+      },
+      true,
+    );
+    const transaction = new Transaction({
+      feePayer: owner,
+      recentBlockhash: Keypair.generate().publicKey.toBase58(),
+    }).add(...instructions);
+
+    expect(instructions).toHaveLength(2);
+    expect(instructions[0]?.data.subarray(0, 8)).toEqual(IX.create_bounty_v2);
+    expect(instructions[1]?.data.subarray(0, 8)).toEqual(IX.fund_bounty);
+    expect(transaction.compileMessage().header.numRequiredSignatures).toBe(1);
+    expect(
+      transaction.serialize({
+        requireAllSignatures: false,
+        verifySignatures: false,
+      }).length,
+    ).toBeLessThanOrEqual(1232);
   });
 
   it("derives reputation and settlement attestation PDAs from immutable actors", () => {
