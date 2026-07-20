@@ -1,20 +1,24 @@
 # SafeReturn
 
-SafeReturn là ứng dụng tìm đồ thất lạc dùng AI để hỗ trợ đối chiếu bằng chứng và Solana Devnet để khóa, hoàn hoặc trao thưởng minh bạch. Dự án không dùng dữ liệu bounty giả và không dùng tiền thật.
+SafeReturn là dApp tìm đồ thất lạc chạy với dữ liệu người dùng thật, Supabase Realtime và Solana Devnet. Ứng dụng không chèn bounty/claim mẫu, không dùng Mainnet và không dùng tài sản có giá trị tiền tệ. FIND chỉ là SPL token thử nghiệm để minh họa escrow.
 
-## Luồng sản phẩm
+## Điểm nổi bật
 
-1. Người dùng đăng nhập và ký tin nhắn để liên kết tài khoản với ví Phantom.
-2. Chủ đồ tạo bounty, ký `create_bounty` và khóa FIND vào escrow PDA.
-3. Finder nộp bằng chứng, ký `submit_claim` trên Devnet.
-4. Server dùng AI trực tuyến để đánh giá; arbiter ký `record_ai_review`.
-5. Chủ đồ chấp nhận/từ chối, hoặc hai bên mở tranh chấp để arbiter phân xử on-chain.
+- Metadata và ảnh riêng tư nằm trong Supabase Storage; SHA-256 của nội dung được cam kết trên Solana để phát hiện thay đổi.
+- Mỗi finder có một `ClaimV2` PDA độc lập, nên một bounty nhận được nhiều claim mà không ghi đè lẫn nhau.
+- FIND được khóa trong vault PDA; program kiểm soát state machine, hoàn tiền, giải ngân và tranh chấp.
+- Groq Vision tạo đánh giá trực tuyến. Chain lưu hash của input, report, model và phiên bản prompt để truy xuất provenance; thiếu provider thì API báo lỗi, không sinh kết quả giả.
+- `ReturnAttestation` và `Reputation` ghi nhận lần trao trả thành công on-chain.
+- SafeTag tạo QR công khai nhưng chỉ chủ sở hữu đã đăng nhập mới đọc được thông tin liên hệ do finder gửi.
+- Phí Devnet có thể được tài trợ bằng một signer tách biệt, có quota và biên nhận trong Supabase.
 
-FIND là SPL token thử nghiệm trên Devnet, không có giá trị tiền tệ. SOL Devnet chỉ dùng trả phí giao dịch thử nghiệm.
+## Kiến trúc tin cậy
+
+Solana Devnet là nguồn sự thật của tiền, trạng thái escrow, claim và quyền giải ngân. Supabase là nguồn metadata, ảnh mã hóa quyền truy cập, tài khoản và dữ liệu Realtime. API server chỉ ghi Supabase sau khi đối chiếu wallet đã xác minh, transaction signature và account PDA trên Devnet.
 
 ## Chạy local
 
-Yêu cầu Node.js 20+, npm và Phantom có bật Testnet Mode.
+Yêu cầu Node.js 20+, npm, Solana CLI/Anchor khi build program và Phantom bật Testnet Mode.
 
 ```bash
 npm install
@@ -22,47 +26,59 @@ copy .env.example .env.local
 npm run dev
 ```
 
-Sau khi tạo Supabase project:
+Với Supabase project mới, chạy `supabase/schema.sql` trước rồi áp dụng lần lượt các file trong `supabase/migrations`. Với project đang hoạt động, dùng migration runner:
 
-1. Chạy toàn bộ [`supabase/schema.sql`](supabase/schema.sql) trong SQL Editor.
-2. Điền URL, anon key và service-role key vào `.env.local`.
-3. Thêm `SOLANA_KEYPAIR_JSON` của đúng arbiter/mint authority vào môi trường server.
-4. Thêm `GROQ_API_KEY` để bật đánh giá Groq Vision trực tuyến. Model mặc định là `qwen/qwen3.6-27b`. Khi thiếu key, hệ thống báo chưa cấu hình và không sinh kết quả thay thế.
-5. Không commit `.env.local` hoặc keypair.
+1. Lấy PostgreSQL URI tại Supabase Dashboard → Connect.
+2. Lưu URI vào `SUPABASE_DB_URL` trong `.env.local`; không gửi URI hoặc password qua chat và không đưa lên Vercel.
+3. Chạy dry-run: `npm run supabase:push`.
+4. Đặt tạm `CONFIRM_SUPABASE_MIGRATE=1` trong terminal rồi chạy lại.
+5. Xóa `SUPABASE_DB_URL` khỏi máy khi không còn cần.
 
-Supabase là nguồn metadata duy nhất. Giao diện đăng ký thay đổi Realtime cho `bounties` và `claims`, đồng thời đọc lại dữ liệu định kỳ nếu kết nối Realtime gián đoạn. Trạng thái tiền và quyền giải ngân luôn được đối chiếu với program trên Solana Devnet.
+Runner chặn connection string không thuộc project được cấu hình và không in secret ra log.
 
-`NEXT_PUBLIC_SITE_URL` phải là origin thật khi deploy để metadata và link chia sẻ được tạo đúng.
-
-## Kiểm tra
+## Kiểm thử và release gate
 
 ```bash
 npm run lint
+npm run typecheck
 npm test
 npm run build
 cargo test -p findback
+npm run findback:smoke
+npm run release:check
 ```
 
-Smoke test Devnet có tạo giao dịch thật trên mạng thử nghiệm:
+`findback:smoke` tạo giao dịch thật trên Devnet với lượng FIND thử nghiệm rất nhỏ. Nó xác minh tương thích v1, hai claim v2 độc lập, AI provenance, reject một claim, giải ngân claim còn lại, attestation, reputation và vault trở về 0.
+
+Chỉ bật v2 khi lệnh sau không còn warning/failure:
 
 ```bash
-npm run findback:smoke
+npm run release:check:v2
 ```
 
-## Cấu trúc chính
+Thứ tự release bắt buộc:
 
-- `src/app/bounties`: giao diện sản phẩm
-- `src/app/api`: API xác minh ví, AI và faucet Devnet
-- `src/lib/findback`: client Solana và state provider
-- `programs/findback`: Anchor escrow program
-- `supabase/schema.sql`: schema, RLS và RPC bảo mật
-- `.github/workflows/ci.yml`: lint, test, build và Rust test
+1. Build và upgrade program bằng `findback:deploy`; script dùng buffer có thể resume sau 429 và so khớp bytecode tải ngược từ chain.
+2. Chạy smoke test Devnet.
+3. Áp dụng migration Supabase và kiểm tra RLS/schema.
+4. Bật `NEXT_PUBLIC_PROTOCOL_V2=1`.
+5. Chỉ bật sponsored fee khi signer riêng và bảng quota đã sẵn sàng: `NEXT_PUBLIC_SPONSORED_FEES=1` cùng `SPONSORED_FEES_ENABLED=1`.
+6. Redeploy rồi chạy lại release checker ở chế độ Production.
+
+## Các thư mục chính
+
+- `programs/findback`: Anchor escrow program và unit test Rust.
+- `src/lib/findback`: client Solana, decoder account và state provider.
+- `src/app/api`: API xác minh wallet, metadata, media, AI, SafeTag và tài trợ phí.
+- `supabase/schema.sql`: schema nền và RLS.
+- `supabase/migrations`: nâng cấp protocol v2, SafeTag và sponsored transactions.
+- `scripts/check-release-readiness.mjs`: release gate không làm lộ secret.
+- `scripts/smoke-findback.mjs`: bằng chứng tích hợp end-to-end trên Devnet.
 
 Program Devnet: `3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna`
+
 FIND mint Devnet: `9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy`
 
-## Lưu ý triển khai
+Không dùng keypair chứa tài sản Mainnet. Không commit `.env.local`, database URI, service-role key hoặc keypair JSON.
 
-Thay đổi trong `programs/findback` chỉ có hiệu lực sau khi build và upgrade program Devnet bằng upgrade authority. Thay đổi schema chỉ có hiệu lực sau khi chạy SQL migration. Không dùng keypair chứa tài sản Mainnet.
-
-MIT License — xem [`LICENSE`](LICENSE).
+MIT License — xem `LICENSE`.

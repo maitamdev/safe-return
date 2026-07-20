@@ -158,14 +158,53 @@ const idlPath = path.join(root, "target", "idl", "findback.json");
 const sourcePath = path.join(root, "programs", "findback", "src", "lib.rs");
 const programKeypairPath = path.join(root, "target", "deploy", "findback-keypair.json");
 const programBinaryPath = path.join(root, "target", "deploy", "findback.so");
-const migrationNames = [
-  "2026072001_protocol_v2.sql",
-  "2026072002_safe_tags.sql",
-  "2026072003_sponsored_fees.sql",
+const migrationContracts = [
+  {
+    name: "2026072001_protocol_v2.sql",
+    required: [
+      /protocol_version/i,
+      /claims_bounty_finder_unique/i,
+      /claim_pda/i,
+      /ai_input_hash/i,
+      /chain_events/i,
+      /claim-evidence/i,
+      /enable row level security/i,
+    ],
+  },
+  {
+    name: "2026072002_safe_tags.sql",
+    required: [
+      /create table if not exists public\.safe_tags/i,
+      /create table if not exists public\.safe_tag_reports/i,
+      /reporter_fingerprint/i,
+      /enable row level security/i,
+      /revoke insert, update, delete/i,
+    ],
+  },
+  {
+    name: "2026072003_sponsored_fees.sql",
+    required: [
+      /create table if not exists public\.sponsored_transactions/i,
+      /last_valid_block_height/i,
+      /expires_at/i,
+      /enable row level security/i,
+      /revoke insert, update, delete/i,
+    ],
+  },
 ];
-for (const migration of migrationNames) {
-  const exists = fs.existsSync(path.join(root, "supabase", "migrations", migration));
-  record(exists ? "pass" : "fail", `Migration ${migration}`, exists ? "có trong repository" : "bị thiếu");
+for (const migration of migrationContracts) {
+  const migrationPath = path.join(root, "supabase", "migrations", migration.name);
+  const sql = fs.existsSync(migrationPath) ? fs.readFileSync(migrationPath, "utf8") : "";
+  const missingContracts = migration.required.filter((pattern) => !pattern.test(sql));
+  record(
+    sql && missingContracts.length === 0 ? "pass" : "fail",
+    `Migration ${migration.name}`,
+    !sql
+      ? "bị thiếu"
+      : missingContracts.length
+        ? `thiếu ${missingContracts.length} invariant bắt buộc`
+        : `${migration.required.length} invariant schema/RLS đều có`,
+  );
 }
 
 if (!fs.existsSync(idlPath)) {
