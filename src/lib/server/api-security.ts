@@ -17,8 +17,15 @@ export async function requireApiUser(): Promise<User> {
 export function requireSameOrigin(req: Request) {
   const origin = req.headers.get("origin");
   if (!origin) return;
-  const requestUrl = new URL(req.url);
-  if (new URL(origin).host !== requestUrl.host) {
+  let requestOrigin: string;
+  let callerOrigin: string;
+  try {
+    requestOrigin = new URL(req.url).origin;
+    callerOrigin = new URL(origin).origin;
+  } catch {
+    throw new ApiError(403, "Nguồn gửi yêu cầu không hợp lệ.");
+  }
+  if (callerOrigin !== requestOrigin) {
     throw new ApiError(403, "Yêu cầu không cùng nguồn bị từ chối.");
   }
 }
@@ -56,7 +63,11 @@ export class ApiError extends Error {
 
 export function apiErrorResponse(error: unknown) {
   const status = error instanceof ApiError ? error.status : 500;
-  const message =
-    error instanceof Error ? error.message : "Yêu cầu không thể xử lý.";
+  if (!(error instanceof ApiError)) {
+    console.error("[SafeReturn API] Unexpected error", error);
+  }
+  const message = error instanceof ApiError
+    ? error.message
+    : "Máy chủ chưa thể xử lý yêu cầu. Vui lòng thử lại sau.";
   return Response.json({ ok: false, error: message }, { status });
 }
