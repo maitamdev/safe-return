@@ -48,7 +48,7 @@ npm run findback:smoke
 npm run release:check
 ```
 
-`findback:smoke` tạo giao dịch thật trên Devnet với lượng FIND thử nghiệm rất nhỏ. Nó xác minh tương thích v1, hai claim v2 độc lập, AI provenance, reject một claim, giải ngân claim còn lại, attestation, reputation và vault trở về 0.
+`findback:smoke` tạo giao dịch thật trên Devnet với lượng FIND thử nghiệm rất nhỏ. Nó xác minh tương thích v1, ba claim v2 độc lập, AI provenance, từ chối mismatch, hội đồng 2/3, giải ngân đúng một lần, attestation, reputation và vault trở về 0.
 
 Chỉ bật v2 khi lệnh sau không còn warning/failure:
 

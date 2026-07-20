@@ -1371,6 +1371,7 @@
         },
         {
           "name": "bounty",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -2482,6 +2483,7 @@
         },
         {
           "name": "bounty",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -2559,6 +2561,7 @@
         },
         {
           "name": "bounty",
+          "writable": true,
           "pda": {
             "seeds": [
               {

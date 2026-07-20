@@ -241,6 +241,12 @@ pub mod findback {
             ctx.accounts.bounty.protocol_version >= 2,
             FbError::ProtocolVersionMismatch
         );
+        // Reviews belong to an active escrow window. A refunded/released
+        // bounty must not accept new AI provenance records for stale claims.
+        require!(
+            ctx.accounts.bounty.status == BountyStatus::Funded,
+            FbError::InvalidStatus
+        );
         require!(score <= 100, FbError::InvalidScore);
         require!(risk_level <= 2, FbError::InvalidScore);
         require!(decision <= 2, FbError::InvalidScore);
@@ -519,6 +525,8 @@ pub mod findback {
             ctx.accounts.bounty.arbitration_mode == 0,
             FbError::QuorumArbitrationRequired
         );
+        let locked_status =
+            lock_for_v2_dispute(ctx.accounts.bounty.status).ok_or(FbError::InvalidStatus)?;
         let claim = &mut ctx.accounts.claim;
         require!(
             ctx.accounts.signer.key() == ctx.accounts.bounty.owner
@@ -533,7 +541,10 @@ pub mod findback {
             FbError::InvalidClaimStatus
         );
         claim.status = ClaimV2Status::Disputed;
-        claim.updated_at = Clock::get()?.unix_timestamp;
+        let now = Clock::get()?.unix_timestamp;
+        claim.updated_at = now;
+        ctx.accounts.bounty.status = locked_status;
+        ctx.accounts.bounty.updated_at = now;
         emit!(ClaimV2Disputed {
             bounty: ctx.accounts.bounty.key(),
             claim: claim.key(),
@@ -547,6 +558,11 @@ pub mod findback {
         let b = &mut ctx.accounts.bounty;
         require!(b.protocol_version < 2, FbError::LegacyInstructionDisabled);
         require_keys_eq!(b.arbiter, ctx.accounts.arbiter.key(), FbError::Unauthorized);
+        require_keys_neq!(
+            b.finder,
+            ctx.accounts.arbiter.key(),
+            FbError::PartyCannotArbitrate
+        );
         require!(b.status == BountyStatus::Disputed, FbError::InvalidStatus);
         require!(b.amount_funded > 0, FbError::NothingToRefund);
 
@@ -612,6 +628,11 @@ pub mod findback {
         let claim = &mut ctx.accounts.claim;
         require!(b.protocol_version >= 2, FbError::ProtocolVersionMismatch);
         require!(b.arbitration_mode == 0, FbError::QuorumArbitrationRequired);
+        require_keys_neq!(
+            claim.finder,
+            ctx.accounts.arbiter.key(),
+            FbError::PartyCannotArbitrate
+        );
         require!(
             claim.status == ClaimV2Status::Disputed,
             FbError::InvalidClaimStatus
@@ -624,7 +645,7 @@ pub mod findback {
         let now = Clock::get()?.unix_timestamp;
 
         if release_to_finder {
-            require!(b.status == BountyStatus::Funded, FbError::InvalidStatus);
+            require!(b.status == BountyStatus::Disputed, FbError::InvalidStatus);
             require!(b.amount_funded >= b.reward_amount, FbError::NotFullyFunded);
             let amount = b.reward_amount;
             let id_bytes = b.bounty_id.as_bytes();
@@ -664,6 +685,8 @@ pub mod findback {
         } else {
             // Other claims stay valid and the bounty remains funded.
             claim.status = ClaimV2Status::Rejected;
+            b.status = resume_after_v2_reject(b.status).ok_or(FbError::InvalidStatus)?;
+            b.updated_at = now;
             emit!(ClaimV2Rejected {
                 bounty: bounty_key,
                 claim: claim_key,
@@ -727,7 +750,7 @@ pub mod findback {
     }
 
     pub fn open_dispute_v3(ctx: Context<OpenDisputeV3>) -> Result<()> {
-        let bounty = &ctx.accounts.bounty;
+        let bounty = &mut ctx.accounts.bounty;
         let claim = &mut ctx.accounts.claim;
         require!(
             bounty.protocol_version >= 2,
@@ -737,6 +760,7 @@ pub mod findback {
             bounty.arbitration_mode == 1,
             FbError::QuorumArbitrationRequired
         );
+        let locked_status = lock_for_v2_dispute(bounty.status).ok_or(FbError::InvalidStatus)?;
         require!(
             ctx.accounts.signer.key() == bounty.owner || ctx.accounts.signer.key() == claim.finder,
             FbError::Unauthorized
@@ -751,6 +775,8 @@ pub mod findback {
         let now = Clock::get()?.unix_timestamp;
         claim.status = ClaimV2Status::Disputed;
         claim.updated_at = now;
+        bounty.status = locked_status;
+        bounty.updated_at = now;
         let case = &mut ctx.accounts.dispute_case;
         case.bounty = bounty.key();
         case.claim = claim.key();
@@ -838,7 +864,7 @@ pub mod findback {
         let bounty = &mut ctx.accounts.bounty;
         let claim = &mut ctx.accounts.claim;
         require!(
-            bounty.status == BountyStatus::Funded,
+            bounty.status == BountyStatus::Disputed,
             FbError::InvalidStatus
         );
         require!(
@@ -909,8 +935,16 @@ pub mod findback {
             ctx.accounts.claim.status == ClaimV2Status::Disputed,
             FbError::InvalidClaimStatus
         );
+        require!(
+            ctx.accounts.bounty.status == BountyStatus::Disputed,
+            FbError::InvalidStatus
+        );
+        let now = Clock::get()?.unix_timestamp;
         ctx.accounts.claim.status = ClaimV2Status::Rejected;
-        ctx.accounts.claim.updated_at = Clock::get()?.unix_timestamp;
+        ctx.accounts.claim.updated_at = now;
+        ctx.accounts.bounty.status =
+            resume_after_v2_reject(ctx.accounts.bounty.status).ok_or(FbError::InvalidStatus)?;
+        ctx.accounts.bounty.updated_at = now;
         case.finalized = true;
         emit!(ClaimV2Rejected {
             bounty: ctx.accounts.bounty.key(),
@@ -1539,6 +1573,7 @@ pub struct OpenDispute<'info> {
 pub struct OpenDisputeV2<'info> {
     pub signer: Signer<'info>,
     #[account(
+        mut,
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
         bump = bounty.bump
     )]
@@ -1698,6 +1733,7 @@ pub struct OpenDisputeV3<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
     #[account(
+        mut,
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
         bump = bounty.bump
     )]
@@ -1816,6 +1852,7 @@ pub struct FinalizeDisputeRelease<'info> {
 pub struct FinalizeDisputeReject<'info> {
     pub finalizer: Signer<'info>,
     #[account(
+        mut,
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
         bump = bounty.bump
     )]
@@ -2077,10 +2114,18 @@ fn initialize_bounty(
         FbError::InvalidId
     );
     require!(reward_amount > 0, FbError::ZeroReward);
+    require!(arbiter != Pubkey::default(), FbError::InvalidArbiter);
+    require!(arbiter != owner, FbError::PartyCannotArbitrate);
     require!(
         matches!(protocol_version, 1 | 2),
         FbError::ProtocolVersionMismatch
     );
+    // Protocol v2 is the content-addressed path. Do not allow a zero
+    // commitment to make it on-chain: a zero hash cannot be verified against
+    // any metadata payload and would silently bypass the integrity contract.
+    // Legacy v1 accounts remain backwards-compatible and may still use the
+    // historical zero value.
+    require_metadata_hash(protocol_version, metadata_hash)?;
     let now = Clock::get()?.unix_timestamp;
     require!(deadline > now, FbError::InvalidDeadline);
 
@@ -2203,6 +2248,21 @@ fn remaining_funding(reward_amount: u64, amount_funded: u64) -> Option<u64> {
     reward_amount.checked_sub(amount_funded)
 }
 
+fn require_metadata_hash(protocol_version: u8, metadata_hash: [u8; 32]) -> Result<()> {
+    if protocol_version >= 2 {
+        require!(metadata_hash != [0u8; 32], FbError::EmptyEvidence);
+    }
+    Ok(())
+}
+
+fn lock_for_v2_dispute(status: BountyStatus) -> Option<BountyStatus> {
+    (status == BountyStatus::Funded).then_some(BountyStatus::Disputed)
+}
+
+fn resume_after_v2_reject(status: BountyStatus) -> Option<BountyStatus> {
+    (status == BountyStatus::Disputed).then_some(BountyStatus::Funded)
+}
+
 fn update_reputation(
     reputation: &mut Account<Reputation>,
     wallet: Pubkey,
@@ -2237,7 +2297,10 @@ fn update_reputation(
 
 #[cfg(test)]
 mod tests {
-    use super::remaining_funding;
+    use super::{
+        lock_for_v2_dispute, remaining_funding, require_metadata_hash,
+        resume_after_v2_reject, BountyStatus,
+    };
 
     #[test]
     fn remaining_funding_handles_partial_and_complete_escrow() {
@@ -2249,5 +2312,27 @@ mod tests {
     #[test]
     fn remaining_funding_rejects_corrupt_overfunded_state() {
         assert_eq!(remaining_funding(100, 101), None);
+    }
+
+    #[test]
+    fn v2_dispute_locks_refund_and_resumes_only_after_rejection() {
+        assert!(matches!(
+            lock_for_v2_dispute(BountyStatus::Funded),
+            Some(BountyStatus::Disputed)
+        ));
+        assert!(lock_for_v2_dispute(BountyStatus::Disputed).is_none());
+        assert!(lock_for_v2_dispute(BountyStatus::Refunded).is_none());
+        assert!(matches!(
+            resume_after_v2_reject(BountyStatus::Disputed),
+            Some(BountyStatus::Funded)
+        ));
+        assert!(resume_after_v2_reject(BountyStatus::Funded).is_none());
+    }
+
+    #[test]
+    fn v2_requires_a_nonzero_metadata_commitment_but_v1_is_compatible() {
+        assert!(require_metadata_hash(1, [0u8; 32]).is_ok());
+        assert!(require_metadata_hash(2, [0u8; 32]).is_err());
+        assert!(require_metadata_hash(2, [7u8; 32]).is_ok());
     }
 }

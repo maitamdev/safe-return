@@ -929,7 +929,7 @@ export async function openDisputeV2OnChain(
     programId: PROGRAM_PK,
     keys: [
       { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
-      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
       { pubkey: claim, isSigner: false, isWritable: true },
     ],
     data: Buffer.from(IX.open_dispute_v2),
@@ -975,7 +975,7 @@ export async function openDisputeV3OnChain(
     programId: PROGRAM_PK,
     keys: [
       { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
       { pubkey: claim, isSigner: false, isWritable: true },
       { pubkey: panel, isSigner: false, isWritable: false },
       { pubkey: disputeCase, isSigner: false, isWritable: true },
@@ -1076,7 +1076,7 @@ export async function finalizeDisputeRejectOnChain(
     programId: PROGRAM_PK,
     keys: [
       { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
-      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
       { pubkey: claim, isSigner: false, isWritable: true },
       { pubkey: panel, isSigner: false, isWritable: false },
       { pubkey: disputeCase, isSigner: false, isWritable: true },

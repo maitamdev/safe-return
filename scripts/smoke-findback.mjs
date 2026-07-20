@@ -3,8 +3,9 @@
  *
  * Proves both paths against the deployed program:
  *   v1: create -> fund -> single claim -> AI review -> release
- *   v2: create -> fund -> two independent Claim PDAs -> review/reject ->
- *       release -> immutable attestation + reputation
+ *   v2: create -> fund -> three independent Claim PDAs -> AI provenance ->
+ *       mismatch rejection -> 2-of-3 dispute rejection -> release one claim ->
+ *       immutable attestation/reputation -> repeat settlement rejection
  *
  * This spends only a small amount of Devnet SOL and FIND test token.
  */
@@ -44,7 +45,10 @@ const payer = loadKeypair(
 );
 const programId = new PublicKey(env.NEXT_PUBLIC_FINDBACK_PROGRAM_ID);
 const mint = new PublicKey(env.NEXT_PUBLIC_FIND_MINT);
-const arbiter = new PublicKey(env.NEXT_PUBLIC_ARBITER);
+const arbiterSigner = Keypair.generate();
+const arbiter = arbiterSigner.publicKey;
+const arbiterB = Keypair.generate();
+const arbiterC = Keypair.generate();
 const reward = 100_000n; // 0.1 FIND (6 decimals), Devnet-only.
 const deadline = Math.floor(Date.now() / 1000) + 86_400;
 const runId = Date.now().toString(36).toUpperCase();
@@ -53,6 +57,7 @@ const v2Id = `SMK2${runId}`;
 const legacyFinder = Keypair.generate();
 const finderA = Keypair.generate();
 const finderB = Keypair.generate();
+const finderC = Keypair.generate();
 const signatures = [];
 
 function readEnv(file) {
@@ -143,6 +148,27 @@ function attestationPda(id, finder) {
   )[0];
 }
 
+function arbitrationPanelPda(id) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("arbitration_panel"), bountyPda(id).toBuffer()],
+    programId,
+  )[0];
+}
+
+function disputeCasePda(id, finder) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("dispute_case"), claimPda(id, finder).toBuffer()],
+    programId,
+  )[0];
+}
+
+function arbitrationVotePda(disputeCase, voter) {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("arbitration_vote"), disputeCase.toBuffer(), voter.toBuffer()],
+    programId,
+  )[0];
+}
+
 function ix(name, keys, ...data) {
   return new TransactionInstruction({
     programId,
@@ -206,6 +232,24 @@ async function send(label, instructions, extraSigners = []) {
   console.log(`[TX] ${label}: ${signature}`);
   await sleep(900);
   return signature;
+}
+
+async function expectProgramFailure(label, instructions, extraSigners = []) {
+  const latest = await readRpc(() => connection.getLatestBlockhash("confirmed"));
+  const transaction = new Transaction({
+    feePayer: payer.publicKey,
+    blockhash: latest.blockhash,
+    lastValidBlockHeight: latest.lastValidBlockHeight,
+  }).add(...instructions);
+  transaction.sign(...uniqueSigners([payer, ...extraSigners]));
+  const simulation = await readRpc(() =>
+    connection.simulateTransaction(transaction, {
+      commitment: "confirmed",
+      sigVerify: true,
+    }),
+  );
+  assert(simulation.value.err, `${label} unexpectedly succeeded`);
+  console.log(`[NEGATIVE] ${label}: rejected as expected`);
 }
 
 function createInstruction(name, id) {
@@ -320,6 +364,18 @@ function decodeClaim(data) {
   };
 }
 
+function decodeDisputeCase(data) {
+  return {
+    bounty: new PublicKey(data.subarray(8, 40)),
+    claim: new PublicKey(data.subarray(40, 72)),
+    panel: new PublicKey(data.subarray(72, 104)),
+    releaseVotes: data[104],
+    rejectVotes: data[105],
+    decision: data[106],
+    finalized: data[107] !== 0,
+  };
+}
+
 function assert(condition, message) {
   if (!condition) throw new Error(`SMOKE ASSERTION FAILED: ${message}`);
 }
@@ -336,10 +392,11 @@ console.log(`Mint: ${mint.toBase58()}`);
 console.log(`Owner: ${payer.publicKey.toBase58()}`);
 console.log(`Bounties: ${v1Id}, ${v2Id}\n`);
 
-const [ownerLamports, ownerFind, claimRent] = await Promise.all([
+const [ownerLamports, ownerFind, claimRent, voteRent] = await Promise.all([
   readRpc(() => connection.getBalance(payer.publicKey, "confirmed")),
   tokenAmount(payer.publicKey),
   readRpc(() => connection.getMinimumBalanceForRentExemption(253)),
+  readRpc(() => connection.getMinimumBalanceForRentExemption(98)),
 ]);
 assert(ownerLamports > 50_000_000, "authority cần ít nhất 0.05 SOL Devnet");
 assert(ownerFind >= reward * 2n, "authority không đủ FIND test token");
@@ -356,6 +413,21 @@ await send(
       fromPubkey: payer.publicKey,
       toPubkey: finderB.publicKey,
       lamports: claimRent + 1_000_000,
+    }),
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: finderC.publicKey,
+      lamports: claimRent + 1_000_000,
+    }),
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: arbiterSigner.publicKey,
+      lamports: voteRent + 1_000_000,
+    }),
+    SystemProgram.transfer({
+      fromPubkey: payer.publicKey,
+      toPubkey: arbiterB.publicKey,
+      lamports: voteRent + 1_000_000,
     }),
   ],
 );
@@ -384,13 +456,13 @@ await send("v1 AI review", [
   ix(
     "record_ai_review",
     [
-      { pubkey: payer.publicKey, isSigner: true, isWritable: false },
+      { pubkey: arbiter, isSigner: true, isWritable: false },
       { pubkey: bountyPda(v1Id), isSigner: false, isWritable: true },
     ],
     Buffer.from([91, 0, 0]),
     hash(`${v1Id}:ai-report`),
   ),
-]);
+], [arbiterSigner]);
 await send("v1 release", [
   acceptInstruction("accept_claim", v1Id, legacyFinder.publicKey),
 ]);
@@ -406,10 +478,29 @@ assert(v2Account, "v2 bounty account không tồn tại");
 assert(decodeBounty(v2Account.data).protocolVersion === 2, "create_bounty_v2 phải ghi protocol_version=2");
 await send("v2 fund", [fundInstruction(v2Id)]);
 
+const panel = arbitrationPanelPda(v2Id);
+await send("v2 configure 2-of-3 panel", [
+  ix(
+    "configure_arbitration_panel",
+    [
+      { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+      { pubkey: bountyPda(v2Id), isSigner: false, isWritable: true },
+      { pubkey: panel, isSigner: false, isWritable: true },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+    ],
+    arbiter.toBuffer(),
+    arbiterB.publicKey.toBuffer(),
+    arbiterC.publicKey.toBuffer(),
+    Buffer.from([2]),
+  ),
+]);
+
 const claimA = claimPda(v2Id, finderA.publicKey);
 const claimB = claimPda(v2Id, finderB.publicKey);
+const claimC = claimPda(v2Id, finderC.publicKey);
 const evidenceA = hash(`${v2Id}:evidence:A`);
 const evidenceB = hash(`${v2Id}:evidence:B`);
+const evidenceC = hash(`${v2Id}:evidence:C`);
 await send(
   "v2 claim A",
   [
@@ -442,6 +533,26 @@ await send(
   ],
   [finderB],
 );
+await send(
+  "v2 claim C",
+  [
+    ix(
+      "submit_claim_v2",
+      [
+        { pubkey: finderC.publicKey, isSigner: true, isWritable: true },
+        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: false },
+        { pubkey: claimC, isSigner: false, isWritable: true },
+        { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      ],
+      evidenceC,
+    ),
+  ],
+  [finderC],
+);
+
+await expectProgramFailure("v2 mismatched claim/finder settlement", [
+  acceptInstruction("accept_claim_v2", v2Id, finderA.publicKey, claimB),
+]);
 
 const inputHash = hash(`${v2Id}:ai-input`);
 const reportHash = hash(`${v2Id}:ai-report`);
@@ -459,14 +570,70 @@ await send("v2 AI provenance", [
     reportHash,
     modelHash,
   ),
-]);
-await send("v2 reject claim B", [
-  ix("reject_claim_v2", [
-    { pubkey: payer.publicKey, isSigner: true, isWritable: false },
-    { pubkey: bountyPda(v2Id), isSigner: false, isWritable: false },
+], [arbiterSigner]);
+
+const disputeCase = disputeCasePda(v2Id, finderB.publicKey);
+await send("v2 open dispute B", [
+  ix("open_dispute_v3", [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: true },
+    { pubkey: bountyPda(v2Id), isSigner: false, isWritable: true },
     { pubkey: claimB, isSigner: false, isWritable: true },
+    { pubkey: panel, isSigner: false, isWritable: false },
+    { pubkey: disputeCase, isSigner: false, isWritable: true },
+    { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ]),
 ]);
+v2Account = await readRpc(() => connection.getAccountInfo(bountyPda(v2Id), "confirmed"));
+assert(decodeBounty(v2Account.data).status === 6, "dispute phải khóa bounty ở trạng thái Disputed");
+
+for (const [label, voter] of [
+  ["lead", arbiterSigner],
+  ["second", arbiterB],
+]) {
+  await send(
+    `v2 ${label} arbiter rejects B`,
+    [
+      ix(
+        "cast_arbitration_vote",
+        [
+          { pubkey: voter.publicKey, isSigner: true, isWritable: true },
+          { pubkey: panel, isSigner: false, isWritable: false },
+          { pubkey: disputeCase, isSigner: false, isWritable: true },
+          { pubkey: claimB, isSigner: false, isWritable: false },
+          {
+            pubkey: arbitrationVotePda(disputeCase, voter.publicKey),
+            isSigner: false,
+            isWritable: true,
+          },
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+        ],
+        Buffer.from([0]),
+      ),
+    ],
+    [voter],
+  );
+}
+
+let disputeAccount = await readRpc(() => connection.getAccountInfo(disputeCase, "confirmed"));
+let disputeState = decodeDisputeCase(disputeAccount.data);
+assert(
+  disputeState.releaseVotes === 0 && disputeState.rejectVotes === 2 && disputeState.decision === 2,
+  "panel phải đạt quorum 2/3 cho quyết định từ chối",
+);
+await send("v2 finalize rejected dispute B", [
+  ix("finalize_dispute_reject", [
+    { pubkey: payer.publicKey, isSigner: true, isWritable: false },
+    { pubkey: bountyPda(v2Id), isSigner: false, isWritable: true },
+    { pubkey: claimB, isSigner: false, isWritable: true },
+    { pubkey: panel, isSigner: false, isWritable: false },
+    { pubkey: disputeCase, isSigner: false, isWritable: true },
+  ]),
+]);
+v2Account = await readRpc(() => connection.getAccountInfo(bountyPda(v2Id), "confirmed"));
+disputeAccount = await readRpc(() => connection.getAccountInfo(disputeCase, "confirmed"));
+disputeState = decodeDisputeCase(disputeAccount.data);
+assert(decodeBounty(v2Account.data).status === 1, "quorum từ chối phải mở lại escrow Funded");
+assert(disputeState.finalized, "dispute case phải được finalize bất biến");
 
 const attestation = attestationPda(v2Id, finderA.publicKey);
 const ownerReputation = reputationPda(payer.publicKey);
@@ -490,7 +657,7 @@ await send("v2 release + attestation", [
 
 const finalAccounts = await readRpc(() =>
   connection.getMultipleAccountsInfo(
-    [bountyPda(v2Id), claimA, claimB, attestation, ownerReputation, finderReputation],
+    [bountyPda(v2Id), claimA, claimB, claimC, attestation, ownerReputation, finderReputation],
     "confirmed",
   ),
 );
@@ -498,6 +665,7 @@ assert(finalAccounts.every(Boolean), "thiếu bounty/claim/attestation/reputatio
 const v2State = decodeBounty(finalAccounts[0].data);
 const claimAState = decodeClaim(finalAccounts[1].data);
 const claimBState = decodeClaim(finalAccounts[2].data);
+const claimCState = decodeClaim(finalAccounts[3].data);
 const finderAfter = await tokenAmount(finderA.publicKey);
 const vaultAfter = await tokenAmount(vaultPda(v2Id));
 
@@ -506,6 +674,7 @@ assert(v2State.status === 5 && v2State.fundedAmount === 0n, "v2 escrow phải Re
 assert(v2State.finder.equals(finderA.publicKey), "v2 settlement finder không khớp");
 assert(claimAState.status === 4, "claim A phải Settled");
 assert(claimBState.status === 2, "claim B phải Rejected độc lập");
+assert(claimCState.status === 0, "claim C phải còn độc lập sau khi claim A được chọn");
 assert(claimAState.evidenceHash.equals(evidenceA), "content hash bằng chứng không khớp");
 assert(claimAState.inputHash.equals(inputHash), "AI input provenance không khớp");
 assert(claimAState.reportHash.equals(reportHash), "AI report provenance không khớp");
@@ -513,9 +682,15 @@ assert(claimAState.modelHash.equals(modelHash), "AI model provenance không kh�
 assert(finderAfter - finderBefore === reward, "finder chưa nhận đúng FIND từ vault");
 assert(vaultAfter === 0n, "vault còn dư FIND sau settlement");
 
+await expectProgramFailure("v2 repeat settlement after escrow release", [
+  acceptInstruction("accept_claim_v2", v2Id, finderC.publicKey, claimC),
+]);
+
 console.log("\nSMOKE OK");
 console.log("- v1 backward compatibility: verified");
-console.log("- v2 independent claims: verified");
+console.log("- three independent v2 claims: verified");
+console.log("- mismatch + repeat settlement rejection: verified");
+console.log("- dispute lock + 2-of-3 quorum: verified");
 console.log("- escrow release: verified");
 console.log("- AI/content hashes: verified");
 console.log("- attestation + reputation: verified");
