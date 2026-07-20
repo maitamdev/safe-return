@@ -15,6 +15,17 @@ import type { ClaimWorkflowStatus } from "./workflow";
 import { PROTOCOL_V2_ENABLED } from "./config";
 import type { BountyMeta } from "./store";
 
+const SYNC_OUTBOX_KEY = "safereturn:sync-outbox:v1";
+const SYNC_OUTBOX_TTL_MS = 24 * 60 * 60_000;
+
+type PendingSync = {
+  key: string;
+  kind: "bounty" | "claim" | "state";
+  bounty: BountyMeta;
+  claim?: BountyMeta["claim"];
+  createdAt: number;
+};
+
 type BountyRow = {
   id: string;
   owner_wallet: string;
@@ -53,6 +64,8 @@ type ClaimRow = {
   ai_prompt_version?: string | null;
   status?: string;
   workflow_status?: ClaimWorkflowStatus;
+  dispute_deadline?: string | null;
+  resolution_deadline?: string | null;
   last_tx?: string | null;
   last_tx_url?: string | null;
   submitted_at: string;
@@ -115,6 +128,71 @@ export async function syncClaimToSupabase(bounty: BountyMeta): Promise<void> {
   });
   const json = (await response.json().catch(() => ({}))) as { error?: string };
   if (!response.ok) throw new Error(json.error || "Không đồng bộ được claim.");
+}
+
+export function queuePendingSync(
+  kind: PendingSync["kind"],
+  bounty: BountyMeta,
+  claim?: BountyMeta["claim"],
+) {
+  if (typeof window === "undefined") return;
+  const finder = claim?.finderWallet || bounty.claim?.finderWallet || "bounty";
+  const entry: PendingSync = {
+    key: `${kind}:${bounty.id}:${finder}`,
+    kind,
+    bounty,
+    claim,
+    createdAt: Date.now(),
+  };
+  const existing = readPendingSyncs().filter((item) => item.key !== entry.key);
+  window.localStorage.setItem(
+    SYNC_OUTBOX_KEY,
+    JSON.stringify([...existing, entry].slice(-20)),
+  );
+}
+
+export async function flushPendingSyncs() {
+  if (typeof window === "undefined") return 0;
+  const pending = readPendingSyncs();
+  const failed: PendingSync[] = [];
+  let completed = 0;
+  for (const item of pending) {
+    try {
+      if (item.kind === "bounty") await syncBountyToSupabase(item.bounty);
+      else if (item.kind === "claim") await syncClaimToSupabase(item.bounty);
+      else await syncBountyStateToSupabase(item.bounty, item.claim);
+      completed += 1;
+    } catch {
+      failed.push(item);
+    }
+  }
+  if (failed.length) {
+    window.localStorage.setItem(SYNC_OUTBOX_KEY, JSON.stringify(failed));
+  } else {
+    window.localStorage.removeItem(SYNC_OUTBOX_KEY);
+  }
+  return completed;
+}
+
+function readPendingSyncs(): PendingSync[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const parsed = JSON.parse(
+      window.localStorage.getItem(SYNC_OUTBOX_KEY) || "[]",
+    ) as PendingSync[];
+    const now = Date.now();
+    return Array.isArray(parsed)
+      ? parsed.filter(
+          (item) =>
+            item &&
+            typeof item.key === "string" &&
+            now - Number(item.createdAt) <= SYNC_OUTBOX_TTL_MS,
+        )
+      : [];
+  } catch {
+    window.localStorage.removeItem(SYNC_OUTBOX_KEY);
+    return [];
+  }
 }
 
 export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
@@ -235,6 +313,12 @@ function fromClaimRow(bountyId: string, claim: ClaimRow) {
     aiPromptVersion: claim.ai_prompt_version,
     status: claim.status,
     workflowStatus: claim.workflow_status || "awaiting_review",
+    disputeDeadline: claim.dispute_deadline
+      ? Date.parse(claim.dispute_deadline)
+      : null,
+    resolutionDeadline: claim.resolution_deadline
+      ? Date.parse(claim.resolution_deadline)
+      : null,
     lastTx: claim.last_tx,
     lastTxUrl: claim.last_tx_url,
   } satisfies NonNullable<BountyMeta["claim"]>;

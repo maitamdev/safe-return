@@ -120,7 +120,7 @@ export async function POST(req: Request) {
         throw new ApiError(409, "Hash ClaimV2 không khớp dữ liệu bằng chứng.");
       }
       const now = new Date().toISOString();
-      const { error } = await admin.from("claims").upsert(
+      const { data: savedClaim, error } = await admin.from("claims").upsert(
         {
           bounty_id: bountyId,
           finder_id: user.id,
@@ -144,8 +144,29 @@ export async function POST(req: Request) {
           updated_at: now,
         },
         { onConflict: "bounty_id,finder_wallet" }
-      );
+      ).select("id").single();
       if (error) throw new Error(error.message);
+      const { data: bountyOwner, error: ownerError } = await admin
+        .from("bounties")
+        .select("owner_id")
+        .eq("id", bountyId)
+        .single();
+      if (ownerError) throw new Error(ownerError.message);
+      const { error: notificationError } = await admin
+        .from("claim_notifications")
+        .upsert(
+          {
+            user_id: bountyOwner.owner_id,
+            claim_id: savedClaim.id,
+            bounty_id: bountyId,
+            kind: "claim_submitted",
+            title: "Có bằng chứng mới",
+            body: "Một người tìm thấy vừa gửi bằng chứng riêng tư cho tin của bạn.",
+            dedupe_key: `claim-submitted:${chainClaim.address}`,
+          },
+          { onConflict: "dedupe_key", ignoreDuplicates: true },
+        );
+      if (notificationError) throw new Error(notificationError.message);
       return Response.json({
         ok: true,
         status: "submitted",

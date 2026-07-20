@@ -54,6 +54,8 @@ export const IX = {
   record_ai_review_v2: Buffer.from([26, 254, 147, 241, 70, 209, 216, 6]),
   accept_claim_v2: Buffer.from([162, 165, 30, 224, 250, 107, 148, 218]),
   reject_claim_v2: Buffer.from([178, 62, 173, 231, 192, 12, 42, 112]),
+  finalize_rejection_v2: Buffer.from([12, 38, 251, 74, 146, 28, 233, 22]),
+  timeout_dispute_v2: Buffer.from([205, 220, 89, 130, 156, 79, 55, 150]),
   open_dispute_v2: Buffer.from([61, 105, 238, 185, 222, 78, 48, 138]),
   resolve_dispute_v2: Buffer.from([35, 255, 241, 246, 120, 1, 194, 73]),
   attest_settlement: Buffer.from([139, 194, 42, 227, 36, 121, 240, 227]),
@@ -139,10 +141,18 @@ export type OnChainBounty = {
   updatedAt: number;
   protocolVersion: number;
   arbitrationMode: number;
+  activeClaims: number;
+  workflowVersion: number;
 };
 
 export type ClaimV2StatusName =
-  "Submitted" | "AiReviewed" | "Rejected" | "Disputed" | "Settled" | "Unknown";
+  | "Submitted"
+  | "AiReviewed"
+  | "Rejected"
+  | "Disputed"
+  | "Settled"
+  | "RejectionPending"
+  | "Unknown";
 
 const CLAIM_V2_STATUS_MAP: ClaimV2StatusName[] = [
   "Submitted",
@@ -150,6 +160,7 @@ const CLAIM_V2_STATUS_MAP: ClaimV2StatusName[] = [
   "Rejected",
   "Disputed",
   "Settled",
+  "RejectionPending",
 ];
 
 export type OnChainClaimV2 = {
@@ -166,6 +177,9 @@ export type OnChainClaimV2 = {
   status: ClaimV2StatusName;
   createdAt: number;
   updatedAt: number;
+  disputeDeadline: number;
+  resolutionDeadline: number;
+  workflowVersion: number;
 };
 
 export type OnChainReputation = {
@@ -462,7 +476,9 @@ export function submitClaimV2SponsoredInstruction(args: {
     keys: [
       { pubkey: args.finder, isSigner: true, isWritable: false },
       { pubkey: args.sponsor, isSigner: true, isWritable: true },
-      { pubkey: bounty, isSigner: false, isWritable: false },
+      // submit_claim_v2_sponsored increments bounty.active_claims.
+      // Anchor rejects a read-only account here with ConstraintMut (2000).
+      { pubkey: bounty, isSigner: false, isWritable: true },
       { pubkey: claim, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
@@ -710,20 +726,35 @@ export async function submitClaimV2OnChain(
   bountyId: string,
   evidenceHash: Uint8Array,
 ) {
-  const [bounty] = bountyPda(bountyId);
+  const ix = submitClaimV2Instruction({
+    finder: wallet.publicKey,
+    bountyId,
+    evidenceHash,
+  });
   const [claim] = claimV2Pda(bountyId, wallet.publicKey);
-  const ix = new TransactionInstruction({
+  const result = await sendIx(wallet, [ix], "submit_claim_v2");
+  return { ...result, claimPda: claim.toBase58() };
+}
+
+export function submitClaimV2Instruction(args: {
+  finder: PublicKey;
+  bountyId: string;
+  evidenceHash: Uint8Array;
+}): TransactionInstruction {
+  const [bounty] = bountyPda(args.bountyId);
+  const [claim] = claimV2Pda(args.bountyId, args.finder);
+  return new TransactionInstruction({
     programId: PROGRAM_PK,
     keys: [
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
-      { pubkey: bounty, isSigner: false, isWritable: false },
+      { pubkey: args.finder, isSigner: true, isWritable: true },
+      // submit_claim_v2 increments bounty.active_claims.
+      // Anchor rejects a read-only account here with ConstraintMut (2000).
+      { pubkey: bounty, isSigner: false, isWritable: true },
       { pubkey: claim, isSigner: false, isWritable: true },
       { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
     ],
-    data: Buffer.concat([IX.submit_claim_v2, encodeBytes32(evidenceHash)]),
+    data: Buffer.concat([IX.submit_claim_v2, encodeBytes32(args.evidenceHash)]),
   });
-  const result = await sendIx(wallet, [ix], "submit_claim_v2");
-  return { ...result, claimPda: claim.toBase58() };
 }
 
 export async function recordAiReviewOnChain(
@@ -898,6 +929,44 @@ export async function rejectClaimV2OnChain(
     data: Buffer.from(IX.reject_claim_v2),
   });
   return sendIx(wallet, [ix], "reject_claim_v2");
+}
+
+export async function finalizeRejectionV2OnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  finder: PublicKey,
+) {
+  const [bounty] = bountyPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: claim, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.from(IX.finalize_rejection_v2),
+  });
+  return sendIx(wallet, [ix], "finalize_rejection_v2");
+}
+
+export async function timeoutDisputeV2OnChain(
+  wallet: WalletLike,
+  bountyId: string,
+  finder: PublicKey,
+) {
+  const [bounty] = bountyPda(bountyId);
+  const [claim] = claimV2Pda(bountyId, finder);
+  const ix = new TransactionInstruction({
+    programId: PROGRAM_PK,
+    keys: [
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: false },
+      { pubkey: bounty, isSigner: false, isWritable: true },
+      { pubkey: claim, isSigner: false, isWritable: true },
+    ],
+    data: Buffer.from(IX.timeout_dispute_v2),
+  });
+  return sendIx(wallet, [ix], "timeout_dispute_v2");
 }
 
 export async function refundAfterExpiryOnChain(
@@ -1257,7 +1326,10 @@ export function decodeBountyAccount(data: Buffer): OnChainBounty | null {
     const updatedAt = Number(data.readBigInt64LE(o));
     o += 8;
     const protocolVersion = data[o++] ?? 0;
-    const arbitrationMode = data[o] ?? 0;
+    const arbitrationMode = data[o++] ?? 0;
+    const activeClaims = data.length >= o + 4 ? data.readUInt32LE(o) : 0;
+    o += 4;
+    const workflowVersion = data[o] ?? 0;
 
     return {
       address: "",
@@ -1280,6 +1352,8 @@ export function decodeBountyAccount(data: Buffer): OnChainBounty | null {
       updatedAt,
       protocolVersion,
       arbitrationMode,
+      activeClaims,
+      workflowVersion,
     };
   } catch {
     return null;
@@ -1321,6 +1395,12 @@ export function decodeClaimV2Account(data: Buffer): OnChainClaimV2 | null {
     const createdAt = Number(data.readBigInt64LE(offset));
     offset += 8;
     const updatedAt = Number(data.readBigInt64LE(offset));
+    offset += 8;
+    const disputeDeadline = Number(data.readBigInt64LE(offset));
+    offset += 8;
+    const resolutionDeadline = Number(data.readBigInt64LE(offset));
+    offset += 8;
+    const workflowVersion = data[offset] ?? 0;
 
     return {
       address: "",
@@ -1336,6 +1416,9 @@ export function decodeClaimV2Account(data: Buffer): OnChainClaimV2 | null {
       status,
       createdAt,
       updatedAt,
+      disputeDeadline,
+      resolutionDeadline,
+      workflowVersion,
     };
   } catch {
     return null;

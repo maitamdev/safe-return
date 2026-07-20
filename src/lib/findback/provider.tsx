@@ -27,6 +27,7 @@ import {
   fundBountyOnChain,
   finalizeDisputeRejectOnChain,
   finalizeDisputeReleaseOnChain,
+  finalizeRejectionV2OnChain,
   openDisputeOnChain,
   openDisputeV2OnChain,
   openDisputeV3OnChain,
@@ -37,6 +38,7 @@ import {
   rejectClaimV2OnChain,
   submitClaimOnChain,
   submitClaimV2OnChain,
+  timeoutDisputeV2OnChain,
   type OnChainBounty,
   type WalletLike,
 } from "./program";
@@ -61,6 +63,8 @@ import { uploadPrivateMedia } from "@/lib/media/client";
 import { useAuth } from "@/lib/auth/AuthProvider";
 import {
   fetchBountiesFromSupabase,
+  flushPendingSyncs,
+  queuePendingSync,
   subscribeToBountyChanges,
   syncBountyStateToSupabase,
   syncClaimToSupabase,
@@ -110,6 +114,8 @@ type FindBackCtx = {
   configureArbitrationPanel: (bountyId: string, arbiters: [string, string, string]) => Promise<void>;
   voteArbitration: (bountyId: string, finderWallet: string, releaseToFinder: boolean) => Promise<void>;
   finalizeArbitration: (bountyId: string, finderWallet: string, releaseToFinder: boolean) => Promise<void>;
+  finalizeRejection: (bountyId: string, finderWallet: string) => Promise<void>;
+  timeoutDispute: (bountyId: string, finderWallet: string) => Promise<void>;
   fetchOnChain: (bountyId: string) => Promise<OnChainBounty | null>;
 };
 
@@ -137,6 +143,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const { user } = useAuth();
   const [bounties, setBounties] = useState<BountyMeta[]>([]);
   const bountiesRef = useRef<BountyMeta[]>([]);
+  const lastReconcileAtRef = useRef(0);
   const [loadingBounties, setLoadingBounties] = useState(true);
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [lastTxUrl, setLastTxUrl] = useState<string | null>(null);
@@ -163,6 +170,26 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     []
   );
 
+  const syncRecoverably = useCallback(
+    async (
+      kind: "bounty" | "claim" | "state",
+      bounty: BountyMeta,
+      claim?: BountyMeta["claim"],
+    ) => {
+      try {
+        if (kind === "bounty") await syncBountyToSupabase(bounty);
+        else if (kind === "claim") await syncClaimToSupabase(bounty);
+        else await syncBountyStateToSupabase(bounty, claim);
+      } catch {
+        queuePendingSync(kind, bounty, claim);
+        setError(
+          "Giao dịch Devnet đã xác nhận. Dữ liệu hiển thị đang được tự động đồng bộ lại.",
+        );
+      }
+    },
+    [],
+  );
+
   const refresh = useCallback(async () => {
     if (!user) {
       replaceBounties([]);
@@ -171,6 +198,14 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     }
     setLoadingBounties(true);
     try {
+      await flushPendingSyncs();
+      if (Date.now() - lastReconcileAtRef.current >= 60_000) {
+        lastReconcileAtRef.current = Date.now();
+        await fetch("/api/bounties/reconcile", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }).catch(() => null);
+      }
       replaceBounties(await fetchBountiesFromSupabase());
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
@@ -376,7 +411,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           lastTxUrl: createdAndFunded.url,
         };
         if (!user?.id) throw new Error("Phiên đăng nhập đã hết hạn.");
-        await syncBountyToSupabase(saved);
+        await syncRecoverably("bounty", saved);
         upsertInMemory(saved);
         await refresh();
         return;
@@ -408,11 +443,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTxUrl: created?.url ?? null,
       };
       if (!user?.id) throw new Error("Phiên đăng nhập đã hết hạn.");
-      await syncBountyToSupabase(draft);
+      await syncRecoverably("bounty", draft);
       upsertInMemory(draft);
 
       if (existing?.status === "Funded") {
-        await syncBountyStateToSupabase(draft);
+        await syncRecoverably("state", draft);
         await refresh();
         return;
       }
@@ -437,11 +472,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTx: funded.signature,
         lastTxUrl: funded.url,
       };
-      await syncBountyStateToSupabase(saved);
+      await syncRecoverably("state", saved);
       upsertInMemory(saved);
       await refresh();
     },
-    [requireWallet, runTx, refresh, upsertInMemory, user]
+    [requireWallet, runTx, refresh, syncRecoverably, upsertInMemory, user]
   );
 
   const fund = useCallback(
@@ -472,11 +507,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTx: result.signature,
         lastTxUrl: result.url,
       };
-      await syncBountyStateToSupabase(updated);
+      await syncRecoverably("state", updated);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const reviewClaim = useCallback(
@@ -604,12 +639,12 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTx: claimTx.signature,
         lastTxUrl: claimTx.url,
       };
-      await syncClaimToSupabase(submitted);
+      await syncRecoverably("claim", submitted);
       upsertInMemory(submitted);
       await refresh();
       return null;
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const accept = useCallback(
@@ -638,11 +673,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
             acceptClaimOnChain(w, bountyId, new PublicKey(finderStr))
           );
       const updated = { ...meta, status: "Released", lastTx: res.signature, lastTxUrl: res.url };
-      await syncBountyStateToSupabase(updated, targetClaim);
+      await syncRecoverably("state", updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const reject = useCallback(
@@ -664,17 +699,14 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         : await runTx("reject_claim", () => rejectClaimOnChain(w, bountyId));
       const updated = {
         ...meta,
-        status: "Funded",
-        claim: null,
-        aiReport: null,
         lastTx: res.signature,
         lastTxUrl: res.url,
       };
-      await syncBountyStateToSupabase(updated, targetClaim);
+      await syncRecoverably("state", updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const dispute = useCallback(
@@ -699,11 +731,57 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
             )
         : await runTx("open_dispute", () => openDisputeOnChain(w, bountyId));
       const updated = { ...meta, status: "Disputed", lastTx: result.signature, lastTxUrl: result.url };
-      await syncBountyStateToSupabase(updated, targetClaim);
+      await syncRecoverably("state", updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
+  );
+
+  const finalizeRejection = useCallback(
+    async (bountyId: string, finderWallet: string) => {
+      const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
+      const meta = currentBounty(bountyId);
+      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      const targetClaim =
+        meta.claims?.find((claim) => claim.finderWallet === finderWallet) ||
+        meta.claim;
+      const result = await runTx("finalize_rejection_v2", () =>
+        finalizeRejectionV2OnChain(w, bountyId, new PublicKey(finderWallet)),
+      );
+      const updated = {
+        ...meta,
+        lastTx: result.signature,
+        lastTxUrl: result.url,
+      };
+      await syncRecoverably("state", updated, targetClaim);
+      await refresh();
+    },
+    [currentBounty, refresh, requireWallet, runTx, syncRecoverably],
+  );
+
+  const timeoutDispute = useCallback(
+    async (bountyId: string, finderWallet: string) => {
+      const w = requireWallet();
+      await requireVerifiedWallet(w.publicKey.toBase58());
+      const meta = currentBounty(bountyId);
+      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      const targetClaim =
+        meta.claims?.find((claim) => claim.finderWallet === finderWallet) ||
+        meta.claim;
+      const result = await runTx("timeout_dispute_v2", () =>
+        timeoutDisputeV2OnChain(w, bountyId, new PublicKey(finderWallet)),
+      );
+      const updated = {
+        ...meta,
+        lastTx: result.signature,
+        lastTxUrl: result.url,
+      };
+      await syncRecoverably("state", updated, targetClaim);
+      await refresh();
+    },
+    [currentBounty, refresh, requireWallet, runTx, syncRecoverably],
   );
 
   const refund = useCallback(
@@ -716,11 +794,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         refundAfterExpiryOnChain(w, bountyId)
       );
       const updated = { ...meta, status: "Refunded", lastTx: res.signature, lastTxUrl: res.url };
-      await syncBountyStateToSupabase(updated);
+      await syncRecoverably("state", updated);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const cancel = useCallback(
@@ -733,11 +811,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         cancelBountyOnChain(w, bountyId)
       );
       const updated = { ...meta, status: "Cancelled", lastTx: result.signature, lastTxUrl: result.url };
-      await syncBountyStateToSupabase(updated);
+      await syncRecoverably("state", updated);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const resolveDispute = useCallback(
@@ -777,11 +855,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTx: result.signature,
         lastTxUrl: result.url,
       };
-      await syncBountyStateToSupabase(updated, targetClaim);
+      await syncRecoverably("state", updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, requireWallet, runTx, refresh, upsertInMemory]
+    [currentBounty, requireWallet, runTx, refresh, syncRecoverably, upsertInMemory]
   );
 
   const configureArbitrationPanel = useCallback(
@@ -845,11 +923,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         lastTx: result.signature,
         lastTxUrl: result.url,
       };
-      await syncBountyStateToSupabase(updated, targetClaim);
+      await syncRecoverably("state", updated, targetClaim);
       upsertInMemory(updated);
       await refresh();
     },
-    [currentBounty, refresh, requireWallet, runTx, upsertInMemory]
+    [currentBounty, refresh, requireWallet, runTx, syncRecoverably, upsertInMemory]
   );
 
   const value: FindBackCtx = {
@@ -878,6 +956,8 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     configureArbitrationPanel,
     voteArbitration,
     finalizeArbitration,
+    finalizeRejection,
+    timeoutDispute,
     fetchOnChain: fetchBounty,
   };
 

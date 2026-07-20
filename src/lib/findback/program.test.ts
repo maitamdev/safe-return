@@ -23,6 +23,7 @@ import {
   reputationPda,
   returnAttestationPda,
   submitClaimV2SponsoredInstruction,
+  submitClaimV2Instruction,
 } from "./program";
 
 type IdlInstruction = { name: string; discriminator: number[] };
@@ -214,6 +215,32 @@ describe("FindBack generated IDL contract", () => {
       expect(signers).toHaveLength(2);
       expect(signers.some((key) => key.pubkey.equals(owner))).toBe(true);
       expect(signers.some((key) => key.pubkey.equals(sponsor) && key.isWritable)).toBe(true);
+    }
+  });
+
+  it("marks the bounty writable for both v2 claim instructions", () => {
+    const finder = Keypair.generate().publicKey;
+    const sponsor = Keypair.generate().publicKey;
+    const bountyId = "writable-claim-test";
+    const [bounty] = bountyPda(bountyId);
+    const instructionsToCheck = [
+      submitClaimV2Instruction({
+        finder,
+        bountyId,
+        evidenceHash: new Uint8Array(32).fill(3),
+      }),
+      submitClaimV2SponsoredInstruction({
+        finder,
+        sponsor,
+        bountyId,
+        evidenceHash: new Uint8Array(32).fill(4),
+      }),
+    ];
+
+    for (const instruction of instructionsToCheck) {
+      const bountyMeta = instruction.keys.find((key) => key.pubkey.equals(bounty));
+      expect(bountyMeta).toBeDefined();
+      expect(bountyMeta?.isWritable).toBe(true);
     }
   });
 });

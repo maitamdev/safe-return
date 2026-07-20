@@ -26,6 +26,8 @@ export type ClaimMeta = {
   aiPromptVersion?: string | null;
   status?: string;
   workflowStatus?: ClaimWorkflowStatus;
+  disputeDeadline?: number | null;
+  resolutionDeadline?: number | null;
   lastTx?: string | null;
   lastTxUrl?: string | null;
 };

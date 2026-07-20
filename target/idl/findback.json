@@ -3264,6 +3264,118 @@
       "args": []
     },
     {
+      "name": "finalize_rejection_v2",
+      "discriminator": [
+        12,
+        38,
+        251,
+        74,
+        146,
+        28,
+        233,
+        22
+      ],
+      "accounts": [
+        {
+          "name": "finalizer",
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [98, 111, 117, 110, 116, 121]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          },
+          "relations": ["claim"]
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 108, 97, 105, 109, 95, 118, 50]
+              },
+              { "kind": "account", "path": "bounty" },
+              {
+                "kind": "account",
+                "path": "claim.finder",
+                "account": "ClaimV2"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "timeout_dispute_v2",
+      "discriminator": [
+        205,
+        220,
+        89,
+        130,
+        156,
+        79,
+        55,
+        150
+      ],
+      "accounts": [
+        {
+          "name": "finalizer",
+          "signer": true
+        },
+        {
+          "name": "bounty",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [98, 111, 117, 110, 116, 121]
+              },
+              {
+                "kind": "account",
+                "path": "bounty.bounty_id",
+                "account": "Bounty"
+              }
+            ]
+          },
+          "relations": ["claim"]
+        },
+        {
+          "name": "claim",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [99, 108, 97, 105, 109, 95, 118, 50]
+              },
+              { "kind": "account", "path": "bounty" },
+              {
+                "kind": "account",
+                "path": "claim.finder",
+                "account": "ClaimV2"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "resolve_dispute",
       "discriminator": [
         231,
@@ -3737,6 +3849,7 @@
         },
         {
           "name": "bounty",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -3828,6 +3941,7 @@
         },
         {
           "name": "bounty",
+          "writable": true,
           "pda": {
             "seeds": [
               {
@@ -4396,6 +4510,31 @@
       "code": 6028,
       "name": "QuorumNotReached",
       "msg": "The arbitration quorum has not reached this decision"
+    },
+    {
+      "code": 6029,
+      "name": "DisputeWindowOpen",
+      "msg": "The finder dispute window is still open"
+    },
+    {
+      "code": 6030,
+      "name": "DisputeWindowClosed",
+      "msg": "The finder dispute window has closed"
+    },
+    {
+      "code": 6031,
+      "name": "ResolutionWindowOpen",
+      "msg": "The arbitration resolution window is still open"
+    },
+    {
+      "code": 6032,
+      "name": "ResolutionWindowClosed",
+      "msg": "The arbitration resolution window has closed"
+    },
+    {
+      "code": 6033,
+      "name": "ActiveClaimsRemain",
+      "msg": "Active claims must be resolved before refund"
     }
   ],
   "types": [
@@ -4672,6 +4811,20 @@
               "0 = legacy single arbiter, 1 = configured 2-of-3 panel."
             ],
             "type": "u8"
+          },
+          {
+            "name": "active_claims",
+            "docs": [
+              "Number of unresolved ClaimV2 accounts for workflow-enabled bounties."
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "workflow_version",
+            "docs": [
+              "0 = legacy behavior, 1 = rejection window + refund/liveness guards."
+            ],
+            "type": "u8"
           }
         ]
       }
@@ -4938,6 +5091,18 @@
           {
             "name": "updated_at",
             "type": "i64"
+          },
+          {
+            "name": "dispute_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "resolution_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "workflow_version",
+            "type": "u8"
           }
         ]
       }
@@ -5080,6 +5245,9 @@
           },
           {
             "name": "Settled"
+          },
+          {
+            "name": "RejectionPending"
           }
         ]
       }

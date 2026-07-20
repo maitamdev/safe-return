@@ -70,18 +70,6 @@ export async function POST(req: Request) {
     }
 
     const status = toDbStatus(onchain.status);
-    const { error: updateError } = await admin
-      .from("bounties")
-      .update({
-        status,
-        ...(lastTx
-          ? { last_tx: lastTx, last_tx_url: explorerTxUrl(lastTx) }
-          : {}),
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", bountyId);
-    if (updateError) throw new Error(updateError.message);
-
     if (useV2 && chainClaim) {
       const claimStatus = toDbStatus(chainClaim.status);
       const workflowStatus =
@@ -91,50 +79,33 @@ export async function POST(req: Request) {
             ? "rejected"
             : chainClaim.status === "Disputed"
               ? "disputed"
-              : undefined;
-      const { error: claimUpdateError } = await admin
-        .from("claims")
+              : chainClaim.status === "RejectionPending"
+                ? "rejection_pending"
+                : "";
+      const { error: syncError } = await admin.rpc("sync_claim_chain_state", {
+        p_bounty_id: bountyId,
+        p_claim_pda: chainClaim.address,
+        p_bounty_status: status,
+        p_claim_status: claimStatus,
+        p_workflow_status: workflowStatus,
+        p_dispute_deadline: unixSecondsToIso(chainClaim.disputeDeadline),
+        p_resolution_deadline: unixSecondsToIso(chainClaim.resolutionDeadline),
+        p_last_tx: lastTx,
+        p_last_tx_url: lastTx ? explorerTxUrl(lastTx) : null,
+      });
+      if (syncError) throw new Error(syncError.message);
+    } else {
+      const { error: updateError } = await admin
+        .from("bounties")
         .update({
-          status: claimStatus,
-          ...(workflowStatus ? { workflow_status: workflowStatus } : {}),
+          status,
           ...(lastTx
             ? { last_tx: lastTx, last_tx_url: explorerTxUrl(lastTx) }
             : {}),
           updated_at: new Date().toISOString(),
         })
-        .eq("claim_pda", chainClaim.address)
-        .eq("bounty_id", bountyId);
-      if (claimUpdateError) throw new Error(claimUpdateError.message);
-
-      if (chainClaim.status === "Settled") {
-        const { data: claimRow, error: claimReadError } = await admin
-          .from("claims")
-          .select("id")
-          .eq("claim_pda", chainClaim.address)
-          .eq("bounty_id", bountyId)
-          .maybeSingle();
-        if (claimReadError) throw new Error(claimReadError.message);
-        if (claimRow) {
-          const { error: receivedError } = await admin
-            .from("claim_handovers")
-            .update({ owner_received_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-            .eq("claim_id", claimRow.id);
-          if (receivedError) throw new Error(receivedError.message);
-          const { error: closeOtherError } = await admin
-            .from("claims")
-            .update({ workflow_status: "rejected", updated_at: new Date().toISOString() })
-            .eq("bounty_id", bountyId)
-            .neq("id", claimRow.id)
-            .in("workflow_status", [
-              "awaiting_review",
-              "more_info_requested",
-              "handover_proposed",
-              "handover_scheduled",
-              "finder_delivered",
-            ]);
-          if (closeOtherError) throw new Error(closeOtherError.message);
-        }
-      }
+        .eq("id", bountyId);
+      if (updateError) throw new Error(updateError.message);
     }
 
     if (!useV2 && onchain.status === "Funded" && isDefaultKey(onchain.finder)) {
@@ -159,4 +130,9 @@ function isDefaultKey(value: string) {
 
 function toDbStatus(status: string) {
   return status.replace(/([a-z])([A-Z])/g, "$1_$2").toLowerCase();
+}
+
+function unixSecondsToIso(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return null;
+  return new Date(value * 1000).toISOString();
 }

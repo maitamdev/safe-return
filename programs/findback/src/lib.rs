@@ -21,6 +21,8 @@ pub const ARBITRATION_PANEL_SEED: &[u8] = b"arbitration_panel";
 pub const DISPUTE_CASE_SEED: &[u8] = b"dispute_case";
 pub const ARBITRATION_VOTE_SEED: &[u8] = b"arbitration_vote";
 pub const MAX_ID_LEN: usize = 32;
+pub const REJECTION_DISPUTE_WINDOW_SECONDS: i64 = 2 * 24 * 60 * 60;
+pub const DISPUTE_RESOLUTION_WINDOW_SECONDS: i64 = 14 * 24 * 60 * 60;
 
 #[program]
 pub mod findback {
@@ -168,7 +170,7 @@ pub mod findback {
     /// original instructions; all new multi-claim clients use this instruction.
     pub fn submit_claim_v2(ctx: Context<SubmitClaimV2>, evidence_hash: [u8; 32]) -> Result<()> {
         initialize_claim_v2(
-            &ctx.accounts.bounty,
+            &mut ctx.accounts.bounty,
             &mut ctx.accounts.claim,
             ctx.accounts.finder.key(),
             evidence_hash,
@@ -181,7 +183,7 @@ pub mod findback {
         evidence_hash: [u8; 32],
     ) -> Result<()> {
         initialize_claim_v2(
-            &ctx.accounts.bounty,
+            &mut ctx.accounts.bounty,
             &mut ctx.accounts.claim,
             ctx.accounts.finder.key(),
             evidence_hash,
@@ -369,10 +371,68 @@ pub mod findback {
             ),
             FbError::InvalidClaimStatus
         );
+        let now = Clock::get()?.unix_timestamp;
+        if claim.workflow_version >= 1 {
+            claim.status = ClaimV2Status::RejectionPending;
+            claim.dispute_deadline = now
+                .checked_add(REJECTION_DISPUTE_WINDOW_SECONDS)
+                .ok_or(FbError::MathOverflow)?;
+        } else {
+            claim.status = ClaimV2Status::Rejected;
+            emit!(ClaimV2Rejected {
+                bounty: ctx.accounts.bounty.key(),
+                claim: claim.key(),
+            });
+        }
+        claim.updated_at = now;
+        Ok(())
+    }
+
+    /// Finalizes an owner rejection only after the finder had a deterministic
+    /// on-chain window in which to open a dispute. Any signer may finalize so
+    /// a missing owner cannot leave the claim pending forever.
+    pub fn finalize_rejection_v2(ctx: Context<FinalizeClaimV2>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let bounty = &mut ctx.accounts.bounty;
+        let claim = &mut ctx.accounts.claim;
+        require!(
+            claim.status == ClaimV2Status::RejectionPending,
+            FbError::InvalidClaimStatus
+        );
+        require!(
+            claim.dispute_deadline > 0 && now > claim.dispute_deadline,
+            FbError::DisputeWindowOpen
+        );
         claim.status = ClaimV2Status::Rejected;
-        claim.updated_at = Clock::get()?.unix_timestamp;
+        claim.updated_at = now;
+        decrement_active_claims(bounty, claim.workflow_version)?;
         emit!(ClaimV2Rejected {
-            bounty: ctx.accounts.bounty.key(),
+            bounty: bounty.key(),
+            claim: claim.key(),
+        });
+        Ok(())
+    }
+
+    /// Liveness fallback for an abandoned arbitration. The timeout rejects the
+    /// claim and re-opens the bounty; it never transfers escrow to an arbitrary
+    /// caller. Any signer may execute the deterministic outcome.
+    pub fn timeout_dispute_v2(ctx: Context<FinalizeClaimV2>) -> Result<()> {
+        let now = Clock::get()?.unix_timestamp;
+        let bounty = &mut ctx.accounts.bounty;
+        let claim = &mut ctx.accounts.claim;
+        require!(claim.status == ClaimV2Status::Disputed, FbError::InvalidClaimStatus);
+        require!(
+            claim.resolution_deadline > 0 && now > claim.resolution_deadline,
+            FbError::ResolutionWindowOpen
+        );
+        require!(bounty.status == BountyStatus::Disputed, FbError::InvalidStatus);
+        claim.status = ClaimV2Status::Rejected;
+        claim.updated_at = now;
+        bounty.status = resume_after_v2_reject(bounty.status).ok_or(FbError::InvalidStatus)?;
+        bounty.updated_at = now;
+        decrement_active_claims(bounty, claim.workflow_version)?;
+        emit!(ClaimV2Rejected {
+            bounty: bounty.key(),
             claim: claim.key(),
         });
         Ok(())
@@ -429,6 +489,7 @@ pub mod findback {
         b.updated_at = now;
         claim.status = ClaimV2Status::Settled;
         claim.updated_at = now;
+        close_all_active_claims(b, claim.workflow_version);
 
         emit!(ClaimV2Settled {
             bounty: bounty_key,
@@ -457,6 +518,10 @@ pub mod findback {
         let now = Clock::get()?.unix_timestamp;
         require!(now > b.deadline, FbError::NotExpired);
         require!(b.amount_funded > 0, FbError::NothingToRefund);
+        require!(
+            b.workflow_version == 0 || b.active_claims == 0,
+            FbError::ActiveClaimsRemain
+        );
 
         let amount = b.amount_funded;
         let id_bytes = b.bounty_id.as_bytes();
@@ -528,21 +593,38 @@ pub mod findback {
         let locked_status =
             lock_for_v2_dispute(ctx.accounts.bounty.status).ok_or(FbError::InvalidStatus)?;
         let claim = &mut ctx.accounts.claim;
+        let signer = ctx.accounts.signer.key();
+        let rejection_pending = claim.status == ClaimV2Status::RejectionPending;
+        let now = Clock::get()?.unix_timestamp;
         require!(
-            ctx.accounts.signer.key() == ctx.accounts.bounty.owner
-                || ctx.accounts.signer.key() == claim.finder,
+            if rejection_pending {
+                signer == claim.finder
+            } else {
+                signer == ctx.accounts.bounty.owner || signer == claim.finder
+            },
             FbError::Unauthorized
         );
         require!(
             matches!(
                 claim.status,
-                ClaimV2Status::Submitted | ClaimV2Status::AiReviewed
+                ClaimV2Status::Submitted
+                    | ClaimV2Status::AiReviewed
+                    | ClaimV2Status::RejectionPending
             ),
             FbError::InvalidClaimStatus
         );
+        if rejection_pending {
+            require!(
+                claim.dispute_deadline > 0 && now <= claim.dispute_deadline,
+                FbError::DisputeWindowClosed
+            );
+        }
         claim.status = ClaimV2Status::Disputed;
-        let now = Clock::get()?.unix_timestamp;
         claim.updated_at = now;
+        claim.dispute_deadline = 0;
+        claim.resolution_deadline = now
+            .checked_add(DISPUTE_RESOLUTION_WINDOW_SECONDS)
+            .ok_or(FbError::MathOverflow)?;
         ctx.accounts.bounty.status = locked_status;
         ctx.accounts.bounty.updated_at = now;
         emit!(ClaimV2Disputed {
@@ -674,6 +756,7 @@ pub mod findback {
             b.status = BountyStatus::Released;
             b.updated_at = now;
             claim.status = ClaimV2Status::Settled;
+            close_all_active_claims(b, claim.workflow_version);
 
             emit!(ClaimV2Settled {
                 bounty: bounty_key,
@@ -687,6 +770,7 @@ pub mod findback {
             claim.status = ClaimV2Status::Rejected;
             b.status = resume_after_v2_reject(b.status).ok_or(FbError::InvalidStatus)?;
             b.updated_at = now;
+            decrement_active_claims(b, claim.workflow_version)?;
             emit!(ClaimV2Rejected {
                 bounty: bounty_key,
                 claim: claim_key,
@@ -761,20 +845,38 @@ pub mod findback {
             FbError::QuorumArbitrationRequired
         );
         let locked_status = lock_for_v2_dispute(bounty.status).ok_or(FbError::InvalidStatus)?;
+        let signer = ctx.accounts.signer.key();
+        let rejection_pending = claim.status == ClaimV2Status::RejectionPending;
+        let now = Clock::get()?.unix_timestamp;
         require!(
-            ctx.accounts.signer.key() == bounty.owner || ctx.accounts.signer.key() == claim.finder,
+            if rejection_pending {
+                signer == claim.finder
+            } else {
+                signer == bounty.owner || signer == claim.finder
+            },
             FbError::Unauthorized
         );
         require!(
             matches!(
                 claim.status,
-                ClaimV2Status::Submitted | ClaimV2Status::AiReviewed
+                ClaimV2Status::Submitted
+                    | ClaimV2Status::AiReviewed
+                    | ClaimV2Status::RejectionPending
             ),
             FbError::InvalidClaimStatus
         );
-        let now = Clock::get()?.unix_timestamp;
+        if rejection_pending {
+            require!(
+                claim.dispute_deadline > 0 && now <= claim.dispute_deadline,
+                FbError::DisputeWindowClosed
+            );
+        }
         claim.status = ClaimV2Status::Disputed;
         claim.updated_at = now;
+        claim.dispute_deadline = 0;
+        claim.resolution_deadline = now
+            .checked_add(DISPUTE_RESOLUTION_WINDOW_SECONDS)
+            .ok_or(FbError::MathOverflow)?;
         bounty.status = locked_status;
         bounty.updated_at = now;
         let case = &mut ctx.accounts.dispute_case;
@@ -816,6 +918,16 @@ pub mod findback {
             case.decision == 0 && !case.finalized,
             FbError::CaseAlreadyResolved
         );
+        require!(
+            ctx.accounts.claim.status == ClaimV2Status::Disputed,
+            FbError::InvalidClaimStatus
+        );
+        let now = Clock::get()?.unix_timestamp;
+        require!(
+            ctx.accounts.claim.resolution_deadline == 0
+                || now <= ctx.accounts.claim.resolution_deadline,
+            FbError::ResolutionWindowClosed
+        );
         if release_to_finder {
             case.release_votes = case
                 .release_votes
@@ -840,7 +952,7 @@ pub mod findback {
         vote.arbiter = ctx.accounts.arbiter.key();
         vote.release_to_finder = release_to_finder;
         vote.bump = ctx.bumps.vote;
-        vote.voted_at = Clock::get()?.unix_timestamp;
+        vote.voted_at = now;
         emit!(ArbitrationVoteCast {
             dispute_case: case.key(),
             vote: vote.key(),
@@ -910,6 +1022,7 @@ pub mod findback {
         bounty.updated_at = now;
         claim.status = ClaimV2Status::Settled;
         claim.updated_at = now;
+        close_all_active_claims(bounty, claim.workflow_version);
         case.finalized = true;
         emit!(ClaimV2Settled {
             bounty: bounty_key,
@@ -945,6 +1058,10 @@ pub mod findback {
         ctx.accounts.bounty.status =
             resume_after_v2_reject(ctx.accounts.bounty.status).ok_or(FbError::InvalidStatus)?;
         ctx.accounts.bounty.updated_at = now;
+        decrement_active_claims(
+            &mut ctx.accounts.bounty,
+            ctx.accounts.claim.workflow_version,
+        )?;
         case.finalized = true;
         emit!(ClaimV2Rejected {
             bounty: ctx.accounts.bounty.key(),
@@ -1075,6 +1192,10 @@ pub struct Bounty {
     pub protocol_version: u8,
     /// 0 = legacy single arbiter, 1 = configured 2-of-3 panel.
     pub arbitration_mode: u8,
+    /// Number of unresolved ClaimV2 accounts for workflow-enabled bounties.
+    pub active_claims: u32,
+    /// 0 = legacy behavior, 1 = rejection window + refund/liveness guards.
+    pub workflow_version: u8,
 }
 
 impl Bounty {
@@ -1106,6 +1227,8 @@ pub enum ClaimV2Status {
     Rejected,
     Disputed,
     Settled,
+    /// Owner requested rejection; finder may still escalate before deadline.
+    RejectionPending,
 }
 
 impl Default for ClaimV2Status {
@@ -1129,6 +1252,9 @@ pub struct ClaimV2 {
     pub bump: u8,
     pub created_at: i64,
     pub updated_at: i64,
+    pub dispute_deadline: i64,
+    pub resolution_deadline: i64,
+    pub workflow_version: u8,
 }
 
 impl ClaimV2 {
@@ -1340,6 +1466,7 @@ pub struct SubmitClaimV2<'info> {
     #[account(mut)]
     pub finder: Signer<'info>,
     #[account(
+        mut,
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
         bump = bounty.bump
     )]
@@ -1361,6 +1488,7 @@ pub struct SubmitClaimV2Sponsored<'info> {
     #[account(mut)]
     pub sponsor: Signer<'info>,
     #[account(
+        mut,
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
         bump = bounty.bump
     )]
@@ -1504,6 +1632,24 @@ pub struct RejectClaimV2<'info> {
         seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
         bump = bounty.bump,
         has_one = owner
+    )]
+    pub bounty: Account<'info, Bounty>,
+    #[account(
+        mut,
+        seeds = [CLAIM_V2_SEED, bounty.key().as_ref(), claim.finder.as_ref()],
+        bump = claim.bump,
+        has_one = bounty
+    )]
+    pub claim: Account<'info, ClaimV2>,
+}
+
+#[derive(Accounts)]
+pub struct FinalizeClaimV2<'info> {
+    pub finalizer: Signer<'info>,
+    #[account(
+        mut,
+        seeds = [BOUNTY_SEED, bounty.bounty_id.as_bytes()],
+        bump = bounty.bump
     )]
     pub bounty: Account<'info, Bounty>,
     #[account(
@@ -2093,6 +2239,16 @@ pub enum FbError {
     CaseAlreadyResolved,
     #[msg("The arbitration quorum has not reached this decision")]
     QuorumNotReached,
+    #[msg("The finder dispute window is still open")]
+    DisputeWindowOpen,
+    #[msg("The finder dispute window has closed")]
+    DisputeWindowClosed,
+    #[msg("The arbitration resolution window is still open")]
+    ResolutionWindowOpen,
+    #[msg("The arbitration resolution window has closed")]
+    ResolutionWindowClosed,
+    #[msg("Active claims must be resolved before refund")]
+    ActiveClaimsRemain,
 }
 
 #[allow(clippy::too_many_arguments)]
@@ -2150,6 +2306,8 @@ fn initialize_bounty(
     bounty.updated_at = now;
     bounty.protocol_version = protocol_version;
     bounty.arbitration_mode = 0;
+    bounty.active_claims = 0;
+    bounty.workflow_version = u8::from(protocol_version >= 2);
 
     emit!(BountyCreated {
         bounty: bounty.key(),
@@ -2199,7 +2357,7 @@ fn apply_funding(bounty: &mut Account<Bounty>, amount: u64) -> Result<()> {
 }
 
 fn initialize_claim_v2(
-    bounty: &Account<Bounty>,
+    bounty: &mut Account<Bounty>,
     claim: &mut Account<ClaimV2>,
     finder: Pubkey,
     evidence_hash: [u8; 32],
@@ -2235,6 +2393,16 @@ fn initialize_claim_v2(
     claim.bump = bump;
     claim.created_at = now;
     claim.updated_at = now;
+    claim.dispute_deadline = 0;
+    claim.resolution_deadline = 0;
+    claim.workflow_version = bounty.workflow_version;
+    if bounty.workflow_version >= 1 {
+        bounty.active_claims = bounty
+            .active_claims
+            .checked_add(1)
+            .ok_or(FbError::MathOverflow)?;
+        bounty.updated_at = now;
+    }
     emit!(ClaimV2Submitted {
         bounty: bounty.key(),
         claim: claim.key(),
@@ -2246,6 +2414,22 @@ fn initialize_claim_v2(
 
 fn remaining_funding(reward_amount: u64, amount_funded: u64) -> Option<u64> {
     reward_amount.checked_sub(amount_funded)
+}
+
+fn decrement_active_claims(bounty: &mut Account<Bounty>, workflow_version: u8) -> Result<()> {
+    if bounty.workflow_version >= 1 && workflow_version >= 1 {
+        bounty.active_claims = bounty
+            .active_claims
+            .checked_sub(1)
+            .ok_or(FbError::MathOverflow)?;
+    }
+    Ok(())
+}
+
+fn close_all_active_claims(bounty: &mut Account<Bounty>, workflow_version: u8) {
+    if bounty.workflow_version >= 1 && workflow_version >= 1 {
+        bounty.active_claims = 0;
+    }
 }
 
 fn require_metadata_hash(protocol_version: u8, metadata_hash: [u8; 32]) -> Result<()> {
@@ -2299,8 +2483,9 @@ fn update_reputation(
 mod tests {
     use super::{
         lock_for_v2_dispute, remaining_funding, require_metadata_hash,
-        resume_after_v2_reject, BountyStatus,
+        resume_after_v2_reject, BountyStatus, ClaimV2, ClaimV2Status,
     };
+    use anchor_lang::AnchorSerialize;
 
     #[test]
     fn remaining_funding_handles_partial_and_complete_escrow() {
@@ -2334,5 +2519,22 @@ mod tests {
         assert!(require_metadata_hash(1, [0u8; 32]).is_ok());
         assert!(require_metadata_hash(2, [0u8; 32]).is_err());
         assert!(require_metadata_hash(2, [7u8; 32]).is_ok());
+    }
+
+    #[test]
+    fn claim_v2_upgrade_preserves_account_size_and_existing_status_indices() {
+        assert_eq!(ClaimV2::SPACE, 253);
+        let statuses = [
+            ClaimV2Status::Submitted,
+            ClaimV2Status::AiReviewed,
+            ClaimV2Status::Rejected,
+            ClaimV2Status::Disputed,
+            ClaimV2Status::Settled,
+            ClaimV2Status::RejectionPending,
+        ];
+        for (expected, status) in statuses.into_iter().enumerate() {
+            let bytes = status.try_to_vec().expect("status must serialize");
+            assert_eq!(bytes, vec![expected as u8]);
+        }
     }
 }
