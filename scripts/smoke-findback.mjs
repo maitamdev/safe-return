@@ -51,6 +51,8 @@ const arbiterB = Keypair.generate();
 const arbiterC = Keypair.generate();
 const reward = 100_000n; // 0.1 FIND (6 decimals), Devnet-only.
 const deadline = Math.floor(Date.now() / 1000) + 86_400;
+const BOUNTY_STATUS = Object.freeze({ FUNDED: 1, RELEASED: 5, DISPUTED: 7 });
+const CLAIM_STATUS = Object.freeze({ SUBMITTED: 0, REJECTED: 2, SETTLED: 4 });
 const runId = Date.now().toString(36).toUpperCase();
 const v1Id = `SMK1${runId}`;
 const v2Id = `SMK2${runId}`;
@@ -203,6 +205,18 @@ async function readRpc(operation, attempts = 3) {
   throw new Error("RPC Devnet không phản hồi.");
 }
 
+async function waitForAccounts(pubkeys, isReady, label, attempts = 10) {
+  let accounts = [];
+  for (let attempt = 0; attempt < attempts; attempt += 1) {
+    accounts = await readRpc(() =>
+      connection.getMultipleAccountsInfo(pubkeys, "confirmed"),
+    );
+    if (isReady(accounts)) return accounts;
+    await sleep(700 + attempt * 250);
+  }
+  throw new Error(`SMOKE ASSERTION FAILED: RPC chưa phản ánh trạng thái ${label}`);
+}
+
 async function send(label, instructions, extraSigners = []) {
   const latest = await readRpc(() => connection.getLatestBlockhash("confirmed"));
   const transaction = new Transaction({
@@ -235,18 +249,12 @@ async function send(label, instructions, extraSigners = []) {
 }
 
 async function expectProgramFailure(label, instructions, extraSigners = []) {
-  const latest = await readRpc(() => connection.getLatestBlockhash("confirmed"));
-  const transaction = new Transaction({
-    feePayer: payer.publicKey,
-    blockhash: latest.blockhash,
-    lastValidBlockHeight: latest.lastValidBlockHeight,
-  }).add(...instructions);
-  transaction.sign(...uniqueSigners([payer, ...extraSigners]));
+  const transaction = new Transaction({ feePayer: payer.publicKey }).add(...instructions);
+  const signers = uniqueSigners([payer, ...extraSigners]);
   const simulation = await readRpc(() =>
-    connection.simulateTransaction(transaction, {
-      commitment: "confirmed",
-      sigVerify: true,
-    }),
+    // web3.js 1.x uses the legacy Transaction overload here; its second
+    // argument is a signer array, not SimulateTransactionConfig.
+    connection.simulateTransaction(transaction, signers),
   );
   assert(simulation.value.err, `${label} unexpectedly succeeded`);
   console.log(`[NEGATIVE] ${label}: rejected as expected`);
@@ -468,7 +476,10 @@ await send("v1 release", [
 ]);
 v1Account = await readRpc(() => connection.getAccountInfo(bountyPda(v1Id), "confirmed"));
 const v1State = decodeBounty(v1Account.data);
-assert(v1State.status === 5 && v1State.fundedAmount === 0n, "v1 escrow phải Released và rỗng");
+assert(
+  v1State.status === BOUNTY_STATUS.RELEASED && v1State.fundedAmount === 0n,
+  "v1 escrow phải Released và rỗng",
+);
 assert(v1State.finder.equals(legacyFinder.publicKey), "v1 finder settlement không khớp");
 
 // Protocol v2 proves independent claims and immutable settlement provenance.
@@ -583,8 +594,17 @@ await send("v2 open dispute B", [
     { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
   ]),
 ]);
-v2Account = await readRpc(() => connection.getAccountInfo(bountyPda(v2Id), "confirmed"));
-assert(decodeBounty(v2Account.data).status === 6, "dispute phải khóa bounty ở trạng thái Disputed");
+v2Account = (await waitForAccounts(
+  [bountyPda(v2Id)],
+  ([account]) => Boolean(
+    account && decodeBounty(account.data).status === BOUNTY_STATUS.DISPUTED,
+  ),
+  "bounty Disputed",
+))[0];
+assert(
+  decodeBounty(v2Account.data).status === BOUNTY_STATUS.DISPUTED,
+  "dispute phải khóa bounty ở trạng thái Disputed",
+);
 
 for (const [label, voter] of [
   ["lead", arbiterSigner],
@@ -629,10 +649,21 @@ await send("v2 finalize rejected dispute B", [
     { pubkey: disputeCase, isSigner: false, isWritable: true },
   ]),
 ]);
-v2Account = await readRpc(() => connection.getAccountInfo(bountyPda(v2Id), "confirmed"));
-disputeAccount = await readRpc(() => connection.getAccountInfo(disputeCase, "confirmed"));
+([v2Account, disputeAccount] = await waitForAccounts(
+  [bountyPda(v2Id), disputeCase],
+  ([bountyAccount, caseAccount]) => Boolean(
+    bountyAccount &&
+    caseAccount &&
+    decodeBounty(bountyAccount.data).status === BOUNTY_STATUS.FUNDED &&
+    decodeDisputeCase(caseAccount.data).finalized,
+  ),
+  "bounty Funded và dispute finalized",
+));
 disputeState = decodeDisputeCase(disputeAccount.data);
-assert(decodeBounty(v2Account.data).status === 1, "quorum từ chối phải mở lại escrow Funded");
+assert(
+  decodeBounty(v2Account.data).status === BOUNTY_STATUS.FUNDED,
+  "quorum từ chối phải mở lại escrow Funded",
+);
 assert(disputeState.finalized, "dispute case phải được finalize bất biến");
 
 const attestation = attestationPda(v2Id, finderA.publicKey);
@@ -655,11 +686,23 @@ await send("v2 release + attestation", [
   attest,
 ]);
 
-const finalAccounts = await readRpc(() =>
-  connection.getMultipleAccountsInfo(
-    [bountyPda(v2Id), claimA, claimB, claimC, attestation, ownerReputation, finderReputation],
-    "confirmed",
+const finalAccountKeys = [
+  bountyPda(v2Id),
+  claimA,
+  claimB,
+  claimC,
+  attestation,
+  ownerReputation,
+  finderReputation,
+];
+const finalAccounts = await waitForAccounts(
+  finalAccountKeys,
+  (accounts) => Boolean(
+    accounts.every(Boolean) &&
+    decodeBounty(accounts[0].data).status === BOUNTY_STATUS.RELEASED &&
+    decodeClaim(accounts[1].data).status === CLAIM_STATUS.SETTLED,
   ),
+  "settlement Released",
 );
 assert(finalAccounts.every(Boolean), "thiếu bounty/claim/attestation/reputation account");
 const v2State = decodeBounty(finalAccounts[0].data);
@@ -670,11 +713,14 @@ const finderAfter = await tokenAmount(finderA.publicKey);
 const vaultAfter = await tokenAmount(vaultPda(v2Id));
 
 assert(v2State.protocolVersion === 2, "v2 protocol version bị thay đổi");
-assert(v2State.status === 5 && v2State.fundedAmount === 0n, "v2 escrow phải Released và rỗng");
+assert(
+  v2State.status === BOUNTY_STATUS.RELEASED && v2State.fundedAmount === 0n,
+  "v2 escrow phải Released và rỗng",
+);
 assert(v2State.finder.equals(finderA.publicKey), "v2 settlement finder không khớp");
-assert(claimAState.status === 4, "claim A phải Settled");
-assert(claimBState.status === 2, "claim B phải Rejected độc lập");
-assert(claimCState.status === 0, "claim C phải còn độc lập sau khi claim A được chọn");
+assert(claimAState.status === CLAIM_STATUS.SETTLED, "claim A phải Settled");
+assert(claimBState.status === CLAIM_STATUS.REJECTED, "claim B phải Rejected độc lập");
+assert(claimCState.status === CLAIM_STATUS.SUBMITTED, "claim C phải còn độc lập sau khi claim A được chọn");
 assert(claimAState.evidenceHash.equals(evidenceA), "content hash bằng chứng không khớp");
 assert(claimAState.inputHash.equals(inputHash), "AI input provenance không khớp");
 assert(claimAState.reportHash.equals(reportHash), "AI report provenance không khớp");
