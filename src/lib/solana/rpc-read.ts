@@ -20,8 +20,8 @@ export async function withRpcReadRetry<T>(
     random?: () => number;
   } = {},
 ) {
-  const attempts = Math.max(1, options.attempts ?? 2);
-  const baseDelayMs = options.baseDelayMs ?? 900;
+  const attempts = Math.max(1, options.attempts ?? 4);
+  const baseDelayMs = options.baseDelayMs ?? 750;
   const sleep = options.sleep ?? ((delayMs) => new Promise((resolve) => setTimeout(resolve, delayMs)));
   const random = options.random ?? Math.random;
 
@@ -29,7 +29,10 @@ export async function withRpcReadRetry<T>(
     try {
       return await operation();
     } catch (error) {
-      if (!isSolanaRateLimitError(error) || attempt === attempts - 1) throw error;
+      if (!isSolanaRateLimitError(error)) throw error;
+      if (attempt === attempts - 1) {
+        throw new Error(SOLANA_RPC_BUSY_MESSAGE);
+      }
       const jitter = Math.floor(random() * 250);
       await sleep(baseDelayMs * 2 ** attempt + jitter);
     }

@@ -39,7 +39,14 @@ export function WalletProviders({ children }: { children: ReactNode }) {
   }, []);
 
   return (
-    <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed" }}>
+    <ConnectionProvider
+      endpoint={endpoint}
+      config={{
+        commitment: "confirmed",
+        disableRetryOnRateLimit: false,
+        confirmTransactionInitialTimeout: 60_000,
+      }}
+    >
       <WalletProvider
         wallets={wallets}
         autoConnect

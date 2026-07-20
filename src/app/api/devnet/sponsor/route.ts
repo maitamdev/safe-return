@@ -18,6 +18,7 @@ import {
 } from "@/lib/server/api-security";
 import { createAdminClient } from "@/lib/supabase/admin";
 import { loadSponsorKeypair } from "@/lib/server/solana-signer";
+import { withRpcReadRetry } from "@/lib/solana/rpc-read";
 
 export const runtime = "nodejs";
 
@@ -79,7 +80,9 @@ export async function POST(req: Request) {
 
     const sponsor = loadSponsorKeypair();
     const connection = getConnection();
-    const sponsorBalance = await connection.getBalance(sponsor.publicKey, "confirmed");
+    const sponsorBalance = await withRpcReadRetry(() =>
+      connection.getBalance(sponsor.publicKey, "confirmed"),
+    );
     if (sponsorBalance < 20_000_000) {
       throw new ApiError(503, "Ví tài trợ Devnet đang thiếu SOL. Quản trị viên cần nạp faucet.");
     }
@@ -98,7 +101,9 @@ export async function POST(req: Request) {
             evidenceHash: hex32(body.evidenceHashHex, "Hash bằng chứng"),
           });
 
-    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash("confirmed");
+    const { blockhash, lastValidBlockHeight } = await withRpcReadRetry(() =>
+      connection.getLatestBlockhash("confirmed"),
+    );
     const transaction = new Transaction({
       feePayer: sponsor.publicKey,
       blockhash,
@@ -108,9 +113,11 @@ export async function POST(req: Request) {
     const wire = transaction.serialize({ requireAllSignatures: false, verifySignatures: false });
     if (wire.length > 1232) throw new ApiError(500, "Giao dịch tài trợ vượt giới hạn Solana.");
 
-    const simulation = await connection.simulateTransaction(
-      new VersionedTransaction(transaction.compileMessage()),
-      { commitment: "confirmed", sigVerify: false }
+    const simulation = await withRpcReadRetry(() =>
+      connection.simulateTransaction(
+        new VersionedTransaction(transaction.compileMessage()),
+        { commitment: "confirmed", sigVerify: false },
+      ),
     );
     if (simulation.value.err) {
       const details = simulation.value.logs?.slice(-5).join(" | ") || JSON.stringify(simulation.value.err);

@@ -10,6 +10,7 @@ import {
 } from "@/lib/server/api-security";
 import { loadServerKeypair } from "@/lib/server/solana-signer";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { withRpcReadRetry } from "@/lib/solana/rpc-read";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,20 +58,17 @@ export async function POST(req: Request) {
 
     const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("devnet");
     const connection = new Connection(rpc, "confirmed");
-    const beforeSol = await connection.getBalance(recipient);
+    const beforeSol = await withRpcReadRetry(() => connection.getBalance(recipient));
     const solClaim = beforeSol < 0.05 * 1e9 ? await claimDevnetSol(address) : null;
 
     const payer = loadServerKeypair();
     const mint = new PublicKey(FIND_MINT);
-    const mintInfo = await getMint(connection, mint);
+    const mintInfo = await withRpcReadRetry(() => getMint(connection, mint));
     if (!mintInfo.mintAuthority?.equals(payer.publicKey)) {
       throw new ApiError(503, "Máy chủ không giữ mint authority của FIND Devnet.");
     }
-    const ata = await getOrCreateAssociatedTokenAccount(
-      connection,
-      payer,
-      mint,
-      recipient
+    const ata = await withRpcReadRetry(() =>
+      getOrCreateAssociatedTokenAccount(connection, payer, mint, recipient),
     );
     const targetAtomic = BigInt(TARGET_FIND) * BigInt(10) ** BigInt(mintInfo.decimals);
     const shortfall = targetAtomic > ata.amount ? targetAtomic - ata.amount : BigInt(0);
@@ -85,7 +83,7 @@ export async function POST(req: Request) {
         ? `Đã cấp thêm ${mintedUi} FIND Devnet. Số dư hiện tại là ${balanceUi} FIND.`
         : `Ví đã có ${balanceUi} FIND Devnet, không cấp thêm.`;
 
-    const afterSol = await connection.getBalance(recipient);
+    const afterSol = await withRpcReadRetry(() => connection.getBalance(recipient));
     return Response.json({
       ok: true,
       message:

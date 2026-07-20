@@ -2,6 +2,10 @@ import "server-only";
 
 import type { User } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
+import {
+  isSolanaRateLimitError,
+  SOLANA_RPC_BUSY_MESSAGE,
+} from "@/lib/solana/rpc-read";
 
 type Bucket = { count: number; resetAt: number };
 const buckets = new Map<string, Bucket>();
@@ -62,12 +66,15 @@ export class ApiError extends Error {
 }
 
 export function apiErrorResponse(error: unknown) {
-  const status = error instanceof ApiError ? error.status : 500;
+  const rpcBusy = isSolanaRateLimitError(error);
+  const status = error instanceof ApiError ? error.status : rpcBusy ? 503 : 500;
   if (!(error instanceof ApiError)) {
     console.error("[SafeReturn API] Unexpected error", error);
   }
   const message = error instanceof ApiError
     ? error.message
-    : "Máy chủ chưa thể xử lý yêu cầu. Vui lòng thử lại sau.";
+    : rpcBusy
+      ? SOLANA_RPC_BUSY_MESSAGE
+      : "Máy chủ chưa thể xử lý yêu cầu. Vui lòng thử lại sau.";
   return Response.json({ ok: false, error: message }, { status });
 }

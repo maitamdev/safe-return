@@ -1,6 +1,7 @@
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { explorerTxUrl } from "./config";
 import { getConnection, PROGRAM_PK, type WalletLike } from "./program";
+import { withRpcReadRetry } from "@/lib/solana/rpc-read";
 
 export type SponsoredAction = "create_bounty" | "fund_bounty" | "submit_claim_v2";
 
@@ -39,11 +40,13 @@ export async function sendSponsoredTransaction(
   ) {
     throw new Error(json.error || "Máy chủ chưa chuẩn bị được giao dịch tài trợ.");
   }
+  const blockhash = json.blockhash;
+  const lastValidBlockHeight = json.lastValidBlockHeight;
 
   const sponsor = new PublicKey(json.sponsor);
   const transaction = Transaction.from(Buffer.from(json.transaction, "base64"));
   const message = transaction.compileMessage();
-  if (!transaction.feePayer?.equals(sponsor) || transaction.recentBlockhash !== json.blockhash) {
+  if (!transaction.feePayer?.equals(sponsor) || transaction.recentBlockhash !== blockhash) {
     throw new Error("Giao dịch tài trợ không khớp biên nhận máy chủ.");
   }
   if (message.header.numRequiredSignatures !== 2 || transaction.instructions.length !== 1) {
@@ -69,17 +72,22 @@ export async function sendSponsoredTransaction(
     throw new Error("Ví không tạo được chữ ký hợp lệ cho giao dịch tài trợ.");
   }
   const connection = getConnection();
-  const signature = await connection.sendRawTransaction(signed.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: "confirmed",
-  });
-  await connection.confirmTransaction(
-    {
-      signature,
-      blockhash: json.blockhash,
-      lastValidBlockHeight: json.lastValidBlockHeight,
-    },
-    "confirmed"
+  const wire = signed.serialize();
+  const signature = await withRpcReadRetry(() =>
+    connection.sendRawTransaction(wire, {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    }),
+  );
+  await withRpcReadRetry(() =>
+    connection.confirmTransaction(
+      {
+        signature,
+        blockhash,
+        lastValidBlockHeight,
+      },
+      "confirmed",
+    ),
   );
 
   void fetch("/api/devnet/sponsor", {

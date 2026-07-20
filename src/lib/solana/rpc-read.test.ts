@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 import {
+  SOLANA_RPC_BUSY_MESSAGE,
   isSolanaRateLimitError,
   withRpcReadRetry,
 } from "./rpc-read";
@@ -37,5 +38,20 @@ describe("Solana RPC read resilience", () => {
     await expect(withRpcReadRetry(operation)).rejects.toThrow("custom program error");
     expect(operation).toHaveBeenCalledOnce();
     expect(sleep).not.toHaveBeenCalled();
+  });
+
+  it("replaces an exhausted 429 response with a useful message", async () => {
+    const operation = vi.fn().mockRejectedValue(new Error("429 Too Many Requests"));
+    const sleep = vi.fn().mockResolvedValue(undefined);
+
+    await expect(
+      withRpcReadRetry(operation, {
+        attempts: 2,
+        baseDelayMs: 1,
+        random: () => 0,
+        sleep,
+      }),
+    ).rejects.toThrow(SOLANA_RPC_BUSY_MESSAGE);
+    expect(operation).toHaveBeenCalledTimes(2);
   });
 });

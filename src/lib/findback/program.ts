@@ -15,7 +15,7 @@ import {
   ASSOCIATED_TOKEN_PROGRAM_ID,
   TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
-  createAssociatedTokenAccountInstruction,
+  createAssociatedTokenAccountIdempotentInstruction,
 } from "@solana/spl-token";
 import {
   FINDBACK_PROGRAM_ID,
@@ -471,7 +471,7 @@ async function sendIx(
 ): Promise<{ signature: string; url: string }> {
   const connection = getConnection();
   const { blockhash, lastValidBlockHeight } =
-    await connection.getLatestBlockhash("confirmed");
+    await withRpcReadRetry(() => connection.getLatestBlockhash("confirmed"));
   const tx = new Transaction({
     feePayer: wallet.publicKey,
     blockhash,
@@ -499,12 +499,11 @@ async function sendIx(
   // Phantom recommends simulating with sigVerify=false before requesting a
   // wallet signature. A VersionedTransaction lets web3.js pass that option
   // explicitly while the wallet can still sign the familiar legacy tx.
-  const simulation = await connection.simulateTransaction(
-    new VersionedTransaction(message),
-    {
+  const simulation = await withRpcReadRetry(() =>
+    connection.simulateTransaction(new VersionedTransaction(message), {
       commitment: "confirmed",
       sigVerify: false,
-    },
+    }),
   );
   if (simulation.value.err) {
     const logs =
@@ -519,27 +518,37 @@ async function sendIx(
   }
 
   const signed = await wallet.signTransaction(tx);
-  const sig = await connection.sendRawTransaction(signed.serialize(), {
-    skipPreflight: false,
-    preflightCommitment: "confirmed",
-  });
-  await connection.confirmTransaction(
-    { signature: sig, blockhash, lastValidBlockHeight },
-    "confirmed",
+  // Retrying the exact same signed bytes is idempotent: Solana derives the
+  // same signature, so a lost/429 response cannot create a second payment.
+  const wire = signed.serialize();
+  const sig = await withRpcReadRetry(() =>
+    connection.sendRawTransaction(wire, {
+      skipPreflight: false,
+      preflightCommitment: "confirmed",
+    }),
+  );
+  await withRpcReadRetry(() =>
+    connection.confirmTransaction(
+      { signature: sig, blockhash, lastValidBlockHeight },
+      "confirmed",
+    ),
   );
   return { signature: sig, url: explorerTxUrl(sig) };
 }
 
-async function ensureAtaIx(
-  connection: Connection,
+function createAtaIx(
   payer: PublicKey,
   owner: PublicKey,
   mint: PublicKey,
-): Promise<TransactionInstruction | null> {
+): TransactionInstruction {
   const ata = getAssociatedTokenAddressSync(mint, owner, true);
-  const info = await withRpcReadRetry(() => connection.getAccountInfo(ata));
-  if (info) return null;
-  return createAssociatedTokenAccountInstruction(payer, ata, owner, mint);
+  // No getAccountInfo round-trip: this is a no-op when the ATA exists.
+  return createAssociatedTokenAccountIdempotentInstruction(
+    payer,
+    ata,
+    owner,
+    mint,
+  );
 }
 
 export async function createBountyOnChain(
@@ -617,25 +626,14 @@ export async function fundBountyOnChain(
   bountyId: string,
   amountUi: number,
 ) {
-  const connection = getConnection();
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
   const [vaultAuth] = vaultAuthorityPda(bountyId);
   const ownerAta = getAssociatedTokenAddressSync(mint, wallet.publicKey);
   const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
 
-  const ixs: TransactionInstruction[] = [];
-  const maybeVault = await ensureAtaIx(
-    connection,
-    wallet.publicKey,
-    vaultAuth,
-    mint,
-  );
-  // vault ATA is init_if_needed in program — still ok if missing, program creates
-  void maybeVault;
-
   const data = Buffer.concat([IX.fund_bounty, encodeU64(toAtomic(amountUi))]);
-  ixs.push(
+  const ixs = [
     new TransactionInstruction({
       programId: PROGRAM_PK,
       keys: [
@@ -655,7 +653,7 @@ export async function fundBountyOnChain(
       ],
       data,
     }),
-  );
+  ];
   return sendIx(wallet, ixs, "fund_bounty");
 }
 
@@ -1101,7 +1099,6 @@ export async function resolveDisputeOnChain(
   counterparty: PublicKey,
   releaseToFinder: boolean,
 ) {
-  const connection = getConnection();
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
   const [vaultAuth] = vaultAuthorityPda(bountyId);
@@ -1111,8 +1108,7 @@ export async function resolveDisputeOnChain(
     counterparty,
     true,
   );
-  const createAta = await ensureAtaIx(
-    connection,
+  const createAta = createAtaIx(
     wallet.publicKey,
     counterparty,
     mint,
@@ -1134,7 +1130,7 @@ export async function resolveDisputeOnChain(
       Buffer.from([releaseToFinder ? 1 : 0]),
     ]),
   });
-  return sendIx(wallet, createAta ? [createAta, ix] : [ix], "resolve_dispute");
+  return sendIx(wallet, [createAta, ix], "resolve_dispute");
 }
 
 export async function resolveDisputeV2OnChain(
@@ -1143,15 +1139,13 @@ export async function resolveDisputeV2OnChain(
   finder: PublicKey,
   releaseToFinder: boolean,
 ) {
-  const connection = getConnection();
   const mint = requireMint();
   const [bounty] = bountyPda(bountyId);
   const [claim] = claimV2Pda(bountyId, finder);
   const [vaultAuth] = vaultAuthorityPda(bountyId);
   const vaultAta = getAssociatedTokenAddressSync(mint, vaultAuth, true);
   const finderAta = getAssociatedTokenAddressSync(mint, finder, true);
-  const createAta = await ensureAtaIx(
-    connection,
+  const createAta = createAtaIx(
     wallet.publicKey,
     finder,
     mint,
@@ -1174,7 +1168,7 @@ export async function resolveDisputeV2OnChain(
       Buffer.from([releaseToFinder ? 1 : 0]),
     ]),
   });
-  const ixs = createAta ? [createAta, ix] : [ix];
+  const ixs = [createAta, ix];
   if (releaseToFinder) {
     const onChainBounty = await fetchBounty(bountyId);
     if (!onChainBounty)

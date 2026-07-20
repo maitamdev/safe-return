@@ -57,4 +57,14 @@ describe("API security boundaries", () => {
     expect(response.status).toBe(403);
     await expect(response.json()).resolves.toMatchObject({ error: "Không có quyền truy cập." });
   });
+
+  it("turns upstream Solana 429 errors into a retryable service response", async () => {
+    vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const response = apiErrorResponse(new Error("429: Too many requests from your IP"));
+    const body = (await response.json()) as { error: string };
+
+    expect(response.status).toBe(503);
+    expect(body.error).toContain("Solana Devnet");
+    expect(body.error).not.toContain("your IP");
+  });
 });
