@@ -17,6 +17,7 @@ import {
 } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { AiReviewPanel } from "@/components/findback/AiPanel";
+import { ClaimWorkflowPanel } from "@/components/findback/ClaimWorkflowPanel";
 import { MediaIntegrityBadge } from "@/components/findback/MediaIntegrityBadge";
 import { TrustProof } from "@/components/findback/TrustProof";
 import { ArbitrationSetup } from "@/components/findback/ArbitrationSetup";
@@ -104,6 +105,11 @@ export default function BountyDetailPage() {
     : meta.claim
       ? [meta.claim]
       : [];
+  const activeClaims = claims.filter((claim) =>
+    ["claim_submitted", "ai_reviewed", "disputed", "ClaimSubmitted", "AiReviewed", "Disputed"].includes(
+      claim.status || "claim_submitted",
+    ),
+  );
   const currentClaim = claims.find(
     (claim) => claim.finderWallet === walletAddress,
   );
@@ -111,24 +117,19 @@ export default function BountyDetailPage() {
     walletAddress &&
     (meta.ownerWallet === walletAddress || onchain?.owner === walletAddress),
   );
-  const isFinder = Boolean(
-    currentClaim || (walletAddress && onchain?.finder === walletAddress),
-  );
   const chainStatus = onchain?.status || meta.status || "Draft";
   const hasDisputedClaim = claims.some(
     (claim) => claim.status?.replaceAll("_", "").toLowerCase() === "disputed",
   );
   const status =
-    meta.protocolVersion === 2 && chainStatus === "Funded" && claims.length > 0
+    meta.protocolVersion === 2 && chainStatus === "Funded" && activeClaims.length > 0
       ? hasDisputedClaim
         ? "Disputed"
-        : claims.some((claim) => claim.aiReport)
+        : activeClaims.some((claim) => claim.aiReport)
         ? "AiReviewed"
         : "ClaimSubmitted"
       : chainStatus;
   const canClaim = onchain?.status === "Funded" && !isOwner && !currentClaim;
-  const canDecide =
-    isOwner && ["AiReviewed", "ClaimSubmitted"].includes(status);
   const deadline = new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "long",
   }).format(new Date(meta.deadlineUnix * 1000));
@@ -328,40 +329,6 @@ export default function BountyDetailPage() {
                 Tôi đã tìm thấy đồ
               </Link>
             )}
-            {isFinder &&
-              ["ClaimSubmitted", "AiReviewed"].includes(status) &&
-              !currentClaim?.aiReport && (
-                <button
-                  type="button"
-                  disabled={busy || txState === "pending"}
-                  onClick={() =>
-                    void run(async () => {
-                      await reviewClaim(id, walletAddress);
-                    })
-                  }
-                  className="app-button-primary w-full"
-                >
-                  Đánh giá bằng AI trực tuyến
-                </button>
-              )}
-            {(isOwner || isFinder) &&
-              ["ClaimSubmitted", "AiReviewed"].includes(status) && (
-                <button
-                  type="button"
-                  disabled={busy || txState === "pending"}
-                  onClick={() =>
-                    void run(() =>
-                      dispute(
-                        id,
-                        isOwner ? meta.claim?.finderWallet : walletAddress,
-                      ),
-                    )
-                  }
-                  className="app-button-secondary w-full"
-                >
-                  Mở tranh chấp
-                </button>
-              )}
             {isOwner &&
               onchain &&
               ["Funded", "ClaimSubmitted", "AiReviewed"].includes(status) && (
@@ -420,33 +387,30 @@ export default function BountyDetailPage() {
           />
         )}
 
-      {claims.length > 0 && <ClaimsSection bountyId={id} claims={claims} />}
+      {isOwner && activeClaims.length > 0 ? (
+        <section className="mt-8 flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between" aria-labelledby="owner-next-action">
+          <div>
+            <h2 id="owner-next-action" className="text-base font-bold text-emerald-950">
+              Bạn có {activeClaims.length} bằng chứng cần xử lý
+            </h2>
+            <p className="mt-1 text-sm leading-6 text-emerald-800">Mở từng hồ sơ, trao đổi riêng và hẹn giao đồ trước khi ký trả thưởng.</p>
+          </div>
+          <a href="#claims-title" className="app-button-primary shrink-0">Xử lý bằng chứng</a>
+        </section>
+      ) : null}
 
-      {meta.aiReport && (
-        <div className="mt-8">
-          <AiReviewPanel
-            report={meta.aiReport}
-            bountyId={id}
-            finderWallet={meta.claim?.finderWallet}
-            provenance={{
-              inputHash: meta.claim?.aiInputHash,
-              reportHash: meta.claim?.aiReportHash,
-              modelHash: meta.claim?.aiModelHash,
-              promptVersion: meta.claim?.aiPromptVersion,
-            }}
-            canDecide={canDecide}
-            busy={busy || txState === "pending"}
-            onAccept={() =>
-              void run(() => accept(id, meta.claim?.finderWallet))
-            }
-            onReject={() =>
-              void run(() => reject(id, meta.claim?.finderWallet))
-            }
-            onDispute={() =>
-              void run(() => dispute(id, meta.claim?.finderWallet))
-            }
-          />
-        </div>
+      {claims.length > 0 && (
+        <ClaimsSection
+          bountyId={id}
+          claims={claims}
+          rewardUi={meta.rewardUi}
+          bountyStatus={chainStatus}
+          busy={busy || txState === "pending"}
+          onReview={(claim) => void run(async () => { await reviewClaim(id, claim.finderWallet); })}
+          onAccept={(claim) => void run(() => accept(id, claim.finderWallet))}
+          onReject={(claim) => void run(() => reject(id, claim.finderWallet))}
+          onDispute={(claim) => void run(() => dispute(id, claim.finderWallet))}
+        />
       )}
       {error && (
         <p
@@ -463,9 +427,23 @@ export default function BountyDetailPage() {
 function ClaimsSection({
   bountyId,
   claims,
+  rewardUi,
+  bountyStatus,
+  busy,
+  onReview,
+  onAccept,
+  onReject,
+  onDispute,
 }: {
   bountyId: string;
   claims: ClaimMeta[];
+  rewardUi: number;
+  bountyStatus: string;
+  busy: boolean;
+  onReview: (claim: ClaimMeta) => void;
+  onAccept: (claim: ClaimMeta) => void;
+  onReject: (claim: ClaimMeta) => void;
+  onDispute: (claim: ClaimMeta) => void;
 }) {
   return (
     <section className="mt-10" aria-labelledby="claims-title">
@@ -478,7 +456,7 @@ function ClaimsSection({
           chủ tin, người gửi và trọng tài được phân công.
         </p>
       </div>
-      <div className="mt-5 grid gap-4 lg:grid-cols-2">
+      <div className="mt-5 grid gap-5">
         {claims.map((claim) => {
           const finder = claim.finderWallet || "Chưa xác định";
           return (
@@ -555,6 +533,42 @@ function ClaimsSection({
                   <LockKey size={15} aria-hidden />
                   Bằng chứng được kiểm tra lại mỗi lần mở
                 </p>
+                {claim.aiReport ? (
+                  <details className="mt-5">
+                    <summary className="cursor-pointer text-sm font-bold text-forest">Xem đánh giá AI</summary>
+                    <div className="mt-3">
+                      <AiReviewPanel
+                        titleId={`review-title-${claim.id || claim.claimPda || claim.submittedAt}`}
+                        report={claim.aiReport}
+                        bountyId={bountyId}
+                        finderWallet={claim.finderWallet}
+                        provenance={{
+                          inputHash: claim.aiInputHash,
+                          reportHash: claim.aiReportHash,
+                          modelHash: claim.aiModelHash,
+                          promptVersion: claim.aiPromptVersion,
+                        }}
+                        canDecide={false}
+                      />
+                    </div>
+                  </details>
+                ) : null}
+                {claim.id ? (
+                  <ClaimWorkflowPanel
+                    claimId={claim.id}
+                    rewardUi={rewardUi}
+                    hasAiReport={Boolean(claim.aiReport)}
+                    chainStatus={claim.status}
+                    bountyStatus={bountyStatus}
+                    busy={busy}
+                    onReview={() => onReview(claim)}
+                    onAccept={() => onAccept(claim)}
+                    onReject={() => onReject(claim)}
+                    onDispute={() => onDispute(claim)}
+                  />
+                ) : (
+                  <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">Bằng chứng cũ chưa có mã riêng nên chưa thể mở trao đổi realtime.</p>
+                )}
               </div>
             </article>
           );

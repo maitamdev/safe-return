@@ -41,6 +41,22 @@ type ArbitrationCase = {
   mode: "single" | "quorum";
   panel: OnChainArbitrationPanel | null;
   disputeCase: OnChainDisputeCase | null;
+  messages: Array<{
+    id: string;
+    senderRole: "owner" | "finder";
+    kind: "message" | "system";
+    body: string;
+    createdAt: string;
+  }>;
+  handover: {
+    scheduledAt: string;
+    meetingLocation: string;
+    note: string;
+    status: "proposed" | "accepted" | "cancelled";
+    acceptedAt: string | null;
+    finderDeliveredAt: string | null;
+    ownerReceivedAt: string | null;
+  } | null;
 };
 
 export default function ArbitrationPage() {
@@ -215,6 +231,33 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
             </div>
           ) : null}
 
+          {(arbitrationCase.handover || arbitrationCase.messages.length > 0) ? (
+            <details className="mt-5 rounded-xl border border-line bg-bg-elevated">
+              <summary className="cursor-pointer px-4 py-3 text-sm font-bold text-ink">Xem lịch giao và trao đổi của hai bên</summary>
+              <div className="border-t border-line p-4">
+                {arbitrationCase.handover ? (
+                  <dl className="grid gap-3 text-xs sm:grid-cols-2">
+                    <Evidence label="Thời gian hẹn" value={formatCaseDate(arbitrationCase.handover.scheduledAt)} />
+                    <Evidence label="Địa điểm hẹn riêng tư" value={arbitrationCase.handover.meetingLocation} />
+                    <Evidence label="Trạng thái lịch" value={arbitrationCase.handover.status === "accepted" ? "Hai bên đã xác nhận" : arbitrationCase.handover.status === "cancelled" ? "Đã hủy" : "Chờ xác nhận"} />
+                    <Evidence label="Xác nhận giao đồ" value={arbitrationCase.handover.finderDeliveredAt ? `Finder xác nhận lúc ${formatCaseDate(arbitrationCase.handover.finderDeliveredAt)}` : "Chưa có"} />
+                  </dl>
+                ) : <p className="text-xs text-ink-muted">Hai bên chưa tạo lịch giao đồ.</p>}
+                {arbitrationCase.messages.length > 0 ? (
+                  <div className="mt-4 space-y-2 border-t border-line pt-4">
+                    {arbitrationCase.messages.map((message) => (
+                      <div key={message.id} className={`rounded-lg px-3 py-2 text-xs leading-5 ${message.kind === "system" ? "bg-bg-deep text-center text-ink-muted" : "border border-line bg-bg-elevated text-ink"}`}>
+                        {message.kind === "message" ? <p className="mb-1 text-[10px] font-bold uppercase tracking-[0.08em] text-ink-muted">{message.senderRole === "owner" ? "Chủ đồ" : "Người tìm thấy"}</p> : null}
+                        <p>{message.body}</p>
+                        <time className="mt-1 block text-[10px] text-ink-muted">{formatCaseDate(message.createdAt)}</time>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            </details>
+          ) : null}
+
           {isQuorum && arbitrationCase.panel && quorumCase ? (
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
               <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-emerald-950">Tiến độ biểu quyết</p><a href={explorerAddressUrl(quorumCase.address)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:underline">Mở case <ArrowSquareOut size={13} /></a></div>
@@ -241,6 +284,13 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
       </div>
     </article>
   );
+}
+
+function formatCaseDate(value: string) {
+  const date = new Date(value);
+  return Number.isFinite(date.getTime())
+    ? new Intl.DateTimeFormat("vi-VN", { dateStyle: "short", timeStyle: "short" }).format(date)
+    : "Không rõ";
 }
 
 function HeaderMetric({ label, value }: { label: string; value: string }) {

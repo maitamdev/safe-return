@@ -31,7 +31,7 @@ type VerificationResult = {
   status: Extract<ProvenanceVerification, "verified" | "mismatch" | "unavailable">;
 };
 
-export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAccept, onReject, onDispute, busy, canDecide }: { report: AiClaimReport; provenance?: AiProvenance; bountyId?: string; finderWallet?: string; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean }) {
+export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAccept, onReject, onDispute, busy, canDecide, titleId = "review-title" }: { report: AiClaimReport; provenance?: AiProvenance; bountyId?: string; finderWallet?: string; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean; titleId?: string }) {
   const Icon = report.decision === "ACCEPT" ? CheckCircle : report.decision === "REJECT" ? XCircle : Warning;
   const tone = report.decision === "ACCEPT" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : report.decision === "REJECT" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800";
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
@@ -115,11 +115,11 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
   }, [bountyId, finderWallet, inputHash, modelHash, modelPayload, reportHash, reportPayload, verificationKey]);
 
   return (
-    <section className="app-card p-5 sm:p-7" aria-labelledby="review-title">
+    <section className="app-card p-5 sm:p-7" aria-labelledby={titleId}>
       <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-start">
         <div>
           <p className="flex items-center gap-2 text-sm font-bold text-forest"><Brain size={19} weight="duotone" />Đánh giá bằng chứng</p>
-          <h2 id="review-title" className="mt-2 text-2xl font-bold">Kết quả so khớp claim</h2>
+          <h2 id={titleId} className="mt-2 text-2xl font-bold">Kết quả so khớp claim</h2>
           <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Kết quả này không tự chuyển tiền. Chủ bounty phải tự kiểm tra và ký quyết định on-chain.</p>
           <p className="mt-4 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
             {report.provider === "groq" ? "Groq Vision" : "AI trực tuyến"}: {report.model || "đã cấu hình"}

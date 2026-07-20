@@ -83,10 +83,20 @@ export async function POST(req: Request) {
     if (updateError) throw new Error(updateError.message);
 
     if (useV2 && chainClaim) {
+      const claimStatus = toDbStatus(chainClaim.status);
+      const workflowStatus =
+        chainClaim.status === "Settled"
+          ? "settled"
+          : chainClaim.status === "Rejected"
+            ? "rejected"
+            : chainClaim.status === "Disputed"
+              ? "disputed"
+              : undefined;
       const { error: claimUpdateError } = await admin
         .from("claims")
         .update({
-          status: toDbStatus(chainClaim.status),
+          status: claimStatus,
+          ...(workflowStatus ? { workflow_status: workflowStatus } : {}),
           ...(lastTx
             ? { last_tx: lastTx, last_tx_url: explorerTxUrl(lastTx) }
             : {}),
@@ -95,6 +105,36 @@ export async function POST(req: Request) {
         .eq("claim_pda", chainClaim.address)
         .eq("bounty_id", bountyId);
       if (claimUpdateError) throw new Error(claimUpdateError.message);
+
+      if (chainClaim.status === "Settled") {
+        const { data: claimRow, error: claimReadError } = await admin
+          .from("claims")
+          .select("id")
+          .eq("claim_pda", chainClaim.address)
+          .eq("bounty_id", bountyId)
+          .maybeSingle();
+        if (claimReadError) throw new Error(claimReadError.message);
+        if (claimRow) {
+          const { error: receivedError } = await admin
+            .from("claim_handovers")
+            .update({ owner_received_at: new Date().toISOString(), updated_at: new Date().toISOString() })
+            .eq("claim_id", claimRow.id);
+          if (receivedError) throw new Error(receivedError.message);
+          const { error: closeOtherError } = await admin
+            .from("claims")
+            .update({ workflow_status: "rejected", updated_at: new Date().toISOString() })
+            .eq("bounty_id", bountyId)
+            .neq("id", claimRow.id)
+            .in("workflow_status", [
+              "awaiting_review",
+              "more_info_requested",
+              "handover_proposed",
+              "handover_scheduled",
+              "finder_delivered",
+            ]);
+          if (closeOtherError) throw new Error(closeOtherError.message);
+        }
+      }
     }
 
     if (!useV2 && onchain.status === "Funded" && isDefaultKey(onchain.finder)) {

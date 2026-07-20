@@ -99,8 +99,10 @@ export async function POST(req: Request) {
       if (!chainClaim || chainClaim.address !== claim.claim_pda) {
         throw new ApiError(409, "Claim PDA không khớp dữ liệu đã lưu.");
       }
-      if (chainClaim.finder !== profile.wallet_pubkey || claim.finder_id !== user.id) {
-        throw new ApiError(403, "Chỉ finder đã xác minh mới có thể yêu cầu đánh giá claim này.");
+      const isFinder = chainClaim.finder === profile.wallet_pubkey && claim.finder_id === user.id;
+      const isOwner = onchain.owner === profile.wallet_pubkey && listing.owner_id === user.id;
+      if (!isFinder && !isOwner) {
+        throw new ApiError(403, "Chỉ chủ đồ hoặc người gửi bằng chứng được yêu cầu đánh giá.");
       }
       if (!['Submitted', 'AiReviewed'].includes(chainClaim.status)) {
         throw new ApiError(409, "Claim không ở trạng thái có thể đánh giá.");

@@ -11,6 +11,7 @@ import {
 import { getSupabaseEnv } from "@/lib/supabase/config";
 import { privateMediaUrl } from "@/lib/media/client";
 import type { StoredMedia } from "@/lib/media/types";
+import type { ClaimWorkflowStatus } from "./workflow";
 import { PROTOCOL_V2_ENABLED } from "./config";
 import type { BountyMeta } from "./store";
 
@@ -51,6 +52,7 @@ type ClaimRow = {
   ai_model_hash?: string | null;
   ai_prompt_version?: string | null;
   status?: string;
+  workflow_status?: ClaimWorkflowStatus;
   last_tx?: string | null;
   last_tx_url?: string | null;
   submitted_at: string;
@@ -232,6 +234,7 @@ function fromClaimRow(bountyId: string, claim: ClaimRow) {
     aiModelHash: claim.ai_model_hash,
     aiPromptVersion: claim.ai_prompt_version,
     status: claim.status,
+    workflowStatus: claim.workflow_status || "awaiting_review",
     lastTx: claim.last_tx,
     lastTxUrl: claim.last_tx_url,
   } satisfies NonNullable<BountyMeta["claim"]>;

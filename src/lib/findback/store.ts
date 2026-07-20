@@ -5,6 +5,7 @@
 
 import type { AiClaimReport } from "@/lib/ai/types";
 import type { StoredMedia } from "@/lib/media/types";
+import type { ClaimWorkflowStatus } from "./workflow";
 
 export type ClaimMeta = {
   id?: string;
@@ -24,6 +25,7 @@ export type ClaimMeta = {
   aiModelHash?: string | null;
   aiPromptVersion?: string | null;
   status?: string;
+  workflowStatus?: ClaimWorkflowStatus;
   lastTx?: string | null;
   lastTxUrl?: string | null;
 };

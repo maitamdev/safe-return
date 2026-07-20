@@ -201,6 +201,29 @@ const migrationContracts = [
       /notify pgrst/i,
     ],
   },
+  {
+    name: "2026072005_claim_handover.sql",
+    required: [
+      /workflow_status/i,
+      /create table if not exists public\.claim_messages/i,
+      /create table if not exists public\.claim_handovers/i,
+      /Participants read claim messages/i,
+      /Participants read claim handovers/i,
+      /revoke insert, update, delete/i,
+      /supabase_realtime/i,
+      /notify pgrst/i,
+    ],
+  },
+  {
+    name: "2026072006_backfill_terminal_claim_workflows.sql",
+    required: [
+      /status = 'settled'/i,
+      /status = 'rejected'/i,
+      /status = 'disputed'/i,
+      /workflow_status/i,
+      /notify pgrst/i,
+    ],
+  },
 ];
 for (const migration of migrationContracts) {
   const migrationPath = path.join(root, "supabase", "migrations", migration.name);
@@ -355,6 +378,7 @@ if (rpc && programId && mint) {
 let schemaV2Ready = false;
 let safeTagReady = false;
 let sponsorSchemaReady = false;
+let workflowSchemaReady = false;
 if (supabaseUrl && anonKey) {
   try {
     const probes = await Promise.all([
@@ -363,20 +387,24 @@ if (supabaseUrl && anonKey) {
       probeSupabase(supabaseUrl, anonKey, "safe_tags", "id,public_code,status"),
       probeSupabase(supabaseUrl, anonKey, "safe_tag_reports", "id,tag_id,status"),
       probeSupabase(supabaseUrl, anonKey, "sponsored_transactions", "request_id,wallet,signature,status"),
+      probeSupabase(supabaseUrl, anonKey, "claim_messages", "id,claim_id,sender_role,kind,created_at"),
+      probeSupabase(supabaseUrl, anonKey, "claim_handovers", "claim_id,scheduled_at,status,finder_delivered_at,owner_received_at"),
     ]);
     schemaV2Ready = probes[0].ready && probes[1].ready;
     safeTagReady = probes[2].ready && probes[3].ready;
     sponsorSchemaReady = probes[4].ready;
+    workflowSchemaReady = probes[5].ready && probes[6].ready;
     record(schemaV2Ready ? "pass" : "warn", "Supabase protocol v2", schemaV2Ready ? "schema khả dụng" : `${probes[0].detail}; ${probes[1].detail}`);
     record(safeTagReady ? "pass" : "warn", "Supabase SafeTag", safeTagReady ? "schema khả dụng" : `${probes[2].detail}; ${probes[3].detail}`);
     record(sponsorSchemaReady ? "pass" : "warn", "Supabase sponsored fees", sponsorSchemaReady ? "schema khả dụng" : probes[4].detail);
+    record(workflowSchemaReady ? "pass" : "warn", "Supabase claim workflow", workflowSchemaReady ? "schema realtime khả dụng" : `${probes[5].detail}; ${probes[6].detail}`);
   } catch (error) {
     record("fail", "Supabase schema probe", error instanceof Error ? error.message : String(error));
   }
 }
 
 const protocolEnabled = env.NEXT_PUBLIC_PROTOCOL_V2 === "1";
-if (protocolEnabled && (!chainV2Ready || !schemaV2Ready || !safeTagReady)) {
+if (protocolEnabled && (!chainV2Ready || !schemaV2Ready || !safeTagReady || !workflowSchemaReady)) {
   record("fail", "Protocol v2 gate", "đang bật nhưng on-chain/Supabase chưa đồng bộ");
 } else if (protocolEnabled) {
   record("pass", "Protocol v2 gate", "đã bật và các dependency bắt buộc sẵn sàng");
@@ -384,7 +412,7 @@ if (protocolEnabled && (!chainV2Ready || !schemaV2Ready || !safeTagReady)) {
   record("pass", "Protocol v2 gate", "đang tắt an toàn");
 }
 
-if (requireV2 && (!chainV2Ready || !schemaV2Ready || !safeTagReady)) {
+if (requireV2 && (!chainV2Ready || !schemaV2Ready || !safeTagReady || !workflowSchemaReady)) {
   record("fail", "V2 release requirement", "chưa đủ điều kiện bật protocol v2");
 }
 

@@ -65,6 +65,21 @@ export async function GET() {
           ? panel.arbiters.includes(wallet)
           : profile.is_arbiter && bounty.arbiter === wallet;
         if (!authorized) return null;
+        const [{ data: messages, error: messageError }, { data: handover, error: handoverError }] = await Promise.all([
+          admin
+            .from("claim_messages")
+            .select("id,sender_role,kind,body,created_at")
+            .eq("claim_id", row.id)
+            .order("created_at", { ascending: true })
+            .limit(200),
+          admin
+            .from("claim_handovers")
+            .select("scheduled_at,meeting_location,note,status,accepted_at,finder_delivered_at,owner_received_at")
+            .eq("claim_id", row.id)
+            .maybeSingle(),
+        ]);
+        if (messageError) throw new Error(messageError.message);
+        if (handoverError) throw new Error(handoverError.message);
         const disputeCase = panel
           ? await fetchDisputeCase(row.bounty_id, new PublicKey(row.finder_wallet))
           : null;
@@ -86,11 +101,30 @@ export async function GET() {
           mode: panel ? "quorum" : "single",
           panel,
           disputeCase,
+          messages: (messages || []).map((message) => ({
+            id: String(message.id),
+            senderRole: message.sender_role,
+            kind: message.kind,
+            body: message.body,
+            createdAt: message.created_at,
+          })),
+          handover: handover
+            ? {
+                scheduledAt: handover.scheduled_at,
+                meetingLocation: handover.meeting_location,
+                note: handover.note,
+                status: handover.status,
+                acceptedAt: handover.accepted_at,
+                finderDeliveredAt: handover.finder_delivered_at,
+                ownerReceivedAt: handover.owner_received_at,
+              }
+            : null,
         };
       })
     );
+    const assignedCases = cases.filter(Boolean);
     return Response.json(
-      { ok: true, cases: cases.filter(Boolean) },
+      { ok: true, canArbitrate: Boolean(profile.is_arbiter || assignedCases.length), cases: assignedCases },
       { headers: { "Cache-Control": "private, no-store" } }
     );
   } catch (error) {

@@ -1,6 +1,8 @@
 -- SafeReturn — schema bảo mật cho Supabase.
 -- Chạy toàn bộ file trong Supabase SQL Editor sau mỗi lần nâng cấp.
 
+create extension if not exists pgcrypto;
+
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
   email text,
@@ -91,7 +93,8 @@ create policy "Authenticated users can read bounties"
 revoke insert, update, delete on public.bounties from authenticated;
 
 create table if not exists public.claims (
-  bounty_id text primary key references public.bounties (id) on delete cascade,
+  id uuid primary key default gen_random_uuid(),
+  bounty_id text not null references public.bounties (id) on delete cascade,
   finder_id uuid not null references auth.users (id) on delete cascade,
   finder_wallet text not null,
   description text not null,
@@ -101,12 +104,15 @@ create table if not exists public.claims (
   evidence_hash text not null,
   ai_report jsonb,
   status text not null default 'claim_submitted',
+  workflow_status text not null default 'awaiting_review',
   last_tx text,
   last_tx_url text,
   submitted_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+alter table public.claims add column if not exists workflow_status text not null default 'awaiting_review';
 create index if not exists claims_finder_idx on public.claims (finder_id);
+create unique index if not exists claims_bounty_finder_unique on public.claims (bounty_id, finder_wallet);
 alter table public.claims enable row level security;
 drop policy if exists "Participants read private claims" on public.claims;
 create policy "Participants read private claims"
@@ -122,6 +128,52 @@ create policy "Participants read private claims"
 -- được kiểm tra lại với tài khoản Solana rồi dùng service-role để cập nhật.
 revoke insert, update, delete on public.claims from authenticated;
 
+create table if not exists public.claim_messages (
+  id uuid primary key default gen_random_uuid(),
+  claim_id uuid not null references public.claims (id) on delete cascade,
+  bounty_id text not null references public.bounties (id) on delete cascade,
+  sender_id uuid not null references auth.users (id) on delete cascade,
+  sender_role text not null check (sender_role in ('owner', 'finder')),
+  kind text not null default 'message' check (kind in ('message', 'system')),
+  body text not null check (char_length(body) between 1 and 1200),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.claim_handovers (
+  claim_id uuid primary key references public.claims (id) on delete cascade,
+  bounty_id text not null references public.bounties (id) on delete cascade,
+  proposed_by uuid not null references auth.users (id) on delete cascade,
+  scheduled_at timestamptz not null,
+  meeting_location text not null check (char_length(meeting_location) between 3 and 200),
+  note text not null default '' check (char_length(note) <= 500),
+  status text not null default 'proposed' check (status in ('proposed', 'accepted', 'cancelled')),
+  accepted_by uuid references auth.users (id) on delete set null,
+  accepted_at timestamptz,
+  finder_delivered_at timestamptz,
+  owner_received_at timestamptz,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists claim_messages_claim_created_idx on public.claim_messages (claim_id, created_at);
+create index if not exists claim_handovers_bounty_idx on public.claim_handovers (bounty_id, updated_at desc);
+alter table public.claim_messages enable row level security;
+alter table public.claim_handovers enable row level security;
+drop policy if exists "Participants read claim messages" on public.claim_messages;
+create policy "Participants read claim messages" on public.claim_messages for select to authenticated
+  using (exists (
+    select 1 from public.claims c join public.bounties b on b.id = c.bounty_id
+    where c.id = claim_id and (c.finder_id = auth.uid() or b.owner_id = auth.uid())
+  ));
+drop policy if exists "Participants read claim handovers" on public.claim_handovers;
+create policy "Participants read claim handovers" on public.claim_handovers for select to authenticated
+  using (exists (
+    select 1 from public.claims c join public.bounties b on b.id = c.bounty_id
+    where c.id = claim_id and (c.finder_id = auth.uid() or b.owner_id = auth.uid())
+  ));
+revoke insert, update, delete on public.claim_messages from authenticated;
+revoke insert, update, delete on public.claim_handovers from authenticated;
+
 -- Không tiếp tục hiển thị kết quả heuristic từ các bản cũ.
 update public.claims
 set ai_report = null, updated_at = now()
@@ -130,6 +182,8 @@ where ai_report is not null and coalesce(ai_report->>'mode', '') <> 'live';
 -- Bật thay đổi thời gian thực. Client chỉ nhận các hàng vượt qua RLS của chính nó.
 alter table public.bounties replica identity full;
 alter table public.claims replica identity full;
+alter table public.claim_messages replica identity full;
+alter table public.claim_handovers replica identity full;
 do $$
 begin
   if exists (select 1 from pg_publication where pubname = 'supabase_realtime') then
@@ -144,6 +198,18 @@ begin
       where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'claims'
     ) then
       alter publication supabase_realtime add table public.claims;
+    end if;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'claim_messages'
+    ) then
+      alter publication supabase_realtime add table public.claim_messages;
+    end if;
+    if not exists (
+      select 1 from pg_publication_tables
+      where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'claim_handovers'
+    ) then
+      alter publication supabase_realtime add table public.claim_handovers;
     end if;
   end if;
 end;
