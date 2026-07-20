@@ -191,6 +191,16 @@ const migrationContracts = [
       /revoke insert, update, delete/i,
     ],
   },
+  {
+    name: "2026072004_private_claim_evidence.sql",
+    required: [
+      /Participants read private claims/i,
+      /auth\.uid\(\) = finder_id/i,
+      /b\.owner_id = auth\.uid\(\)/i,
+      /verified arbitration APIs/i,
+      /notify pgrst/i,
+    ],
+  },
 ];
 for (const migration of migrationContracts) {
   const migrationPath = path.join(root, "supabase", "migrations", migration.name);

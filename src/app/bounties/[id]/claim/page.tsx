@@ -5,7 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { ArrowLeft, ImageSquare, ShieldWarning } from "@phosphor-icons/react";
+import { ArrowLeft, ImageSquare, LockKey, ShieldWarning } from "@phosphor-icons/react";
 import { useFindBack } from "@/lib/findback/provider";
 import { ConnectWalletButton } from "@/components/wallet/ConnectWalletButton";
 import type { AiClaimReport } from "@/lib/ai/types";
@@ -60,13 +60,17 @@ export default function SubmitClaimPage() {
       setError("Mô tả bằng chứng cần ít nhất 20 ký tự.");
       return;
     }
+    if (location.trim().length < 3) {
+      setError("Hãy nhập địa điểm bạn thực sự tìm thấy đồ.");
+      return;
+    }
     if (!foundAt) {
       setError("Hãy chọn thời điểm tìm thấy đồ.");
       return;
     }
     setBusy(true);
     try {
-      const result = await submitClaim({ bountyId: id, description: description.trim(), location: location.trim() || meta.location, foundAt, imageDataUrl });
+      const result = await submitClaim({ bountyId: id, description: description.trim(), location: location.trim(), foundAt, imageDataUrl });
       setReport(result);
       setSubmitted(true);
     } catch (cause) {
@@ -95,19 +99,19 @@ export default function SubmitClaimPage() {
       <p className="mt-2 text-lg font-semibold text-forest">{meta.title}</p>
       <div className="mt-5 flex items-start gap-3 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm leading-6 text-amber-900">
         <ShieldWarning size={21} className="mt-0.5 shrink-0" />
-        <p>Không đăng số điện thoại, email, số giấy tờ hoặc chi tiết bí mật. Ảnh ở off-chain; blockchain chỉ nhận hash bằng chứng.</p>
+        <p>Không đăng số điện thoại, email, số giấy tờ hoặc chi tiết bí mật. Nội dung, địa điểm, thời gian và ảnh chỉ mở cho bạn, chủ tin và trọng tài được phân công; blockchain chỉ nhận hash bằng chứng.</p>
       </div>
 
       {!connected && <div className="app-card mt-6 p-5"><p className="mb-3 text-sm text-ink-soft">Kết nối ví Devnet để ký claim.</p><ConnectWalletButton size="md" /></div>}
 
       <div className="app-card mt-6 space-y-5 p-5 sm:p-7">
         <label className="block"><span className="text-sm font-bold">Mô tả đồ bạn tìm thấy</span><span className="mt-1 block text-xs leading-5 text-ink-muted">Nêu màu, thương hiệu, vết xước và đặc điểm nhìn thấy được.</span><textarea className="app-input mt-2 min-h-36 resize-y" value={description} onChange={(event) => setDescription(event.target.value)} maxLength={1800} placeholder="Mô tả chi tiết bằng chứng" /></label>
-        <label className="block"><span className="text-sm font-bold">Địa điểm tìm thấy</span><input className="app-input mt-2" value={location} onChange={(event) => setLocation(event.target.value)} placeholder={meta.location} maxLength={180} /></label>
+        <label className="block"><span className="inline-flex items-center gap-1.5 text-sm font-bold"><LockKey size={16} className="text-forest" />Địa điểm tìm thấy <span className="font-normal text-ink-muted">(riêng tư)</span></span><span className="mt-1 block text-xs leading-5 text-ink-muted">Không hiển thị công khai và không tự sao chép địa điểm làm mất.</span><input className="app-input mt-2" name="private-found-location" autoComplete="off" value={location} onChange={(event) => setLocation(event.target.value)} placeholder="Ví dụ: Sảnh thư viện, gần quầy bảo vệ" maxLength={180} /></label>
         <label className="block"><span className="text-sm font-bold">Thời điểm tìm thấy</span><input type="datetime-local" className="app-input mt-2" value={foundAt} onChange={(event) => setFoundAt(event.target.value)} /></label>
         <label className="block"><span className="text-sm font-bold">Ảnh bằng chứng <span className="font-normal text-ink-muted">(không bắt buộc)</span></span><span className="mt-1 block text-xs leading-5 text-ink-muted">Không có ảnh, AI chỉ đánh giá mô tả và luôn yêu cầu chủ tin kiểm tra thêm.</span><span className="mt-2 flex min-h-28 flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-bg-deep p-4 text-center hover:border-forest"><ImageSquare size={26} className="text-forest" /><span className="mt-2 text-sm font-semibold">{imageBusy ? "Đang tối ưu ảnh" : "Chọn ảnh, tối đa 10 MB"}</span><input type="file" accept="image/*" disabled={imageBusy} className="sr-only" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} /></span></label>
         {imageDataUrl && <div><Image unoptimized src={imageDataUrl} alt="Ảnh bằng chứng đã chọn" width={960} height={540} className="max-h-64 w-auto rounded-xl object-cover" /></div>}
         {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
-        <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary w-full">{busy ? "Đang ghi claim" : "Gửi claim lên Devnet"}</button>
+        <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary w-full">{busy ? "Đang ghi bằng chứng" : "Gửi bằng chứng riêng tư"}</button>
       </div>
     </div>
   );

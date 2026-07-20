@@ -115,9 +115,6 @@ create policy "Participants read private claims"
     auth.uid() = finder_id or exists (
       select 1 from public.bounties b
       where b.id = bounty_id and b.owner_id = auth.uid()
-    ) or exists (
-      select 1 from public.profiles p
-      where p.id = auth.uid() and p.is_arbiter and p.wallet_verified_at is not null
     )
   );
 

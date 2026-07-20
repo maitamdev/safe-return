@@ -474,8 +474,8 @@ function ClaimsSection({
           Bằng chứng từ người tìm thấy
         </h2>
         <p className="mt-2 text-sm leading-6 text-ink-soft">
-          Mỗi người gửi có một Claim PDA độc lập. Ảnh riêng tư chỉ mở cho các
-          bên tham gia giao dịch.
+          Mỗi người gửi có một Claim PDA độc lập. Nội dung chi tiết chỉ mở cho
+          chủ tin, người gửi và trọng tài được phân công.
         </p>
       </div>
       <div className="mt-5 grid gap-4 lg:grid-cols-2">
@@ -516,10 +516,13 @@ function ClaimsSection({
                   {claim.description}
                 </p>
                 <dl className="mt-4 grid gap-3 text-xs sm:grid-cols-2">
-                  <div>
-                    <dt className="text-ink-muted">Địa điểm tìm thấy</dt>
-                    <dd className="mt-1 font-semibold text-ink">
-                      {claim.location || "Không cung cấp"}
+                  <div className="sm:col-span-2">
+                    <dt className="inline-flex items-center gap-1.5 text-ink-muted"><LockKey size={14} aria-hidden />Địa điểm tìm thấy (riêng tư)</dt>
+                    <dd className="mt-1">
+                      <details className="rounded-lg border border-line bg-bg-deep px-3 py-2">
+                        <summary className="cursor-pointer font-semibold text-forest">Hiện địa điểm cho người có quyền</summary>
+                        <p className="mt-2 font-semibold text-ink">{claim.location || "Không cung cấp"}</p>
+                      </details>
                     </dd>
                   </div>
                   <div>

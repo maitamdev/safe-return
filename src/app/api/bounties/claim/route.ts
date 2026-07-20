@@ -38,6 +38,12 @@ export async function POST(req: Request) {
     const body = (await req.json()) as ClaimBody;
     const bountyId = body.bountyId?.trim() || "";
     if (!bountyId || !body.claim) throw new ApiError(400, "Thiếu dữ liệu claim.");
+    if (body.claim.location.trim().length < 3 || body.claim.location.length > 200) {
+      throw new ApiError(400, "Địa điểm tìm thấy không hợp lệ.");
+    }
+    if (!body.claim.foundAt || !Number.isFinite(Date.parse(body.claim.foundAt))) {
+      throw new ApiError(400, "Thời điểm tìm thấy không hợp lệ.");
+    }
     if ((body.claim.imageDataUrl?.length || 0) > MAX_IMAGE) {
       throw new ApiError(400, "Ảnh bằng chứng quá lớn.");
     }
