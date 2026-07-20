@@ -8,6 +8,8 @@ export type AiClaimReport = {
   fraud_signals: string[];
   explanation: string;
   confidence: number; // 0-1
+  /** Server-issued ISO timestamp for this exact model response. */
+  generated_at?: string;
   evidence_quality?: "image-backed" | "partial-image" | "text-only";
   evidence_notes?: string[];
   mode: "live";

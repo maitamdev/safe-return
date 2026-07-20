@@ -1,6 +1,12 @@
 import { createHash } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { aiInputProvenancePayload, aiModelIdentityPayload } from "./provenance";
+import {
+  aiInputProvenancePayload,
+  aiModelIdentityPayload,
+  aiReportProvenancePayload,
+  canonicalJson,
+} from "./provenance";
+import type { AiClaimReport } from "./types";
 
 const input = {
   promptVersion: "review-v2",
@@ -48,5 +54,52 @@ describe("AI provenance commitments", () => {
     );
     expect(aiModelIdentityPayload({ provider: "groq", model: "qwen", promptVersion: "v1" }))
       .not.toBe(aiModelIdentityPayload({ provider: "groq", model: "qwen", promptVersion: "v2" }));
+  });
+
+  it("canonicalizes report object key order and line endings", () => {
+    const first = {
+      mode: "live",
+      score: 80,
+      decision: "REVIEW",
+      matching_features: ["màu sắc"],
+      contradictions: [],
+      fraud_signals: [],
+      explanation: "Dòng một\r\nDòng hai",
+      confidence: 0.8,
+    } satisfies AiClaimReport;
+    const second = {
+      confidence: 0.8,
+      explanation: "Dòng một\nDòng hai",
+      fraud_signals: [],
+      contradictions: [],
+      matching_features: ["màu sắc"],
+      decision: "REVIEW",
+      score: 80,
+      mode: "live",
+    } satisfies AiClaimReport;
+
+    expect(aiReportProvenancePayload(first)).toBe(
+      aiReportProvenancePayload(second)
+    );
+    expect(canonicalJson({ b: 1, a: 2 })).toBe('{"a":2,"b":1}');
+  });
+
+  it("keeps report provenance bound to every material field", () => {
+    const report = {
+      score: 80,
+      decision: "REVIEW",
+      matching_features: [],
+      contradictions: [],
+      fraud_signals: [],
+      explanation: "Cần kiểm tra thêm",
+      confidence: 0.8,
+      mode: "live",
+    } satisfies AiClaimReport;
+    expect(hash(aiReportProvenancePayload(report))).not.toBe(
+      hash(aiReportProvenancePayload({ ...report, score: 81 }))
+    );
+    expect(hash(aiReportProvenancePayload(report))).not.toBe(
+      hash(aiReportProvenancePayload({ ...report, provider: "groq" }))
+    );
   });
 });

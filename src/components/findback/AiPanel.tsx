@@ -31,6 +31,11 @@ export function AiReviewPanel({ report, provenance, onAccept, onReject, onDisput
           <p className="mt-4 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
             {report.provider === "groq" ? "Groq Vision" : "AI trực tuyến"}: {report.model || "đã cấu hình"}
           </p>
+          {report.generated_at ? (
+            <p className="mt-2 text-xs text-ink-muted">
+              Tạo lúc {new Intl.DateTimeFormat("vi-VN", { dateStyle: "medium", timeStyle: "short" }).format(new Date(report.generated_at))}
+            </p>
+          ) : null}
         </div>
         <div className="rounded-2xl border border-line bg-bg-deep px-6 py-4 text-center">
           <p className="text-4xl font-bold tabular-nums text-ink">{report.score}</p>

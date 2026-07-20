@@ -188,6 +188,7 @@ async function callOpenAiCompatible(
       0,
       1
     ),
+    generated_at: new Date().toISOString(),
     evidence_quality: evidenceQuality,
     evidence_notes: evidenceNotes,
     mode: "live",

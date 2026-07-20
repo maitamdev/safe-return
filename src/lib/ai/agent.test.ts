@@ -58,6 +58,7 @@ describe("live claim review", () => {
     expect(report.mode).toBe("live");
     expect(report.provider).toBe("groq");
     expect(report.model).toBe("vision-model");
+    expect(Number.isNaN(Date.parse(report.generated_at || ""))).toBe(false);
     expect(report.score).toBe(84);
     expect(report.evidence_quality).toBe("image-backed");
     expect(report.evidence_notes).toEqual([]);
@@ -98,6 +99,7 @@ describe("live claim review", () => {
     expect(report.score).toBe(69);
     expect(report.confidence).toBe(0.55);
     expect(report.evidence_quality).toBe("text-only");
+    expect(Number.isNaN(Date.parse(report.generated_at || ""))).toBe(false);
     expect(report.evidence_notes).toEqual([
       "Chủ tin chưa cung cấp ảnh tham chiếu.",
       "Người gửi claim chưa cung cấp ảnh bằng chứng.",

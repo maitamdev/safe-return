@@ -7,7 +7,11 @@ import {
 } from "@/lib/ai/agent";
 import type { AiReviewInput } from "@/lib/ai/types";
 import { decisionToU8, riskToU8 } from "@/lib/ai/types";
-import { aiInputProvenancePayload, aiModelIdentityPayload } from "@/lib/ai/provenance";
+import {
+  aiInputProvenancePayload,
+  aiModelIdentityPayload,
+  aiReportProvenancePayload,
+} from "@/lib/ai/provenance";
 import { ARBITER, PROTOCOL_V2_ENABLED } from "@/lib/findback/config";
 import {
   evidenceIntegrityPayloadV2,
@@ -167,7 +171,9 @@ export async function POST(req: Request) {
       bountyId,
     };
     const report = await runClaimReview(reviewInput);
-    const reportHashHex = await sha256Hex(JSON.stringify(report));
+    // Hash a key-sorted, Unicode-normalized payload so the commitment can be
+    // recomputed from the persisted report after a DB round trip.
+    const reportHashHex = await sha256Hex(aiReportProvenancePayload(report));
     const signer = loadServerKeypair();
     if (signer.publicKey.toBase58() !== onchain.arbiter) {
       throw new ApiError(503, "Khóa arbiter trên máy chủ không khớp bounty.");
