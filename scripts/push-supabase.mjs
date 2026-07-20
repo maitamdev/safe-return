@@ -15,7 +15,22 @@ const root = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const env = { ...readEnv(path.join(root, ".env.local")), ...process.env };
 const dbUrl = env.SUPABASE_DB_URL?.trim();
 const projectUrl = env.NEXT_PUBLIC_SUPABASE_URL?.trim();
-const npx = process.platform === "win32" ? "npx.cmd" : "npx";
+const npx = resolveNpx();
+
+function resolveNpx() {
+  if (process.platform !== "win32") return { command: "npx", args: [] };
+  const candidates = [
+    path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js"),
+    env.APPDATA
+      ? path.join(env.APPDATA, "npm", "node_modules", "npm", "bin", "npx-cli.js")
+      : "",
+  ];
+  const cli = candidates.find((candidate) => candidate && fs.existsSync(candidate));
+  if (!cli) {
+    fail("Không tìm thấy npx-cli.js để chạy Supabase CLI an toàn trên Windows.");
+  }
+  return { command: process.execPath, args: [cli] };
+}
 
 function readEnv(file) {
   if (!fs.existsSync(file)) return {};
@@ -86,7 +101,7 @@ const migrationArgs = [
 
 console.log(`Supabase project: ${projectRef}`);
 console.log("Đang kiểm tra migration bằng remote dry-run (connection string được ẩn)...");
-run(npx, [...migrationArgs, "--dry-run"]);
+run(npx.command, [...npx.args, ...migrationArgs, "--dry-run"]);
 
 if (env.CONFIRM_SUPABASE_MIGRATE !== "1") {
   console.log("Dry-run hoàn tất. Đặt CONFIRM_SUPABASE_MIGRATE=1 rồi chạy lại để áp dụng.");
@@ -94,7 +109,7 @@ if (env.CONFIRM_SUPABASE_MIGRATE !== "1") {
 }
 
 console.log("Đang áp dụng các migration đã review...");
-run(npx, migrationArgs);
+run(npx.command, [...npx.args, ...migrationArgs]);
 console.log("Migration hoàn tất. Đang bắt buộc xác minh protocol v2 và SafeTag từ API công khai...");
 run(process.execPath, [
   path.join(root, "scripts", "check-release-readiness.mjs"),
