@@ -189,15 +189,22 @@ export function ClaimWorkflowPanel({
       handover?.status === "accepted" &&
       !handover.finderDeliveredAt,
   );
+  // Owner may pay after reviewing evidence. Handover is optional safety, not a hard gate.
   const canReward = Boolean(
     workflow?.role === "owner" &&
-      handover?.status === "accepted" &&
-      handover.finderDeliveredAt &&
-      !handover.ownerReceivedAt,
+      chainActiveStatus(bountyStatus, chainStatus) &&
+      canMutateWorkflow(workflow.status) &&
+      !handover?.ownerReceivedAt &&
+      (
+        // Preferred path: finder confirmed delivery after an accepted meetup.
+        (handover?.status === "accepted" && Boolean(handover.finderDeliveredAt)) ||
+        // Direct path: owner trusts the claim and pays from review / chat stage.
+        ["awaiting_review", "more_info_requested", "handover_proposed", "handover_scheduled", "finder_delivered"].includes(
+          workflow.status,
+        )
+      ),
   );
-  const chainActive =
-    ["Funded", "ClaimSubmitted", "AiReviewed"].includes(bountyStatus) &&
-    (!chainStatus || ["claim_submitted", "ai_reviewed", "ClaimSubmitted", "AiReviewed"].includes(chainStatus));
+  const chainActive = chainActiveStatus(bountyStatus, chainStatus);
   const active = workflow ? canMutateWorkflow(workflow.status) && chainActive : false;
   const locked = busy || actionBusy;
   const rejectionExpired = Boolean(disputeDeadline && now > disputeDeadline);
@@ -299,7 +306,7 @@ export function ClaimWorkflowPanel({
           {active ? <div className="mt-5 grid gap-2 sm:grid-cols-2">
             {!hasAiReport && chainActive ? <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full"><Robot size={17} aria-hidden /> Kiểm tra bằng AI</button> : null}
             {workflow.role === "owner" && ["awaiting_review", "more_info_requested"].includes(workflow.status) ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "request_info" })} className="app-button-secondary w-full"><ChatCircleText size={17} aria-hidden /> Yêu cầu bổ sung</button> : null}
-            {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> Đã nhận đúng đồ, trả {rewardUi} FIND</button> : null}
+            {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> {handover?.finderDeliveredAt ? `Đã nhận đúng đồ, trả ${rewardUi} FIND` : `Chấp nhận claim và trả ${rewardUi} FIND`}</button> : null}
             {workflow.role === "owner" && chainActive && !handover?.finderDeliveredAt ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
           </div> : null}
 
@@ -359,6 +366,7 @@ function nextStepCopy(workflow: ClaimWorkflow) {
   if (workflow.status === "finder_delivered") return workflow.role === "owner" ? "Kiểm tra đồ trực tiếp, sau đó xác nhận nhận đồ để trả thưởng." : "Chờ chủ đồ kiểm tra và ký giao dịch trả thưởng.";
   if (workflow.status === "handover_scheduled") return "Gặp tại nơi công cộng và chỉ xác nhận sau khi việc giao đồ thật sự diễn ra.";
   if (workflow.status === "handover_proposed") return workflow.handover?.proposedByMe ? "Bên còn lại chưa xác nhận đề xuất." : "Kiểm tra thời gian, địa điểm rồi xác nhận hoặc trao đổi lại.";
+  if (workflow.status === "awaiting_review") return workflow.role === "owner" ? "Bạn có thể chat, hẹn giao đồ, hoặc bấm trả FIND ngay nếu đã tin bằng chứng." : "Chờ chủ đồ kiểm tra bằng chứng và quyết định trả thưởng.";
   if (workflow.status === "more_info_requested") return workflow.role === "finder" ? "Chủ đồ cần thêm thông tin. Hãy trả lời trong trao đổi riêng." : "Đang chờ người tìm thấy bổ sung thông tin.";
   return workflow.role === "owner" ? "Đối chiếu bằng chứng, trao đổi riêng rồi đề xuất lịch giao đồ." : "Chờ chủ đồ kiểm tra. Bạn có thể chủ động nhắn tin hoặc đề xuất lịch giao.";
 }
@@ -371,14 +379,39 @@ function formatDeadline(value?: number | null) {
   }).format(new Date(value));
 }
 
+
+function chainActiveStatus(bountyStatus: string, chainStatus?: string) {
+  const bountyOk = ["Funded", "ClaimSubmitted", "AiReviewed", "Disputed"].includes(bountyStatus);
+  if (!bountyOk) return false;
+  if (!chainStatus) return true;
+  const normalized = chainStatus.trim();
+  // Accept both snake_case DB values and PascalCase on-chain labels, plus early workflow tags.
+  const ok = new Set([
+    "claim_submitted",
+    "ai_reviewed",
+    "ClaimSubmitted",
+    "AiReviewed",
+    "Funded",
+    "funded",
+    "awaiting_review",
+    "more_info_requested",
+    "handover_proposed",
+    "handover_scheduled",
+    "finder_delivered",
+    "submitted",
+    "pending",
+  ]);
+  return ok.has(normalized);
+}
+
 function confirmTitle(action: Exclude<ConfirmAction, null>, rewardUi: number) {
-  if (action === "reward") return `Xác nhận đã nhận đúng đồ và trả ${rewardUi} FIND?`;
+  if (action === "reward") return `Xác nhận trả ${rewardUi} FIND cho người tìm thấy?`;
   if (action === "reject") return "Từ chối bằng chứng này?";
   return "Chuyển yêu cầu sang phân xử?";
 }
 
 function confirmCopy(action: Exclude<ConfirmAction, null>) {
-  if (action === "reward") return "Phantom sẽ yêu cầu một chữ ký. Sau khi giao dịch xác nhận, phần thưởng không thể hoàn tác.";
+  if (action === "reward") return "Phantom sẽ yêu cầu một chữ ký để chuyển FIND từ vault bounty sang ví người tìm thấy. Sau khi xác nhận, không hoàn tác được.";
   if (action === "reject") return "Claim này sẽ bị đóng nhưng tin vẫn tiếp tục nhận bằng chứng từ người khác.";
   return "Chỉ dùng khi hai bên không thể tự thống nhất. Trọng tài sẽ được quyền xem bằng chứng riêng tư.";
 }
