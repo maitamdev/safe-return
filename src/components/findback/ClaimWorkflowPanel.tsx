@@ -189,23 +189,17 @@ export function ClaimWorkflowPanel({
       handover?.status === "accepted" &&
       !handover.finderDeliveredAt,
   );
-  // Owner may pay after reviewing evidence. Handover is optional safety, not a hard gate.
+  const chainActive = chainActiveStatus(bountyStatus, chainStatus);
+  // Owner can always pay while escrow is still open — handover/chat are optional.
   const canReward = Boolean(
     workflow?.role === "owner" &&
-      chainActiveStatus(bountyStatus, chainStatus) &&
+      chainActive &&
+      workflow &&
       canMutateWorkflow(workflow.status) &&
-      !handover?.ownerReceivedAt &&
-      (
-        // Preferred path: finder confirmed delivery after an accepted meetup.
-        (handover?.status === "accepted" && Boolean(handover.finderDeliveredAt)) ||
-        // Direct path: owner trusts the claim and pays from review / chat stage.
-        ["awaiting_review", "more_info_requested", "handover_proposed", "handover_scheduled", "finder_delivered"].includes(
-          workflow.status,
-        )
-      ),
+      !handover?.ownerReceivedAt,
   );
-  const chainActive = chainActiveStatus(bountyStatus, chainStatus);
-  const active = workflow ? canMutateWorkflow(workflow.status) && chainActive : false;
+  // Chat/handover stay available whenever workflow is open; don't block on claim label quirks.
+  const active = Boolean(workflow && canMutateWorkflow(workflow.status) && chainActive);
   const locked = busy || actionBusy;
   const rejectionExpired = Boolean(disputeDeadline && now > disputeDeadline);
   const resolutionExpired = Boolean(
@@ -303,12 +297,18 @@ export function ClaimWorkflowPanel({
             </div>
           </details>
 
-          {active ? <div className="mt-5 grid gap-2 sm:grid-cols-2">
+          {(active || canReward) ? <div className="mt-5 grid gap-2 sm:grid-cols-2">
             {!hasAiReport && chainActive ? <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full"><Robot size={17} aria-hidden /> Kiểm tra bằng AI</button> : null}
             {workflow.role === "owner" && ["awaiting_review", "more_info_requested"].includes(workflow.status) ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "request_info" })} className="app-button-secondary w-full"><ChatCircleText size={17} aria-hidden /> Yêu cầu bổ sung</button> : null}
-            {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> {handover?.finderDeliveredAt ? `Đã nhận đúng đồ, trả ${rewardUi} FIND` : `Chấp nhận claim và trả ${rewardUi} FIND`}</button> : null}
-            {workflow.role === "owner" && chainActive && !handover?.finderDeliveredAt ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
+            {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> Chấp nhận và trả {rewardUi} FIND</button> : null}
+            {workflow.role === "owner" && chainActive && !handover?.ownerReceivedAt ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
           </div> : null}
+          {workflow.role === "owner" && chainActive && !canReward ? (
+            <div className="alert-box-warn mt-5 rounded-xl p-4 text-sm leading-6">
+              <p className="font-bold">Không thể trả thưởng lúc này</p>
+              <p className="mt-1 text-xs opacity-90">Trạng thái workflow: {workflow.status}. Hãy hard-refresh trang hoặc kết nối đúng ví chủ tin.</p>
+            </div>
+          ) : null}
 
           {active ? <details className="alert-box-warn mt-3 rounded-xl">
             <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất?</span></summary>
@@ -368,7 +368,7 @@ function nextStepCopy(workflow: ClaimWorkflow) {
   if (workflow.status === "handover_proposed") return workflow.handover?.proposedByMe ? "Bên còn lại chưa xác nhận đề xuất." : "Kiểm tra thời gian, địa điểm rồi xác nhận hoặc trao đổi lại.";
   if (workflow.status === "awaiting_review") return workflow.role === "owner" ? "Bạn có thể chat, hẹn giao đồ, hoặc bấm trả FIND ngay nếu đã tin bằng chứng." : "Chờ chủ đồ kiểm tra bằng chứng và quyết định trả thưởng.";
   if (workflow.status === "more_info_requested") return workflow.role === "finder" ? "Chủ đồ cần thêm thông tin. Hãy trả lời trong trao đổi riêng." : "Đang chờ người tìm thấy bổ sung thông tin.";
-  return workflow.role === "owner" ? "Đối chiếu bằng chứng, trao đổi riêng rồi đề xuất lịch giao đồ." : "Chờ chủ đồ kiểm tra. Bạn có thể chủ động nhắn tin hoặc đề xuất lịch giao.";
+  return workflow.role === "owner" ? "Bấm nút xanh bên dưới để trả FIND cho người tìm thấy (chat/hẹn giao chỉ là tùy chọn)." : "Chờ chủ đồ kiểm tra và ký giao dịch trả thưởng.";
 }
 
 function formatDeadline(value?: number | null) {
@@ -380,28 +380,13 @@ function formatDeadline(value?: number | null) {
 }
 
 
-function chainActiveStatus(bountyStatus: string, chainStatus?: string) {
-  const bountyOk = ["Funded", "ClaimSubmitted", "AiReviewed", "Disputed"].includes(bountyStatus);
-  if (!bountyOk) return false;
-  if (!chainStatus) return true;
-  const normalized = chainStatus.trim();
-  // Accept both snake_case DB values and PascalCase on-chain labels, plus early workflow tags.
-  const ok = new Set([
-    "claim_submitted",
-    "ai_reviewed",
-    "ClaimSubmitted",
-    "AiReviewed",
-    "Funded",
-    "funded",
-    "awaiting_review",
-    "more_info_requested",
-    "handover_proposed",
-    "handover_scheduled",
-    "finder_delivered",
-    "submitted",
-    "pending",
-  ]);
-  return ok.has(normalized);
+function chainActiveStatus(bountyStatus: string, _chainStatus?: string) {
+  // Bounty-level gate only. Claim labels vary and must never hide owner pay/chat
+  // while escrow is still locked on-chain.
+  const raw = (bountyStatus || "").trim();
+  if (!raw) return true;
+  const lower = raw.toLowerCase().replace(/[\s-]+/g, "_");
+  return !["released", "refunded", "cancelled", "canceled", "draft"].includes(lower);
 }
 
 function confirmTitle(action: Exclude<ConfirmAction, null>, rewardUi: number) {

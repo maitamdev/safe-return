@@ -411,9 +411,12 @@ export default function BountyDetailPage() {
             <h2 id="owner-next-action" className="text-base font-bold text-emerald-950">
               Bạn có {activeClaims.length} bằng chứng cần xử lý
             </h2>
-            <p className="mt-1 text-sm leading-6 text-emerald-800">Mở từng hồ sơ, trao đổi riêng và hẹn giao đồ trước khi ký trả thưởng.</p>
+            <p className="mt-1 text-sm leading-6 text-emerald-800">
+              Cuộn xuống từng claim và bấm <strong>Chấp nhận và trả FIND</strong> — Phantom sẽ ký chuyển thưởng từ vault.
+              Chat/hẹn giao chỉ tùy chọn.
+            </p>
           </div>
-          <a href="#claims-title" className="app-button-primary shrink-0">Xử lý bằng chứng</a>
+          <a href="#claims-title" className="app-button-primary shrink-0">Trả thưởng ngay</a>
         </section>
       ) : null}
 
@@ -585,6 +588,31 @@ function ClaimsSection({
                     </div>
                   </details>
                 ) : null}
+                <div className="mt-5 rounded-2xl border-2 border-forest/30 bg-emerald-50 p-4">
+                  <p className="text-sm font-bold text-emerald-950">Trả thưởng on-chain</p>
+                  <p className="mt-1 text-xs leading-5 text-emerald-900/80">
+                    Nút này ký giao dịch Solana Devnet: chuyển {rewardUi} FIND từ vault bounty sang ví người gửi claim.
+                    Cần kết nối đúng ví chủ tin trên Phantom (Devnet).
+                  </p>
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      disabled={busy || !claim.finderWallet}
+                      onClick={() => onAccept(claim)}
+                      className="app-button-primary min-h-11"
+                    >
+                      Chấp nhận và trả {rewardUi} FIND
+                    </button>
+                    <button
+                      type="button"
+                      disabled={busy || !claim.finderWallet}
+                      onClick={() => onReject(claim)}
+                      className="app-button-secondary min-h-11 text-rose-800"
+                    >
+                      Từ chối bằng chứng
+                    </button>
+                  </div>
+                </div>
                 {claim.id ? (
                   <ClaimWorkflowPanel
                     claimId={claim.id}
