@@ -8,9 +8,10 @@ import "driver.js/dist/driver.css";
 import { useAuth } from "@/lib/auth/AuthProvider";
 
 /** Bump when tour steps change so returning users see the new tour once. */
-export const TOUR_STORAGE_KEY = "safereturn:product-tour:v2";
+export const TOUR_STORAGE_KEY = "safereturn:product-tour:v3";
 const LEGACY_KEYS = [
   "safereturn:product-tour:v1",
+  "safereturn:product-tour:v2",
   "safereturn:first-visit-guide:v1",
   "safereturn:first-visit-guide:v2",
 ] as const;
@@ -86,47 +87,47 @@ function waitForTourTarget(tourId: string, timeoutMs = 3500): Promise<Element | 
 function landingPlan(): PlannedStep[] {
   return [
     {
-      title: "Chào mừng đến SafeReturn",
+      title: "Chào mừng bạn đến với SafeReturn",
       description:
-        "Tìm đồ thất lạc minh bạch trên Solana Devnet. Tour ngắn trên trang này — không cần đăng nhập trước.",
+        "Nền tảng hỗ trợ tìm lại đồ thất lạc, xác minh bằng chứng và trao thưởng minh bạch trên Solana Devnet. Hãy cùng làm quen với các bước chính trước khi bắt đầu.",
     },
     {
       target: "landing-brand",
-      title: "SafeReturn · mạng thử nghiệm",
+      title: "Môi trường thử nghiệm Devnet",
       description:
-        "App chạy Solana Devnet. SOL/FIND chỉ để thử — không phải tiền thật. Đừng gửi tài sản mainnet.",
+        "SafeReturn đang vận hành trên Solana Devnet. SOL và FIND tại đây chỉ phục vụ mục đích trải nghiệm — không phải tài sản thật. Vui lòng không chuyển tiền từ mạng chính (mainnet).",
       side: "bottom",
       align: "start",
     },
     {
       target: "landing-how",
-      title: "Cách hoạt động",
+      title: "Quy trình hoạt động",
       description:
-        "4 bước: đăng tin → nộp bằng chứng → kiểm tra → chủ đồ ký trả thưởng. AI chỉ hỗ trợ, không tự chuyển tiền.",
+        "Bốn bước cốt lõi: đăng tin thất lạc, nộp bằng chứng tìm thấy, đối chiếu thông tin, và chủ sở hữu ký xác nhận trả thưởng. Trí tuệ nhân tạo chỉ hỗ trợ đánh giá — không tự động chuyển tiền.",
       side: "top",
       align: "center",
     },
     {
       target: "landing-cta",
-      title: "Bắt đầu khi sẵn sàng",
+      title: "Bắt đầu sử dụng",
       description:
-        "«Xem tin thất lạc» cần đăng nhập email. Tạo tài khoản miễn phí, rồi kết nối Phantom (Devnet) để khóa thưởng hoặc gửi bằng chứng.",
+        "Chọn «Xem tin thất lạc» để vào ứng dụng (cần đăng nhập). Sau đó kết nối ví Phantom ở chế độ Devnet để khóa phần thưởng hoặc gửi bằng chứng tìm thấy.",
       side: "bottom",
       align: "start",
     },
     {
       target: "landing-auth",
-      title: "Đăng nhập / tạo tài khoản",
+      title: "Tài khoản và bảo mật",
       description:
-        "Dùng email để vào app. Ví Phantom gắn sau — dùng ký giao dịch, không thay thế tài khoản.",
+        "Đăng ký hoặc đăng nhập bằng email để sử dụng dịch vụ. Ví Phantom dùng để ký giao dịch trên chuỗi khối — không thay thế tài khoản đăng nhập và không được chia sẻ cụm từ khôi phục.",
       side: "bottom",
       align: "end",
     },
     {
       target: "help",
-      title: "Xem lại hướng dẫn",
+      title: "Hỗ trợ khi cần",
       description:
-        "Bấm nút này bất cứ lúc nào. Sau khi đăng nhập, tour trong app sẽ chỉ menu Danh sách · Tạo tin · Của tôi và ví.",
+        "Bạn có thể mở lại hướng dẫn bất cứ lúc nào bằng nút này. Sau khi đăng nhập, hướng dẫn trong ứng dụng sẽ giới thiệu menu chính và thao tác với ví.",
       side: "left",
       align: "end",
     },
@@ -137,68 +138,71 @@ function landingPlan(): PlannedStep[] {
 function appPlan(): PlannedStep[] {
   return [
     {
-      title: "Tour nhanh trong app",
+      title: "Chào mừng bạn đến với SafeReturn",
       description:
-        "Bạn đã đăng nhập. Các bước sau chỉ các nút quan trọng — khoảng 45 giây.",
+        "Bạn đã đăng nhập thành công. Phần hướng dẫn sau sẽ giới thiệu các khu vực quan trọng trong ứng dụng để bạn sử dụng an toàn và hiệu quả.",
     },
     {
       target: "brand",
-      title: "SafeReturn · Devnet",
+      title: "SafeReturn trên Solana Devnet",
       description:
-        "SOL và FIND ở đây chỉ để thử. Luôn kiểm tra mạng Phantom là Devnet trước khi ký.",
+        "Mọi giao dịch tại đây diễn ra trên mạng thử nghiệm. Trước khi ký, hãy chắc chắn ví Phantom đang chọn Devnet — SOL và FIND không mang giá trị thương mại.",
       side: "bottom",
       align: "start",
     },
     {
       target: "nav-list",
-      title: "Danh sách tin",
-      description: "Xem tin đang mở. Nhặt được đồ → tìm tin khớp → gửi bằng chứng riêng tư.",
+      title: "Danh sách tin thất lạc",
+      description:
+        "Xem toàn bộ tin đang mở. Nếu bạn nhặt được đồ, hãy tìm tin phù hợp và gửi bằng chứng riêng tư để chủ sở hữu xem xét.",
       side: "bottom",
       align: "center",
     },
     {
       target: "nav-create",
-      title: "Đăng tin mất đồ",
+      title: "Đăng tin khi mất đồ",
       description:
-        "Mô tả, ảnh, khu vực, mức thưởng FIND. Thưởng khóa trong két đến khi bạn chấp nhận bằng chứng đúng.",
+        "Cung cấp mô tả, hình ảnh tham chiếu, khu vực và mức thưởng FIND. Phần thưởng được khóa an toàn cho đến khi bạn chấp nhận bằng chứng hợp lệ.",
       side: "bottom",
       align: "center",
     },
     {
       target: "nav-mine",
-      title: "Của tôi",
-      description: "Tin đã đăng và claim đã gửi. Theo dõi chat, hẹn giao và trả thưởng tại đây.",
+      title: "Quản lý tin của bạn",
+      description:
+        "Theo dõi tin đã đăng và các hồ sơ tìm thấy bạn đã gửi. Tại đây bạn trao đổi, hẹn giao nhận và hoàn tất trả thưởng.",
       side: "bottom",
       align: "center",
     },
     {
       target: "wallet",
-      title: "Ví Phantom",
+      title: "Kết nối ví giao dịch",
       description:
-        "Kết nối ví Devnet để khóa thưởng / nhận FIND. Không chia sẻ seed phrase. Đọc kỹ popup ký.",
+        "Kết nối Phantom (Devnet) để khóa thưởng, gửi bằng chứng on-chain hoặc nhận FIND. Luôn đọc kỹ nội dung giao dịch trước khi xác nhận — không chia sẻ seed phrase với bất kỳ ai.",
       side: "bottom",
       align: "end",
     },
     {
       target: "wallet-setup",
-      title: "Chuẩn bị SOL & FIND thử",
+      title: "Chuẩn bị tài sản thử nghiệm",
       description:
-        "Chưa có số dư? Bổ sung tài sản hoặc faucet. Cần SOL trả phí mạng và FIND để demo khóa thưởng.",
+        "Nếu ví chưa có số dư, hãy bổ sung SOL (phí mạng) và FIND (thưởng demo) qua chức năng chuẩn bị ví hoặc faucet chính thức của Solana.",
       side: "bottom",
       align: "center",
     },
     {
       target: "bounty-list",
-      title: "Luồng thực tế",
+      title: "Quy trình trao trả an toàn",
       description:
-        "① Chủ đồ: đăng tin → xem bằng chứng → hẹn nơi công cộng → nhận đồ → trả thưởng. ② Người nhặt: gửi bằng chứng → chat → giao đồ → nhận FIND. ③ Trả sớm chỉ khi chủ đồ tick chấp nhận rủi ro.",
+        "Chủ đồ: đăng tin → xem bằng chứng → hẹn gặp nơi công cộng → nhận đúng đồ → trả thưởng. Người tìm thấy: gửi bằng chứng → trao đổi → giao đồ → nhận thưởng. Nên xác nhận đã nhận đồ trước khi giải ngân; trả sớm chỉ khi bạn chủ động chấp nhận rủi ro.",
       side: "top",
       align: "center",
     },
     {
       target: "help",
-      title: "Xong — dùng thử thôi",
-      description: "Cần xem lại? Bấm Hướng dẫn. Chúc bạn tìm được đồ an toàn.",
+      title: "Bạn đã sẵn sàng",
+      description:
+        "Chúc bạn sớm tìm lại được đồ thất lạc. Khi cần xem lại hướng dẫn, hãy chọn nút Hướng dẫn ở góc màn hình.",
       side: "left",
       align: "end",
     },
@@ -286,9 +290,9 @@ async function runDriverTour(plan: PlannedStep[], onDone: () => void) {
     disableActiveInteraction: true,
     popoverClass: "sr-driver-theme",
     progressText: "{{current}} / {{total}}",
-    nextBtnText: "Tiếp",
-    prevBtnText: "Lùi",
-    doneBtnText: "Đã hiểu",
+    nextBtnText: "Tiếp tục",
+    prevBtnText: "Quay lại",
+    doneBtnText: "Bắt đầu sử dụng",
     steps: resolved,
     onDestroyStarted: () => {
       if (active?.isActive()) active.destroy();
