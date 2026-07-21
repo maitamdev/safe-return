@@ -1,3 +1,4 @@
+import type { ClaimWorkflowStatus } from "@/lib/findback/workflow";
 "use client";
 
 import {
@@ -13,7 +14,7 @@ import {
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import type { AiClaimReport } from "@/lib/ai/types";
-import type { BountyMeta } from "../store";
+import type { BountyMeta, ClaimMeta } from "../store";
 import {
   acceptClaimOnChain,
   acceptClaimV2OnChain,
@@ -557,6 +558,8 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           claimPda,
           submittedAt: Date.now(),
           evidenceHashHex,
+          status: "Submitted",
+          workflowStatus: "awaiting_review",
         },
         aiReport: null,
         status: "ClaimSubmitted",
@@ -596,8 +599,51 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         : await runTx("accept_claim", () =>
             acceptClaimOnChain(w, bountyId, new PublicKey(finderStr))
           );
-      const updated = { ...meta, status: "Released", lastTx: res.signature, lastTxUrl: res.url };
-      await syncRecoverably("state", updated, targetClaim);
+      const settledClaim = targetClaim
+        ? {
+            ...targetClaim,
+            status: "Settled",
+            workflowStatus: "settled" as ClaimWorkflowStatus,
+          }
+        : null;
+      const updatedClaims = meta.claims?.map((c) => {
+        if (c.finderWallet === finderStr) {
+          return { ...c, status: "Settled", workflowStatus: "settled" as ClaimWorkflowStatus };
+        }
+        // Sibling claims lose the race once escrow is released.
+        if (c.workflowStatus !== "settled") {
+          return { ...c, status: "Rejected", workflowStatus: "rejected" as ClaimWorkflowStatus };
+        }
+        return c;
+      });
+      const updated = {
+        ...meta,
+        status: "Released" as const,
+        lastTx: res.signature,
+        lastTxUrl: res.url,
+        claim: settledClaim || meta.claim,
+        claims: updatedClaims,
+      };
+      // Always pass finder so sync settles workflow even if claim row was thin.
+      let syncClaim: ClaimMeta;
+      if (settledClaim) {
+        syncClaim = settledClaim;
+      } else if (targetClaim) {
+        syncClaim = { ...targetClaim, finderWallet: finderStr };
+      } else if (meta.claim) {
+        syncClaim = { ...meta.claim, finderWallet: finderStr };
+      } else {
+        syncClaim = {
+          finderWallet: finderStr,
+          description: "",
+          location: "",
+          foundAt: "",
+          submittedAt: Date.now(),
+          status: "Settled",
+          workflowStatus: "settled",
+        };
+      }
+      await syncRecoverably("state", updated, syncClaim);
       upsertInMemory(updated);
       await refresh();
     },
@@ -621,12 +667,28 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
             rejectClaimV2OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
           )
         : await runTx("reject_claim", () => rejectClaimOnChain(w, bountyId));
+      const rejectedClaim = targetClaim
+        ? {
+            ...targetClaim,
+            status: useV2 ? "RejectionPending" : "Rejected",
+            workflowStatus: (
+              useV2 ? "rejection_pending" : "rejected"
+            ) as ClaimWorkflowStatus,
+          }
+        : null;
+      const updatedClaims = meta.claims?.map((c) =>
+        c.finderWallet === targetClaim?.finderWallet && rejectedClaim
+          ? rejectedClaim
+          : c,
+      );
       const updated = {
         ...meta,
         lastTx: res.signature,
         lastTxUrl: res.url,
+        claim: rejectedClaim || meta.claim,
+        claims: updatedClaims,
       };
-      await syncRecoverably("state", updated, targetClaim);
+      await syncRecoverably("state", updated, rejectedClaim || targetClaim);
       upsertInMemory(updated);
       await refresh();
     },

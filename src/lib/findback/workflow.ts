@@ -63,10 +63,16 @@ export function cleanWorkflowText(value: unknown, maxLength: number) {
     .slice(0, maxLength);
 }
 
+/** Handover / most mutations closed for terminal + dispute states. */
 export function canMutateWorkflow(status: ClaimWorkflowStatus) {
   return !(
     ["settled", "rejected", "rejection_pending", "disputed"] as ClaimWorkflowStatus[]
   ).includes(status);
+}
+
+/** Messaging stays open during rejection window so parties can negotiate. */
+export function canSendWorkflowMessage(status: ClaimWorkflowStatus) {
+  return !(["settled", "rejected", "disputed"] as ClaimWorkflowStatus[]).includes(status);
 }
 
 export function workflowStatusLabel(status: ClaimWorkflowStatus) {

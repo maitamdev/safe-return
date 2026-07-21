@@ -27,6 +27,7 @@ import {
   explorerAddressUrl,
   fromAtomic,
 } from "@/lib/findback/config";
+import { isActionableOwnerClaim, isPayableClaimStatus } from "@/lib/findback/status";
 import {
   bountyPda,
   getConnection,
@@ -115,9 +116,7 @@ export default function BountyDetailPage() {
       ? [meta.claim]
       : [];
   const activeClaims = claims.filter((claim) =>
-    ["claim_submitted", "ai_reviewed", "ClaimSubmitted", "AiReviewed"].includes(
-      claim.status || "claim_submitted",
-    ),
+    isActionableOwnerClaim(claim.status, claim.workflowStatus),
   );
   const currentClaim = claims.find(
     (claim) => claim.finderWallet === walletAddress,
@@ -138,7 +137,11 @@ export default function BountyDetailPage() {
         ? "AiReviewed"
         : "ClaimSubmitted"
       : chainStatus;
-  const canClaim = onchain?.status === "Funded" && !isOwner && !currentClaim;
+  const canClaim =
+    onchain?.status === "Funded" &&
+    !isOwner &&
+    !currentClaim &&
+    nowUnix <= (onchain?.deadline ?? meta.deadlineUnix);
   const deadline = new Intl.DateTimeFormat("vi-VN", {
     dateStyle: "long",
   }).format(new Date(meta.deadlineUnix * 1000));
@@ -365,11 +368,21 @@ export default function BountyDetailPage() {
           onchain.protocolVersion >= 2 &&
           onchain.arbitrationMode === 0 &&
           ["Draft", "Funded"].includes(onchain.status) ? (
-            <ArbitrationSetup
-              bountyId={id}
-              leadArbiter={onchain.arbiter}
-              onConfigured={reloadChain}
-            />
+            <details className="mt-3 rounded-xl border border-line bg-bg-deep">
+              <summary className="cursor-pointer list-none px-3 py-2 text-xs font-bold text-ink-soft">
+                Nâng cao: hội đồng phân xử 2/3 (không bắt buộc)
+              </summary>
+              <div className="border-t border-line p-3">
+                <p className="mb-3 text-[11px] leading-5 text-ink-muted">
+                  Mặc định dùng một trọng tài. Chỉ bật hội đồng khi bạn cần bỏ phiếu 2/3 cho tranh chấp phức tạp.
+                </p>
+                <ArbitrationSetup
+                  bountyId={id}
+                  leadArbiter={onchain.arbiter}
+                  onConfigured={reloadChain}
+                />
+              </div>
+            </details>
           ) : null}
         </aside>
       </div>
@@ -592,7 +605,10 @@ function ClaimsSection({
                   </details>
                 ) : null}
                 {isOwner &&
-                !["Released", "Refunded", "Cancelled", "Canceled"].includes(bountyStatus) ? (
+                isPayableClaimStatus(claim.status, claim.workflowStatus) &&
+                !["Released", "Refunded", "Cancelled", "Canceled", "Disputed"].includes(
+                  bountyStatus,
+                ) ? (
                   <div className="mt-5 rounded-2xl border-2 border-forest/30 bg-emerald-50 p-4">
                     <p className="text-sm font-bold text-emerald-950">
                       Trả thưởng on-chain (chỉ chủ tin)

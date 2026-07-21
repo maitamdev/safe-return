@@ -1,4 +1,5 @@
 /** Supabase lưu metadata; Solana Devnet vẫn là nguồn sự thật của trạng thái tiền. */
+import { normalizeClaimStatus } from "@/lib/findback/status";
 
 import { createClient } from "@/lib/supabase/client";
 import {
@@ -311,7 +312,7 @@ function fromClaimRow(bountyId: string, claim: ClaimRow) {
     aiReportHash: claim.ai_report_hash,
     aiModelHash: claim.ai_model_hash,
     aiPromptVersion: claim.ai_prompt_version,
-    status: claim.status,
+    status: normalizeClaimStatus(claim.status),
     workflowStatus: claim.workflow_status || "awaiting_review",
     disputeDeadline: claim.dispute_deadline
       ? Date.parse(claim.dispute_deadline)

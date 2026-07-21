@@ -18,10 +18,12 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import {
   canMutateWorkflow,
+  canSendWorkflowMessage,
   workflowStatusLabel,
   type ClaimWorkflow,
   type ClaimWorkflowAction,
 } from "@/lib/findback/workflow";
+import { isPayableClaimStatus } from "@/lib/findback/status";
 
 type Props = {
   claimId: string;
@@ -189,17 +191,21 @@ export function ClaimWorkflowPanel({
       handover?.status === "accepted" &&
       !handover.finderDeliveredAt,
   );
-  const chainActive = chainActiveStatus(bountyStatus, chainStatus);
-  // Owner can always pay while escrow is still open — handover/chat are optional.
+  const chainActive = chainActiveStatus(bountyStatus);
+  const claimPayable = isPayableClaimStatus(chainStatus, workflow?.status);
+  // Owner can pay while escrow open and claim not terminal/dispute.
   const canReward = Boolean(
     workflow?.role === "owner" &&
       chainActive &&
+      claimPayable &&
       workflow &&
       canMutateWorkflow(workflow.status) &&
       !handover?.ownerReceivedAt,
   );
-  // Chat/handover stay available whenever workflow is open; don't block on claim label quirks.
   const active = Boolean(workflow && canMutateWorkflow(workflow.status) && chainActive);
+  const canChat = Boolean(
+    workflow && canSendWorkflowMessage(workflow.status) && chainActive,
+  );
   const locked = busy || actionBusy;
   const rejectionExpired = Boolean(disputeDeadline && now > disputeDeadline);
   const resolutionExpired = Boolean(
@@ -289,7 +295,7 @@ export function ClaimWorkflowPanel({
                   <div key={item.id} className={`flex ${item.mine ? "justify-end" : "justify-start"}`}><div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-5 ${item.mine ? "bg-forest text-white" : "border border-line bg-bg-deep text-ink"}`}><p>{item.body}</p><time className={`mt-1 block text-[10px] ${item.mine ? "text-white/70" : "text-ink-muted"}`}>{formatTime(item.createdAt)}</time></div></div>
                 )) : <p className="py-5 text-center text-xs text-ink-muted">Chưa có tin nhắn. Hãy trao đổi trước khi hẹn giao đồ.</p>}
               </div>
-              {active ? (
+              {canChat ? (
                 <div className="mt-3 flex gap-2"><label className="sr-only" htmlFor={`message-${claimId}`}>Tin nhắn riêng</label><textarea id={`message-${claimId}`} className="app-input min-h-11 flex-1 resize-none py-2.5 text-sm" value={message} onChange={(event) => setMessage(event.target.value)} maxLength={1200} placeholder="Nhập tin nhắn riêng" /><button type="button" disabled={locked || !message.trim()} onClick={() => void sendMessage()} className="app-button-primary min-h-11 shrink-0 px-4" aria-label="Gửi tin nhắn"><PaperPlaneTilt size={18} aria-hidden /></button></div>
               ) : (
                 <p className="mt-3 text-xs leading-5 text-ink-muted">Cuộc trao đổi đã đóng. Lịch sử vẫn được giữ để hai bên đối chiếu.</p>
@@ -298,21 +304,15 @@ export function ClaimWorkflowPanel({
           </details>
 
           {(active || canReward) ? <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {!hasAiReport && chainActive ? <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full"><Robot size={17} aria-hidden /> Kiểm tra bằng AI</button> : null}
+            {workflow.role === "owner" && !hasAiReport && chainActive && claimPayable ? <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full"><Robot size={17} aria-hidden /> Kiểm tra bằng AI</button> : null}
             {workflow.role === "owner" && ["awaiting_review", "more_info_requested"].includes(workflow.status) ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "request_info" })} className="app-button-secondary w-full"><ChatCircleText size={17} aria-hidden /> Yêu cầu bổ sung</button> : null}
             {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> Chấp nhận và trả {rewardUi} FIND</button> : null}
-            {workflow.role === "owner" && chainActive && !handover?.ownerReceivedAt ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
+            {workflow.role === "owner" && canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
           </div> : null}
-          {workflow.role === "owner" && chainActive && !canReward ? (
-            <div className="alert-box-warn mt-5 rounded-xl p-4 text-sm leading-6">
-              <p className="font-bold">Không thể trả thưởng lúc này</p>
-              <p className="mt-1 text-xs opacity-90">Trạng thái workflow: {workflow.status}. Hãy hard-refresh trang hoặc kết nối đúng ví chủ tin.</p>
-            </div>
-          ) : null}
 
-          {active ? <details className="alert-box-warn mt-3 rounded-xl">
-            <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất?</span></summary>
-            <div className="border-t border-current/15 p-4"><p className="text-xs leading-5">Chỉ mở tranh chấp khi hai bên bất đồng về việc giao đồ hoặc trả thưởng. Phần thưởng sẽ tiếp tục bị khóa để trọng tài xem xét.</p><button type="button" disabled={locked || !chainActive} onClick={() => setConfirmAction("dispute")} className="app-button-secondary mt-3 min-h-10 py-2 text-xs"><Gavel size={16} aria-hidden /> Mở tranh chấp</button></div>
+          {active && ["handover_scheduled", "finder_delivered", "handover_proposed"].includes(workflow.status) ? <details className="alert-box-warn mt-3 rounded-xl">
+            <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất? (phương án cuối)</span></summary>
+            <div className="border-t border-current/15 p-4"><p className="text-xs leading-5">Chỉ mở tranh chấp khi hai bên bất đồng về giao đồ hoặc trả thưởng. Phần thưởng sẽ tiếp tục bị khóa để trọng tài xem xét.</p><button type="button" disabled={locked || !chainActive} onClick={() => setConfirmAction("dispute")} className="app-button-secondary mt-3 min-h-10 py-2 text-xs"><Gavel size={16} aria-hidden /> Mở tranh chấp</button></div>
           </details> : null}
 
           {workflow.status === "rejection_pending" ? (
@@ -380,11 +380,10 @@ function formatDeadline(value?: number | null) {
 }
 
 
-function chainActiveStatus(bountyStatus: string, _chainStatus?: string) {
-  // Bounty-level gate only. Claim labels vary and must never hide owner pay/chat
-  // while escrow is still locked on-chain.
+function chainActiveStatus(bountyStatus: string) {
   const raw = (bountyStatus || "").trim();
-  if (!raw) return true;
+  // Unknown/empty status: treat as inactive to avoid pay/chat after settle desync.
+  if (!raw) return false;
   const lower = raw.toLowerCase().replace(/[\s-]+/g, "_");
   return !["released", "refunded", "cancelled", "canceled", "draft"].includes(lower);
 }

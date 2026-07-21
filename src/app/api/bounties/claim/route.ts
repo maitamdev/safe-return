@@ -120,29 +120,53 @@ export async function POST(req: Request) {
         throw new ApiError(409, "Hash ClaimV2 không khớp dữ liệu bằng chứng.");
       }
       const now = new Date().toISOString();
+      // Non-destructive upsert: never wipe AI review or terminal statuses on retry/outbox.
+      const { data: existingClaim } = await admin
+        .from("claims")
+        .select("id,status,ai_report,workflow_status")
+        .eq("bounty_id", bountyId)
+        .eq("finder_wallet", chainClaim.finder)
+        .maybeSingle();
+
+      const existingStatus = String(existingClaim?.status || "").toLowerCase();
+      const isTerminal = ["settled", "rejected", "disputed", "rejection_pending"].includes(
+        existingStatus,
+      ) || ["settled", "rejected", "disputed", "rejection_pending"].includes(
+        String(existingClaim?.workflow_status || "").toLowerCase(),
+      );
+      const hasAi = Boolean(existingClaim?.ai_report);
+
+      const claimPayload: Record<string, unknown> = {
+        bounty_id: bountyId,
+        finder_id: user.id,
+        finder_wallet: chainClaim.finder,
+        protocol_version: 2,
+        claim_pda: chainClaim.address,
+        description: body.claim.description.slice(0, 2000),
+        location: body.claim.location.slice(0, 200),
+        found_at: body.claim.foundAt.slice(0, 80),
+        image_data: null,
+        image_storage_path: body.claim.media?.storagePath ?? null,
+        image_sha256: body.claim.media?.sha256 ?? null,
+        image_mime_type: body.claim.media?.mimeType ?? null,
+        image_byte_size: body.claim.media?.byteSize ?? null,
+        evidence_hash: evidenceHex,
+        last_tx: body.signature ?? null,
+        last_tx_url: body.signature ? explorerTxUrl(body.signature) : null,
+        updated_at: now,
+      };
+      if (!existingClaim) {
+        claimPayload.ai_report = null;
+        claimPayload.status = "submitted";
+        claimPayload.submitted_at = now;
+      } else if (!isTerminal && !hasAi) {
+        // Only reset status while still in the initial submitted window.
+        claimPayload.status = "submitted";
+      }
+      // If AI/terminal already present, leave status + ai_report untouched.
+
       const { data: savedClaim, error } = await admin.from("claims").upsert(
-        {
-          bounty_id: bountyId,
-          finder_id: user.id,
-          finder_wallet: chainClaim.finder,
-          protocol_version: 2,
-          claim_pda: chainClaim.address,
-          description: body.claim.description.slice(0, 2000),
-          location: body.claim.location.slice(0, 200),
-          found_at: body.claim.foundAt.slice(0, 80),
-          image_data: null,
-          image_storage_path: body.claim.media?.storagePath ?? null,
-          image_sha256: body.claim.media?.sha256 ?? null,
-          image_mime_type: body.claim.media?.mimeType ?? null,
-          image_byte_size: body.claim.media?.byteSize ?? null,
-          evidence_hash: evidenceHex,
-          ai_report: null,
-          status: "submitted",
-          last_tx: body.signature ?? null,
-          last_tx_url: body.signature ? explorerTxUrl(body.signature) : null,
-          submitted_at: now,
-          updated_at: now,
-        },
+        claimPayload,
         { onConflict: "bounty_id,finder_wallet" }
       ).select("id").single();
       if (error) throw new Error(error.message);

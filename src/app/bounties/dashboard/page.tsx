@@ -13,7 +13,13 @@ export default function DashboardPage() {
   const { bounties, loadingBounties, lastTxUrl, lastIx, txState } = useFindBack();
   const address = publicKey?.toBase58();
   const owned = address ? bounties.filter((b) => b.ownerWallet === address) : [];
-  const claimed = address ? bounties.filter((b) => b.claim?.finderWallet === address) : [];
+  const claimed = address
+    ? bounties.filter(
+        (b) =>
+          b.claims?.some((c) => c.finderWallet === address) ||
+          b.claim?.finderWallet === address,
+      )
+    : [];
   const totalRewards = owned.reduce((total, bounty) => total + bounty.rewardUi, 0);
 
   return (

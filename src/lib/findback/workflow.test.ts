@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   canMutateWorkflow,
+  canSendWorkflowMessage,
   cleanWorkflowText,
   workflowStatusLabel,
 } from "./workflow";
@@ -24,5 +25,15 @@ describe("claim workflow helpers", () => {
     expect(workflowStatusLabel("awaiting_review")).toContain("chủ đồ");
     expect(workflowStatusLabel("settled")).toContain("trả thưởng");
     expect(workflowStatusLabel("disputed")).toBeTruthy();
+  });
+});
+
+
+describe("canSendWorkflowMessage", () => {
+  it("allows chat during rejection_pending", () => {
+    expect(canSendWorkflowMessage("rejection_pending")).toBe(true);
+    expect(canSendWorkflowMessage("awaiting_review")).toBe(true);
+    expect(canSendWorkflowMessage("settled")).toBe(false);
+    expect(canSendWorkflowMessage("disputed")).toBe(false);
   });
 });
