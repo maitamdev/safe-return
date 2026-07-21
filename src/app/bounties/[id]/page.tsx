@@ -426,6 +426,7 @@ export default function BountyDetailPage() {
           claims={claims}
           rewardUi={meta.rewardUi}
           bountyStatus={chainStatus}
+          isOwner={isOwner}
           busy={busy || txState === "pending"}
           onReview={(claim) => void run(async () => { await reviewClaim(id, claim.finderWallet); })}
           onAccept={(claim) => void run(() => accept(id, claim.finderWallet))}
@@ -456,6 +457,7 @@ function ClaimsSection({
   claims,
   rewardUi,
   bountyStatus,
+  isOwner,
   busy,
   onReview,
   onAccept,
@@ -468,6 +470,7 @@ function ClaimsSection({
   claims: ClaimMeta[];
   rewardUi: number;
   bountyStatus: string;
+  isOwner: boolean;
   busy: boolean;
   onReview: (claim: ClaimMeta) => void;
   onAccept: (claim: ClaimMeta) => void;
@@ -588,31 +591,36 @@ function ClaimsSection({
                     </div>
                   </details>
                 ) : null}
-                <div className="mt-5 rounded-2xl border-2 border-forest/30 bg-emerald-50 p-4">
-                  <p className="text-sm font-bold text-emerald-950">Trả thưởng on-chain</p>
-                  <p className="mt-1 text-xs leading-5 text-emerald-900/80">
-                    Nút này ký giao dịch Solana Devnet: chuyển {rewardUi} FIND từ vault bounty sang ví người gửi claim.
-                    Cần kết nối đúng ví chủ tin trên Phantom (Devnet).
-                  </p>
-                  <div className="mt-3 flex flex-wrap gap-2">
-                    <button
-                      type="button"
-                      disabled={busy || !claim.finderWallet}
-                      onClick={() => onAccept(claim)}
-                      className="app-button-primary min-h-11"
-                    >
-                      Chấp nhận và trả {rewardUi} FIND
-                    </button>
-                    <button
-                      type="button"
-                      disabled={busy || !claim.finderWallet}
-                      onClick={() => onReject(claim)}
-                      className="app-button-secondary min-h-11 text-rose-800"
-                    >
-                      Từ chối bằng chứng
-                    </button>
+                {isOwner &&
+                !["Released", "Refunded", "Cancelled", "Canceled"].includes(bountyStatus) ? (
+                  <div className="mt-5 rounded-2xl border-2 border-forest/30 bg-emerald-50 p-4">
+                    <p className="text-sm font-bold text-emerald-950">
+                      Trả thưởng on-chain (chỉ chủ tin)
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-emerald-900/80">
+                      Chỉ ví chủ bounty mới ký được. Chuyển {rewardUi} FIND từ vault sang ví
+                      người gửi claim trên Solana Devnet.
+                    </p>
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        disabled={busy || !claim.finderWallet}
+                        onClick={() => onAccept(claim)}
+                        className="app-button-primary min-h-11"
+                      >
+                        Chấp nhận và trả {rewardUi} FIND
+                      </button>
+                      <button
+                        type="button"
+                        disabled={busy || !claim.finderWallet}
+                        onClick={() => onReject(claim)}
+                        className="app-button-secondary min-h-11 text-rose-800"
+                      >
+                        Từ chối bằng chứng
+                      </button>
+                    </div>
                   </div>
-                </div>
+                ) : null}
                 {claim.id ? (
                   <ClaimWorkflowPanel
                     claimId={claim.id}
