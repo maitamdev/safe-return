@@ -41,7 +41,7 @@ export default function GlobalRootError({
         >
           <h1 style={{ margin: 0, fontSize: "1.35rem" }}>SafeReturn gặp lỗi nghiêm trọng</h1>
           <p style={{ marginTop: 12, lineHeight: 1.55, color: "#9aada4", fontSize: 14 }}>
-            Hãy tải lại trang. Trạng thái escrow trên Solana Devnet vẫn được giữ nguyên.
+            Hãy tải lại trang. Phần thưởng đang khóa trên mạng vẫn được giữ nguyên.
           </p>
           {error.digest ? (
             <p style={{ marginTop: 12, fontFamily: "ui-monospace, monospace", fontSize: 12, color: "#7f948a" }}>

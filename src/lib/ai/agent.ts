@@ -156,7 +156,7 @@ async function callOpenAiCompatible(
       : "text-only";
   const evidenceNotes = [
     ...(!ownerHasImage ? ["Chủ tin chưa cung cấp ảnh tham chiếu."] : []),
-    ...(!finderHasImage ? ["Người gửi claim chưa cung cấp ảnh bằng chứng."] : []),
+    ...(!finderHasImage ? ["Người gửi hồ sơ chưa cung cấp ảnh bằng chứng."] : []),
   ];
 
   // Without a finder photo there is no visual proof of possession. Keep a live

@@ -28,7 +28,7 @@ export function GetStarted() {
 
   const prepareWallet = async () => {
     if (!address) {
-      setError("Hãy kết nối ví trước khi nhận tài sản Devnet.");
+      setError("Hãy kết nối ví trước khi nhận tài sản thử nghiệm.");
       return;
     }
     setBusy(true);
@@ -42,7 +42,7 @@ export function GetStarted() {
         body: JSON.stringify({ address, amount: 100 }),
       });
       const result = (await response.json()) as DevnetFundResult;
-      if (!response.ok || !result.ok) throw new Error(result.error || "Không chuẩn bị được ví Devnet.");
+      if (!response.ok || !result.ok) throw new Error(result.error || "Không chuẩn bị được ví trên mạng thử nghiệm.");
 
       setMessage(formatFundingSuccess(result, FIND_SYMBOL));
       if (!result.find?.skipped && (result.find?.amount ?? 0) > 0) {
@@ -70,7 +70,7 @@ export function GetStarted() {
             </h2>
             <p className="mt-1 text-xs leading-5 text-ink-muted">
               {connected
-                ? "SOL và FIND thử nghiệm trên Solana Devnet."
+                ? "SOL và FIND chỉ dùng trên mạng thử nghiệm Solana."
                 : "Ví dùng để đăng tin, gửi bằng chứng và nhận thưởng FIND."}
             </p>
           </div>
@@ -82,10 +82,10 @@ export function GetStarted() {
               <TokenBalances />
               <button type="button" onClick={() => void prepareWallet()} disabled={busy} className="app-button-secondary whitespace-nowrap">
                 {busy ? <CircleNotch size={17} className="animate-spin" /> : <Coins size={17} weight="bold" />}
-                {busy ? "Đang kiểm tra" : "Bổ sung tài sản"}
+                {busy ? "Đang kiểm tra" : "Nhận tài sản thử nghiệm"}
               </button>
               <a href="https://faucet.solana.com" target="_blank" rel="noreferrer" className="inline-flex items-center gap-1.5 whitespace-nowrap text-xs font-bold text-forest hover:underline">
-                Faucet SOL <ArrowSquareOut size={14} />
+                Nhận SOL miễn phí <ArrowSquareOut size={14} />
               </a>
             </div>
           ) : (

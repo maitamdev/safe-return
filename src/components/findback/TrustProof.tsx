@@ -104,7 +104,7 @@ export function TrustProof({ bountyId, owner, finder }: TrustProofProps) {
             rel="noreferrer"
             className="app-button-secondary self-start"
           >
-            Mở attestation <ArrowSquareOut size={16} aria-hidden />
+            Xem xác nhận trên Explorer <ArrowSquareOut size={16} aria-hidden />
           </a>
         ) : null}
       </div>
@@ -150,7 +150,7 @@ export function TrustProof({ bountyId, owner, finder }: TrustProofProps) {
             </dl>
           ) : (
             <p className="mt-4 text-sm leading-6 text-ink-soft">
-              Giao dịch cũ chưa có attestation v2. Không tạo điểm uy tín thay
+              Giao dịch cũ chưa có xác nhận uy tín trên mạng. Không tạo điểm uy tín thay
               thế từ dữ liệu ngoài chuỗi.
             </p>
           )}

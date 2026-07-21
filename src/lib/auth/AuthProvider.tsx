@@ -75,7 +75,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const signIn = useCallback(async (email: string, password: string) => {
     const supabase = createClient();
-    if (!supabase) throw new Error("Chưa cấu hình Supabase.");
+    if (!supabase) throw new Error("Chưa cấu hình đăng nhập.");
     const { error } = await supabase.auth.signInWithPassword({
       email: email.trim(),
       password,
@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const signUp = useCallback(
     async (email: string, password: string, name?: string) => {
       const supabase = createClient();
-      if (!supabase) throw new Error("Chưa cấu hình Supabase.");
+      if (!supabase) throw new Error("Chưa cấu hình đăng nhập.");
       const { data, error } = await supabase.auth.signUp({
         email: email.trim(),
         password,
@@ -101,7 +101,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (error) throw new Error(error.message);
       // null session often means email confirmation required
       if (!data.session) {
-        return "Đăng ký OK. Kiểm tra email để xác nhận (hoặc tắt Confirm email trong Supabase).";
+        return "Đăng ký thành công. Vui lòng mở email để xác nhận tài khoản.";
       }
       return null;
     },

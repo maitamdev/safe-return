@@ -22,7 +22,7 @@ export default function SignupPage() {
     setError(null);
     setInfo(null);
     if (!configured) {
-      setError("Ứng dụng chưa cấu hình Supabase.");
+      setError("Ứng dụng chưa cấu hình đăng nhập.");
       return;
     }
     if (password.length < 6) {
@@ -49,16 +49,16 @@ export default function SignupPage() {
       <div className="relative hidden overflow-hidden lg:block">
         <Image src="/images/safereturn-hero-map.png" alt="Bản đồ tìm đồ thất lạc của SafeReturn" fill priority sizes="55vw" className="object-cover" />
         <div className="absolute inset-x-8 bottom-8 rounded-2xl border border-line bg-bg-elevated/92 p-6 shadow-[0_20px_60px_rgba(26,58,42,0.17)] backdrop-blur-md">
-          <p className="text-lg font-bold text-ink">Không bao giờ chia sẻ seed phrase</p>
-          <p className="mt-2 text-sm leading-6 text-ink-soft">SafeReturn chỉ yêu cầu chữ ký giao dịch Devnet trong cửa sổ Phantom.</p>
+          <p className="text-lg font-bold text-ink">Không bao giờ chia sẻ cụm từ khôi phục ví</p>
+          <p className="mt-2 text-sm leading-6 text-ink-soft">SafeReturn chỉ yêu cầu chữ ký giao dịch trên mạng thử nghiệm trong cửa sổ Phantom.</p>
         </div>
       </div>
       <div className="flex items-center justify-center px-4 py-12 sm:px-8">
       <div className="w-full max-w-md">
         <Link href="/" className="inline-flex items-center gap-2 text-sm font-bold text-forest"><ShieldCheck size={20} weight="fill" />SafeReturn</Link>
         <h1 className="mt-6 text-3xl font-bold tracking-tight">Tạo tài khoản</h1>
-        <p className="mt-2 text-sm leading-6 text-ink-soft">Đăng ký bằng email trước. Bạn không cần cung cấp seed phrase hoặc kết nối ví ở bước này.</p>
-        {!configured && <div className="alert-box-warn mt-5 rounded-xl p-4 text-sm">Thiếu cấu hình Supabase. Xem <Link href="/setup" className="font-bold underline">trang thiết lập</Link>.</div>}
+        <p className="mt-2 text-sm leading-6 text-ink-soft">Đăng ký bằng email trước. Bạn không cần cung cấp cụm từ khôi phục ví hay kết nối ví ở bước này.</p>
+        {!configured && <div className="alert-box-warn mt-5 rounded-xl p-4 text-sm">Thiếu cấu hình đăng nhập. Xem <Link href="/setup" className="font-bold underline">trang thiết lập</Link>.</div>}
         <form onSubmit={(event) => void submit(event)} className="app-card mt-6 space-y-5 p-5 sm:p-6">
           <label className="block"><span className="text-sm font-bold">Tên hiển thị</span><input value={name} onChange={(event) => setName(event.target.value)} className="app-input mt-2" autoComplete="name" placeholder="Tên của bạn" maxLength={80} /></label>
           <label className="block"><span className="text-sm font-bold">Email</span><input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="app-input mt-2" placeholder="ban@example.com" /></label>

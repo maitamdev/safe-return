@@ -1,12 +1,12 @@
 /** Shared Vietnamese status copy and claim-status normalizers. */
 
 export const BOUNTY_STATUS_LABELS: Record<string, string> = {
-  Draft: "Chờ khóa thưởng",
-  Funded: "Đang nhận claim",
-  ClaimSubmitted: "Đã có claim",
-  AiReviewed: "Đã đánh giá",
+  Draft: "Chưa khóa thưởng",
+  Funded: "Đang nhận hồ sơ",
+  ClaimSubmitted: "Đã có hồ sơ tìm thấy",
+  AiReviewed: "Đã có đánh giá hỗ trợ",
   Released: "Đã trả thưởng",
-  Refunded: "Đã hoàn tiền",
+  Refunded: "Đã hoàn phần thưởng",
   Disputed: "Đang tranh chấp",
   Cancelled: "Đã hủy",
 };

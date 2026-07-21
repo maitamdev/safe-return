@@ -57,7 +57,7 @@ export function MediaIntegrityBadge({
     return (
       <div className="inline-flex items-center gap-2 rounded-xl border border-line bg-bg-elevated px-3 py-2 text-xs font-semibold text-ink-soft" role="status">
         <ShieldCheck size={16} aria-hidden />
-        Đang đối chiếu hash với Devnet
+        Đang đối chiếu ảnh với mạng thử nghiệm
       </div>
     );
   }
@@ -74,7 +74,7 @@ export function MediaIntegrityBadge({
   return (
     <div className="alert-box-ok inline-flex max-w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold" title={`SHA-256 ${verification?.sha256}`}>
       <CheckCircle size={16} weight="fill" aria-hidden />
-      <span>Ảnh khớp Solana Devnet</span>
+      <span>Ảnh khớp bản ghi trên mạng thử nghiệm</span>
       <span className="font-mono text-[10px] opacity-80">
         {verification?.sha256.slice(0, 8)}…{verification?.sha256.slice(-6)}
       </span>

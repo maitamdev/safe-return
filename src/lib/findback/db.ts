@@ -81,7 +81,7 @@ type ClaimRow = {
 function requireClient() {
   const supabase = createClient();
   if (!supabase) {
-    throw new Error("Ứng dụng chưa cấu hình kết nối Supabase.");
+    throw new Error("Ứng dụng chưa cấu hình kết nối dữ liệu.");
   }
   return supabase;
 }
@@ -95,7 +95,7 @@ export async function syncBountyToSupabase(
     body: JSON.stringify({ bounty }),
   });
   const json = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new Error(json.error || "Không lưu được metadata bounty.");
+  if (!response.ok) throw new Error(json.error || "Không lưu được thông tin tin thất lạc.");
 }
 
 export async function syncBountyStateToSupabase(
@@ -128,7 +128,7 @@ export async function syncClaimToSupabase(bounty: BountyMeta): Promise<void> {
     }),
   });
   const json = (await response.json().catch(() => ({}))) as { error?: string };
-  if (!response.ok) throw new Error(json.error || "Không đồng bộ được claim.");
+  if (!response.ok) throw new Error(json.error || "Không đồng bộ được hồ sơ tìm thấy.");
 }
 
 export function queuePendingSync(
@@ -231,7 +231,7 @@ export async function fetchBountiesFromSupabase(): Promise<BountyMeta[]> {
 
   const { data: rows, error } = bountyResult;
   const { data: claims, error: claimError } = claimResult;
-  if (error || !rows) throw new Error(error?.message || "Không đọc được danh sách bounty.");
+  if (error || !rows) throw new Error(error?.message || "Không đọc được danh sách tin.");
   if (claimError) throw new Error(claimError.message);
   const bountyRows = rows as unknown as BountyRow[];
   const claimRows = (claims || []) as unknown as ClaimRow[];

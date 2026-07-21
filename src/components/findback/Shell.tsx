@@ -23,7 +23,7 @@ import { NotificationsButton } from "@/components/findback/NotificationsButton";
 
 const nav = [
   { href: "/bounties", label: "Danh sách", icon: MagnifyingGlass },
-  { href: "/bounties/create", label: "Tạo tin", icon: PlusCircle },
+  { href: "/bounties/create", label: "Đăng tin", icon: PlusCircle },
   { href: "/bounties/dashboard", label: "Của tôi", icon: SquaresFour },
   { href: "/bounties/arbitration", label: "Phân xử", icon: Gavel },
   { href: "/", label: "Giới thiệu", icon: House },
@@ -118,7 +118,7 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
       {(error || txState === "pending" || (txState === "confirmed" && lastTxUrl)) && (
         <div className={cn("border-b", error ? "alert-box-danger border-b" : txState === "confirmed" ? "alert-box-ok border-b" : "border-line bg-bg-elevated")} role={error ? "alert" : "status"}>
           <div className="mx-auto flex max-w-7xl items-start gap-2 px-4 py-3 text-sm sm:px-6 lg:px-8">
-            {error ? <><WarningCircle size={18} className="mt-0.5 shrink-0" /><span className="min-w-0 flex-1">{error}</span><button type="button" onClick={clearError} className="rounded-lg p-1 opacity-80 hover:opacity-100" aria-label="Đóng thông báo"><X size={16} /></button></> : txState === "pending" ? <><span className="mt-1 h-2 w-2 animate-pulse rounded-full bg-forest" /><span className="text-ink">Đang gửi {transactionLabel(lastIx)}. Kiểm tra cửa sổ Phantom để ký.</span></> : txState === "confirmed" && lastTxUrl ? <a href={lastTxUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-semibold text-forest hover:underline"><CheckCircle size={17} weight="fill" />Giao dịch thành công. Mở Solana Explorer</a> : null}
+            {error ? <><WarningCircle size={18} className="mt-0.5 shrink-0" /><span className="min-w-0 flex-1">{error}</span><button type="button" onClick={clearError} className="rounded-lg p-1 opacity-80 hover:opacity-100" aria-label="Đóng thông báo"><X size={16} /></button></> : txState === "pending" ? <><span className="mt-1 h-2 w-2 animate-pulse rounded-full bg-forest" /><span className="text-ink">Đang gửi {transactionLabel(lastIx)}. Vui lòng xác nhận trong cửa sổ Phantom.</span></> : txState === "confirmed" && lastTxUrl ? <a href={lastTxUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-semibold text-forest hover:underline"><CheckCircle size={17} weight="fill" />Giao dịch thành công. Xem trên Solana Explorer</a> : null}
           </div>
         </div>
       )}
@@ -158,24 +158,24 @@ function transactionLabel(ix: string | null) {
   const labels: Record<string, string> = {
     create_and_fund_bounty: "giao dịch đăng tin và khóa thưởng",
     create_and_fund_bounty_v2: "giao dịch đăng tin và khóa thưởng",
-    create_bounty: "giao dịch tạo bounty",
+    create_bounty: "giao dịch tạo tin",
     fund_bounty: "giao dịch khóa thưởng",
-    submit_claim: "bằng chứng lên chuỗi",
-    record_ai_review: "kết quả đánh giá lên chuỗi",
+    submit_claim: "ghi nhận bằng chứng trên mạng",
+    record_ai_review: "ghi nhận kết quả đánh giá trên mạng",
     accept_claim: "lệnh trả thưởng",
-    reject_claim: "lệnh từ chối claim",
+    reject_claim: "lệnh từ chối hồ sơ",
     open_dispute: "yêu cầu tranh chấp",
     refund_after_expiry: "yêu cầu hoàn tiền",
-    cancel_bounty: "lệnh hủy bounty",
+    cancel_bounty: "lệnh hủy tin",
     resolve_dispute: "quyết định phân xử",
-    create_bounty_sponsored: "bounty được tài trợ phí",
-    fund_bounty_sponsored: "escrow được tài trợ phí",
-    submit_claim_v2_sponsored: "claim được tài trợ phí",
+    create_bounty_sponsored: "tin với phí mạng được hỗ trợ",
+    fund_bounty_sponsored: "khóa thưởng với phí mạng được hỗ trợ",
+    submit_claim_v2_sponsored: "hồ sơ với phí mạng được hỗ trợ",
     configure_arbitration_panel: "cấu hình hội đồng phân xử",
     open_dispute_v3: "yêu cầu hội đồng phân xử",
-    cast_arbitration_vote: "phiếu phân xử on-chain",
+    cast_arbitration_vote: "phiếu phân xử trên mạng",
     finalize_dispute_release: "quyết định trả thưởng 2/3",
-    finalize_dispute_reject: "quyết định từ chối claim 2/3",
+    finalize_dispute_reject: "quyết định từ chối hồ sơ (2/3 phiếu)",
   };
   return ix ? labels[ix] ?? ix : "giao dịch";
 }

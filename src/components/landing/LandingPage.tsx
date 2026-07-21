@@ -23,7 +23,7 @@ const steps = [
   {
     icon: Wallet,
     title: "Đăng tin",
-    body: "Cung cấp mô tả, khu vực và mức thưởng FIND Devnet.",
+    body: "Mô tả đồ, khu vực và mức thưởng FIND trên mạng thử nghiệm.",
   },
   {
     icon: MagnifyingGlass,
@@ -32,13 +32,13 @@ const steps = [
   },
   {
     icon: Brain,
-    title: "Kiểm tra",
-    body: "Hệ thống nêu điểm trùng khớp, mâu thuẫn và rủi ro.",
+    title: "Đối chiếu",
+    body: "Hệ thống nêu điểm trùng khớp, mâu thuẫn và rủi ro để bạn tham khảo.",
   },
   {
     icon: Coins,
-    title: "Trao thưởng",
-    body: "Chủ đồ kiểm tra rồi tự ký lệnh giải ngân on-chain.",
+    title: "Trả thưởng",
+    body: "Chủ đồ tự kiểm tra rồi ký xác nhận trả thưởng trên mạng.",
   },
 ];
 
@@ -49,13 +49,13 @@ export function LandingPage() {
         <div className="relative z-10 max-w-xl py-8 lg:py-0">
           <p className="inline-flex items-center gap-2 text-sm font-bold text-forest">
             <ShieldCheck size={19} weight="fill" />
-            Giao dịch thật trên Solana Devnet
+            Giao dịch thật trên mạng thử nghiệm Solana
           </p>
           <h1 className="font-display mt-5 text-5xl font-bold leading-[1.02] tracking-[-0.055em] text-ink sm:text-6xl lg:text-[4.5rem]">
             Tìm lại điều quan trọng.
           </h1>
           <p className="mt-5 max-w-lg text-base leading-7 text-ink-soft sm:text-lg">
-            Đăng tin, xác minh bằng chứng và trao thưởng minh bạch bằng giao dịch có thể kiểm tra.
+            Đăng tin thất lạc, xác minh bằng chứng và trao thưởng minh bạch — mọi quyết định đều do bạn ký xác nhận.
           </p>
           <div className="mt-8 flex flex-wrap gap-3" data-tour="landing-cta">
             <Link href="/bounties" className="app-button-primary px-5">
@@ -84,8 +84,8 @@ export function LandingPage() {
                   <LockKey size={21} weight="duotone" />
                 </span>
                 <div>
-                  <p className="text-sm font-bold text-ink">Ký quỹ được bảo vệ</p>
-                  <p className="mt-0.5 text-xs text-ink-soft">FIND nằm trong vault của program</p>
+                  <p className="text-sm font-bold text-ink">Phần thưởng được khóa an toàn</p>
+                  <p className="mt-0.5 text-xs text-ink-soft">FIND tạm giữ đến khi bạn chấp nhận hồ sơ hợp lệ</p>
                 </div>
                 <CheckCircle size={22} weight="fill" className="ml-auto text-forest" />
               </div>
@@ -100,18 +100,18 @@ export function LandingPage() {
 
       <section className="border-y border-line bg-bg-elevated" aria-label="Cam kết hệ thống">
         <div className="mx-auto grid max-w-7xl divide-y divide-line px-4 sm:px-6 md:grid-cols-3 md:divide-x md:divide-y-0 lg:px-8">
-          <HeroFact icon={Fingerprint} title="Minh bạch" body="Mỗi giao dịch có chữ ký để kiểm tra." />
-          <HeroFact icon={LockKey} title="An toàn" body="Phần thưởng được khóa bằng escrow." />
-          <HeroFact icon={MapPin} title="Dữ liệu có nguồn" body="Danh sách chỉ có tin do người dùng tạo." />
+          <HeroFact icon={Fingerprint} title="Minh bạch" body="Mỗi giao dịch có chữ ký để bạn tự kiểm tra." />
+          <HeroFact icon={LockKey} title="An toàn" body="Phần thưởng được tạm giữ đến khi trao trả." />
+          <HeroFact icon={MapPin} title="Tin do người dùng đăng" body="Danh sách chỉ gồm tin thật do cộng đồng tạo." />
         </div>
       </section>
 
       <section id="how" className="py-20 sm:py-24" data-tour="landing-how">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
-            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">Một quy trình dễ hiểu</h2>
+            <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">Một quy trình rõ ràng</h2>
             <p className="mt-4 max-w-xl text-base leading-7 text-ink-soft">
-              Mỗi bước đều cho biết ai chịu trách nhiệm, dữ liệu nằm ở đâu và giao dịch nào cần ký.
+              Mỗi bước cho biết ai chịu trách nhiệm, thông tin nào được bảo mật và khi nào cần ký xác nhận.
             </p>
           </div>
           <ol className="mt-10 overflow-hidden rounded-2xl border border-line bg-bg-elevated md:grid md:grid-cols-2 xl:grid-cols-4">
@@ -139,10 +139,10 @@ export function LandingPage() {
                   <ShieldCheck size={30} weight="fill" />
                 </span>
                 <h2 className="font-display mt-6 max-w-md text-3xl font-bold tracking-tight sm:text-4xl">
-                  Minh bạch trên chuỗi, riêng tư ngoài chuỗi
+                  Minh bạch trên mạng, riêng tư ngoài mạng
                 </h2>
                 <p className="mt-4 max-w-lg text-sm leading-7 text-ink-soft">
-                  Blockchain lưu trạng thái, hash bằng chứng và lệnh giải ngân. Ảnh cùng mô tả chi tiết không bị công khai trên chuỗi.
+                  Mạng ghi nhận trạng thái, mã kiểm tra bằng chứng và lệnh trả thưởng. Ảnh cùng mô tả chi tiết không bị công khai trên mạng.
                 </p>
                 <a
                   href={explorerAddressUrl(FINDBACK_PROGRAM_ID)}
@@ -150,19 +150,19 @@ export function LandingPage() {
                   rel="noreferrer"
                   className="app-button-secondary mt-6"
                 >
-                  Xem program <ArrowSquareOut size={16} />
+                  Xem hợp đồng trên Explorer <ArrowSquareOut size={16} />
                 </a>
               </div>
               <div className="overflow-hidden rounded-2xl border border-line bg-bg-elevated">
-                <TrustItem icon={Database} title="Dữ liệu người dùng" body="Supabase lưu tin do người dùng tạo và cập nhật trạng thái theo giao dịch." />
+                <TrustItem icon={Database} title="Dữ liệu người dùng" body="Hệ thống lưu tin do bạn tạo và cập nhật theo giao dịch đã xác nhận." />
                 <TrustItem icon={Fingerprint} title="Có thể kiểm tra" body="Chữ ký giao dịch mở trực tiếp trên Solana Explorer." />
-                <TrustItem icon={LockKey} title="Escrow an toàn" body="FIND Devnet nằm trong vault đến khi chủ đồ quyết định." />
-                <TrustItem icon={Brain} title="AI chỉ tư vấn" body="Kết quả so khớp không có quyền tự chuyển phần thưởng." />
+                <TrustItem icon={LockKey} title="Khóa thưởng an toàn" body="FIND trên mạng thử nghiệm được tạm giữ đến khi chủ đồ quyết định." />
+                <TrustItem icon={Brain} title="AI chỉ hỗ trợ" body="Kết quả đối chiếu không có quyền tự chuyển phần thưởng." />
               </div>
             </div>
             <div className="border-t border-line bg-bg-elevated/70 px-6 py-4 sm:px-8">
               <p className="break-all font-mono text-[11px] leading-5 text-ink-soft">
-                Program: {FINDBACK_PROGRAM_ID}
+                Hợp đồng: {FINDBACK_PROGRAM_ID}
               </p>
             </div>
           </div>
@@ -172,8 +172,8 @@ export function LandingPage() {
       <section className="border-t border-line bg-bg-elevated py-14">
         <div className="mx-auto flex max-w-7xl flex-col items-start justify-between gap-6 px-4 sm:px-6 md:flex-row md:items-center lg:px-8">
           <div>
-            <h2 className="font-display text-2xl font-bold">Bắt đầu bằng tài sản Devnet miễn phí</h2>
-            <p className="mt-2 text-sm text-ink-soft">Không gửi SOL mainnet hoặc tài sản có giá trị vào ứng dụng.</p>
+            <h2 className="font-display text-2xl font-bold">Bắt đầu với tài sản thử nghiệm miễn phí</h2>
+            <p className="mt-2 text-sm text-ink-soft">Không gửi SOL mạng chính hoặc tài sản có giá trị thật vào ứng dụng.</p>
           </div>
           <Link href="/signup" className="app-button-primary px-5">
             Tạo tài khoản <ArrowRight size={17} />
@@ -183,7 +183,7 @@ export function LandingPage() {
 
       <footer className="border-t border-line bg-bg-elevated py-8">
         <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 text-sm text-ink-soft sm:px-6 md:flex-row md:items-center md:justify-between lg:px-8">
-          <p><span className="font-bold text-ink">SafeReturn.</span> Lost and found trên Solana Devnet.</p>
+          <p><span className="font-bold text-ink">SafeReturn.</span> Nền tảng tìm đồ thất lạc trên mạng thử nghiệm Solana.</p>
           <div className="flex gap-5">
             <Link href="/bounties" className="font-semibold hover:text-forest">Danh sách tin</Link>
             <Link href="/login" className="font-semibold hover:text-forest">Đăng nhập</Link>

@@ -119,8 +119,8 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
       <div className="grid gap-6 sm:grid-cols-[1fr_auto] sm:items-start">
         <div>
           <p className="flex items-center gap-2 text-sm font-bold text-forest"><Brain size={19} weight="duotone" />Đánh giá bằng chứng</p>
-          <h2 id={titleId} className="mt-2 text-2xl font-bold">Kết quả so khớp claim</h2>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Kết quả này không tự chuyển tiền. Chủ bounty phải tự kiểm tra và ký quyết định on-chain.</p>
+          <h2 id={titleId} className="mt-2 text-2xl font-bold">Kết quả đối chiếu hồ sơ</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Kết quả này không tự chuyển tiền. Chủ đồ phải tự kiểm tra và ký quyết định trên mạng. AI không tự chuyển thưởng.</p>
           <p className="mt-4 inline-flex rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-1.5 text-xs font-bold text-emerald-800">
             {report.provider === "groq" ? "Groq Vision" : "AI trực tuyến"}: {report.model || "đã cấu hình"}
           </p>
@@ -148,21 +148,21 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
           <summary className="flex cursor-pointer list-none items-center gap-2 text-sm font-bold text-emerald-900">
             <ShieldCheck size={18} weight="fill" aria-hidden />
             {verification === "verified"
-              ? "Provenance AI đã khớp Claim PDA"
+              ? "Đã xác minh nguồn gốc đánh giá AI trên mạng"
               : verification === "mismatch"
-                ? "Cảnh báo: provenance không khớp"
+                ? "Cảnh báo: dữ liệu đánh giá không khớp bản ghi trên mạng"
                 : verification === "legacy"
-                  ? "Provenance thuộc định dạng cũ"
+                  ? "Đánh giá theo định dạng cũ"
                 : verification === "checking"
-                  ? "Đang đối chiếu provenance với Devnet"
-                  : "Provenance AI đã ghi lên Claim PDA"}
+                  ? "Đang đối chiếu với mạng thử nghiệm"
+                  : "Đánh giá AI đã được ghi nhận trên mạng"}
           </summary>
           <p className="mt-2 max-w-2xl text-xs leading-5 text-emerald-800">
             Ba hash dưới đây khóa đúng dữ liệu đầu vào, báo cáo đầu ra và model đã dùng. AI không có quyền tự chuyển phần thưởng.
           </p>
           {verification === "mismatch" ? (
             <p className="alert-box-danger mt-3 rounded-lg p-3 text-xs font-semibold" role="alert">
-              Báo cáo hoặc model hiện tại không khớp commitment trên Claim PDA. Không nên dùng kết quả này để quyết định.
+              Dữ liệu đánh giá hiện tại không khớp bản ghi đã xác nhận trên mạng. Không nên dùng kết quả này để quyết định.
             </p>
           ) : verification === "legacy" ? (
             <p className="mt-3 text-xs text-ink-muted" role="status">
@@ -170,7 +170,7 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
             </p>
           ) : verification === "unavailable" ? (
             <p className="mt-3 text-xs text-amber-800" role="status">
-              Chưa đọc được Claim PDA từ Devnet; hãy thử lại khi RPC ổn định.
+              Chưa đọc được dữ liệu hồ sơ từ mạng thử nghiệm; hãy thử lại khi RPC ổn định.
             </p>
           ) : null}
           <dl className="mt-4 grid gap-3 md:grid-cols-2">
@@ -204,10 +204,10 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
 
       {canDecide && (
         <div className="mt-7 border-t border-line pt-5">
-          <p className="mb-4 text-sm font-semibold text-ink-soft">Quyết định của chủ bounty</p>
+          <p className="mb-4 text-sm font-semibold text-ink-soft">Quyết định của chủ đồ</p>
           <div className="flex flex-wrap gap-3">
             <button type="button" disabled={busy} onClick={onAccept} className="app-button-primary">Chấp nhận và trả thưởng</button>
-            <button type="button" disabled={busy} onClick={onReject} className="app-button-secondary">Từ chối claim</button>
+            <button type="button" disabled={busy} onClick={onReject} className="app-button-secondary">Từ chối hồ sơ</button>
             <button type="button" disabled={busy} onClick={onDispute} className="app-button-secondary border-amber-300 text-amber-900">Mở tranh chấp</button>
           </div>
         </div>

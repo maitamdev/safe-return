@@ -22,27 +22,27 @@ const mono = JetBrains_Mono({
 
 export const metadata: Metadata = {
   metadataBase: new URL(process.env.NEXT_PUBLIC_SITE_URL || "http://localhost:3000"),
-  title: "SafeReturn: Tìm đồ thất lạc trên Solana Devnet",
+  title: "SafeReturn: Tìm đồ thất lạc trên mạng thử nghiệm Solana",
   description:
-    "Đăng tin thất lạc, kiểm tra bằng chứng và khóa phần thưởng minh bạch trên Solana Devnet.",
+    "Đăng tin thất lạc, kiểm tra bằng chứng và khóa phần thưởng minh bạch trên mạng thử nghiệm Solana.",
   keywords: [
     "SafeReturn",
     "tìm đồ thất lạc",
     "Solana",
-    "AI claim",
-    "escrow",
+    "hồ sơ tìm thấy",
+    "khóa thưởng",
     "lost and found",
   ],
   applicationName: "SafeReturn",
   manifest: "/manifest.webmanifest",
   openGraph: {
-    title: "SafeReturn: Tìm đồ thất lạc trên Solana Devnet",
+    title: "SafeReturn: Tìm đồ thất lạc trên mạng thử nghiệm Solana",
     description: "Đối chiếu bằng chứng và trao thưởng FIND minh bạch trên mạng thử nghiệm Solana.",
     type: "website",
     locale: "vi_VN",
     siteName: "SafeReturn",
   },
-  twitter: { card: "summary_large_image", title: "SafeReturn", description: "Tìm đồ thất lạc với bằng chứng có thể kiểm tra trên Solana Devnet." },
+  twitter: { card: "summary_large_image", title: "SafeReturn", description: "Tìm đồ thất lạc với bằng chứng có thể kiểm tra trên mạng thử nghiệm Solana." },
 };
 
 export const viewport = {

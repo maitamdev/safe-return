@@ -5,11 +5,11 @@ describe("formatFundingSuccess", () => {
   it("reports the existing balance instead of saying zero tokens were issued", () => {
     expect(
       formatFundingSuccess({
-        sol: { note: "Ví đã có đủ SOL để trả phí Devnet." },
+        sol: { note: "Ví đã có đủ SOL để trả phí mạng thử nghiệm." },
         find: { amount: 0, balance: 300 },
       })
     ).toBe(
-      "Ví đã có đủ SOL để trả phí Devnet. Ví đã có 300 FIND Devnet, không cấp thêm."
+      "Ví đã có đủ SOL để trả phí mạng thử nghiệm. Ví đã có 300 FIND thử nghiệm, không cấp thêm."
     );
   });
 
@@ -18,7 +18,7 @@ describe("formatFundingSuccess", () => {
       formatFundingSuccess({
         find: { amount: 75, balance: 100 },
       })
-    ).toBe("Đã cấp thêm 75 FIND Devnet. Số dư hiện tại là 100 FIND.");
+    ).toBe("Đã cấp thêm 75 FIND thử nghiệm. Số dư hiện tại là 100 FIND.");
   });
 
   it("uses the authoritative server note when supplied", () => {
@@ -29,11 +29,11 @@ describe("formatFundingSuccess", () => {
           amount: 0,
           balance: 300,
           skipped: true,
-          note: "Ví hiện có 300 FIND Devnet, không mint thêm.",
+          note: "Ví hiện có 300 FIND thử nghiệm, không cấp thêm.",
         },
       })
     ).toBe(
-      "SOL đã sẵn sàng. Ví hiện có 300 FIND Devnet, không mint thêm."
+      "SOL đã sẵn sàng. Ví hiện có 300 FIND thử nghiệm, không cấp thêm."
     );
   });
 });

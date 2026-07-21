@@ -123,7 +123,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       } catch {
         queuePendingSync(kind, bounty, claim);
         setError(
-          "Giao dịch Devnet đã xác nhận. Dữ liệu hiển thị đang được tự động đồng bộ lại.",
+          "Giao dịch đã xác nhận. Dữ liệu hiển thị đang được tự động đồng bộ lại.",
         );
       }
     },
@@ -154,7 +154,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       hasLoadedBountiesRef.current = true;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
-      setError(`Không tải được dữ liệu thật từ Supabase: ${message}`);
+      setError(`Không tải được danh sách tin: ${message}`);
     } finally {
       if (showLoading) setLoadingBounties(false);
     }
@@ -195,7 +195,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const requireWallet = useCallback(() => {
     if (!wallet)
       throw new Error(
-        "Chưa nối ví. Bấm «Kết nối ví» và bảo đảm Phantom đang ở Devnet."
+        "Chưa kết nối ví. Bấm «Kết nối ví» và chọn mạng thử nghiệm (Devnet) trên Phantom."
       );
     return wallet;
   }, [wallet]);
@@ -239,15 +239,15 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
     }) => {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
-      if (!SOLANA_LIVE) throw new Error("SOLANA_LIVE is off");
-      if (!FIND_MINT) throw new Error("FIND mint not configured");
+      if (!SOLANA_LIVE) throw new Error("Kết nối mạng chưa được bật. Vui lòng thử lại sau.");
+      if (!FIND_MINT) throw new Error("Token FIND chưa được cấu hình. Vui lòng liên hệ quản trị.");
 
       let deadlineUnix =
         Math.floor(Date.now() / 1000) + Math.max(1, input.days) * 86400;
       const existing = await fetchBounty(input.id);
       if (existing) {
         if (existing.owner !== w.publicKey.toBase58()) {
-          throw new Error("Mã bounty đã thuộc về ví khác.");
+          throw new Error("Mã tin đã thuộc về ví khác.");
         }
         deadlineUnix = existing.deadline;
       }
@@ -292,7 +292,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           .map((byte) => byte.toString(16).padStart(2, "0"))
           .join("");
         if (existingMetadataHashHex !== metadataHashHex) {
-          throw new Error("Metadata Supabase không khớp hash bounty trên Devnet.");
+          throw new Error("Dữ liệu tin không khớp bản ghi trên mạng thử nghiệm.");
         }
       }
 
@@ -377,7 +377,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         return;
       }
       if (existing && existing.status !== "Draft") {
-        throw new Error(`Bounty đã ở trạng thái ${existing.status}, không thể nạp lại.`);
+        throw new Error(`Tin đã ở trạng thái ${existing.status}, không thể nạp lại.`);
       }
 
       const funded = SPONSORED_FEES_ENABLED && useV2
@@ -409,11 +409,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy metadata của bounty.");
+      if (!meta) throw new Error("Không tìm thấy thông tin tin thất lạc.");
       const onchain = await fetchBounty(bountyId);
-      if (!onchain) throw new Error("Không tìm thấy bounty trên Devnet.");
+      if (!onchain) throw new Error("Không tìm thấy tin trên mạng thử nghiệm.");
       const remaining = onchain.rewardAmount - onchain.amountFunded;
-      if (remaining <= BigInt(0)) throw new Error("Bounty đã được nạp đủ phần thưởng.");
+      if (remaining <= BigInt(0)) throw new Error("Tin đã khóa đủ phần thưởng.");
       const useSponsored =
         SPONSORED_FEES_ENABLED && onchain.protocolVersion >= 2;
       const result = useSponsored
@@ -442,11 +442,11 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const reviewClaim = useCallback(
     async (bountyId: string, finderWallet?: string) => {
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const targetClaim = finderWallet
         ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
         : meta.claim;
-      if (!targetClaim) throw new Error("Chưa có bằng chứng claim để đánh giá.");
+      if (!targetClaim) throw new Error("Chưa có hồ sơ tìm thấy để đánh giá.");
       let report: AiClaimReport | null = null;
       const result = await runTx("record_ai_review", async () => {
         const response = await fetch("/api/ai/review", {
@@ -460,7 +460,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
           error?: string;
         };
         if (!response.ok || !json.report || !json.reviewTx) {
-          throw new Error(json.error || "AI review failed");
+          throw new Error(json.error || "Không hoàn tất được đánh giá hỗ trợ.");
         }
         report = json.report;
         return json.reviewTx;
@@ -490,10 +490,10 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(input.bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
 
       const onchain = await fetchBounty(input.bountyId);
-      if (!onchain) throw new Error("Không tìm thấy bounty trên Solana Devnet.");
+      if (!onchain) throw new Error("Không tìm thấy tin trên mạng thử nghiệm.");
       const useV2 = onchain.protocolVersion >= 2 && PROTOCOL_V2_ENABLED;
       const imageDescriptor = useV2
         ? await imageDescriptorFromDataUrl(input.imageDataUrl)
@@ -579,7 +579,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const onchain = await fetchBounty(bountyId);
       const targetClaim = finderWallet
         ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
@@ -590,7 +590,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         onchain.finder !== "11111111111111111111111111111111"
           ? onchain.finder
           : undefined);
-      if (!finderStr) throw new Error("No finder on claim");
+      if (!finderStr) throw new Error("Không xác định được người gửi hồ sơ.");
       const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
       const res = useV2
         ? await runTx("accept_claim_v2", () =>
@@ -655,13 +655,13 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const onchain = await fetchBounty(bountyId);
       const targetClaim = finderWallet
         ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
         : meta.claim;
       const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
-      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
+      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy người gửi hồ sơ trên mạng.");
       const res = useV2
         ? await runTx("reject_claim_v2", () =>
             rejectClaimV2OnChain(w, bountyId, new PublicKey(targetClaim!.finderWallet!))
@@ -700,13 +700,13 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const onchain = await fetchBounty(bountyId);
       const targetClaim = finderWallet
         ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
         : meta.claim;
       const useV2 = PROTOCOL_V2_ENABLED && Boolean(onchain?.protocolVersion && onchain.protocolVersion >= 2);
-      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
+      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy người gửi hồ sơ trên mạng.");
       const result = useV2
         ? onchain?.arbitrationMode === 1
           ? await runTx("open_dispute_v3", () =>
@@ -729,7 +729,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const targetClaim =
         meta.claims?.find((claim) => claim.finderWallet === finderWallet) ||
         meta.claim;
@@ -752,7 +752,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const targetClaim =
         meta.claims?.find((claim) => claim.finderWallet === finderWallet) ||
         meta.claim;
@@ -775,7 +775,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const res = await runTx("refund_after_expiry", () =>
         refundAfterExpiryOnChain(w, bountyId)
       );
@@ -792,7 +792,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const result = await runTx("cancel_bounty", () =>
         cancelBountyOnChain(w, bountyId)
       );
@@ -809,17 +809,17 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const onchain = await fetchBounty(bountyId);
-      if (!onchain) throw new Error("Không tìm thấy bounty trên Devnet.");
+      if (!onchain) throw new Error("Không tìm thấy tin trên mạng thử nghiệm.");
       const targetClaim = finderWallet
         ? meta.claims?.find((claim) => claim.finderWallet === finderWallet)
         : meta.claim;
       const useV2 = PROTOCOL_V2_ENABLED && onchain.protocolVersion >= 2;
       if (useV2 && onchain.arbitrationMode === 1) {
-        throw new Error("Bounty này dùng hội đồng 2/3. Hãy bỏ phiếu trên trang Phân xử.");
+        throw new Error("Tin này dùng hội đồng 3 người (cần 2/3 phiếu). Hãy bỏ phiếu tại trang Phân xử.");
       }
-      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy finder của Claim PDA.");
+      if (useV2 && !targetClaim?.finderWallet) throw new Error("Không tìm thấy người gửi hồ sơ trên mạng.");
       const result = useV2
         ? await runTx("resolve_dispute_v2", () =>
             resolveDisputeV2OnChain(
@@ -861,7 +861,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         throw new Error("Ba trọng tài phải là ba ví khác nhau.");
       }
       if (parsed.some((address) => address.equals(w.publicKey))) {
-        throw new Error("Chủ bounty không thể nằm trong hội đồng phân xử.");
+        throw new Error("Chủ tin không thể là thành viên hội đồng phân xử.");
       }
       await runTx("configure_arbitration_panel", () =>
         configureArbitrationPanelOnChain(w, bountyId, parsed)
@@ -891,7 +891,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
       const w = requireWallet();
       await requireVerifiedWallet(w.publicKey.toBase58());
       const meta = currentBounty(bountyId);
-      if (!meta) throw new Error("Không tìm thấy bounty trong Supabase.");
+      if (!meta) throw new Error("Không tìm thấy tin thất lạc.");
       const targetClaim = meta.claims?.find(
         (claim) => claim.finderWallet === finderWallet
       ) || meta.claim;

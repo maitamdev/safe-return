@@ -80,13 +80,13 @@ export default function BountyDetailPage() {
           if (cancelled) return;
           setOnchain(result);
           setChainError(
-            result ? null : "Không tìm thấy tài khoản bounty trên Devnet.",
+            result ? null : "Không tìm thấy tin này trên mạng thử nghiệm.",
           );
           setChainLoading(false);
         })
         .catch(() => {
           if (cancelled) return;
-          setChainError("Không thể đọc Solana Devnet lúc này.");
+          setChainError("Không đọc được dữ liệu mạng thử nghiệm lúc này.");
           setChainLoading(false);
         });
     };
@@ -152,10 +152,10 @@ export default function BountyDetailPage() {
       const result = await fetchOnChain(id);
       setOnchain(result);
       setChainError(
-        result ? null : "Không tìm thấy tài khoản bounty trên Devnet.",
+        result ? null : "Không tìm thấy tin này trên mạng thử nghiệm.",
       );
     } catch {
-      setChainError("Không thể đọc Solana Devnet lúc này.");
+      setChainError("Không đọc được dữ liệu mạng thử nghiệm lúc này.");
     } finally {
       setChainLoading(false);
     }
@@ -230,7 +230,7 @@ export default function BountyDetailPage() {
 
         <aside className="app-card self-start p-5 sm:p-6">
           <div className="flex items-center justify-between gap-3">
-            <h2 className="text-lg font-bold">Kiểm tra on-chain</h2>
+            <h2 className="text-lg font-bold">Kiểm tra trên mạng</h2>
             <button
               type="button"
               onClick={() => void reloadChain()}
@@ -252,7 +252,7 @@ export default function BountyDetailPage() {
               }
             />
             <ChainRow
-              label="Escrow"
+              label="Phần thưởng đã khóa"
               value={
                 onchain
                   ? `${fromAtomic(onchain.amountFunded)} / ${fromAtomic(onchain.rewardAmount)} ${FIND_SYMBOL}`
@@ -274,7 +274,7 @@ export default function BountyDetailPage() {
             />
             {onchain && (
               <ChainRow
-                label="Mã tin (on-chain)"
+                label="Mã tin trên mạng"
                 value={
                   <a
                     href={explorerAddressUrl(onchain.address)}
@@ -330,7 +330,7 @@ export default function BountyDetailPage() {
                 onClick={() => void run(() => cancel(id))}
                 className="app-button-secondary w-full"
               >
-                Hủy bounty chưa nạp tiền
+                Hủy tin chưa khóa thưởng
               </button>
             )}
             {canClaim && (
@@ -388,7 +388,7 @@ export default function BountyDetailPage() {
       </div>
 
       <section className="mt-10 border-t border-line pt-8">
-        <h2 className="text-lg font-bold">Tiến trình bounty</h2>
+        <h2 className="text-lg font-bold">Tiến trình tin</h2>
         <ol className="mt-5 grid gap-2 sm:grid-cols-5">
           {flow.map((item) => {
             const currentRank = flow.indexOf(
@@ -681,8 +681,7 @@ function NotFound({ id }: { id: string }) {
     <div className="app-card mx-auto max-w-lg p-7 text-center">
       <h1 className="text-xl font-bold">Không tìm thấy tin</h1>
       <p className="mt-2 text-sm leading-6 text-ink-soft">
-        Bounty {id || "này"} không tồn tại trong dữ liệu Supabase bạn được phép
-        xem.
+        Tin {id || "này"} không tồn tại hoặc bạn không có quyền xem.
       </p>
       <Link href="/bounties" className="app-button-primary mt-5">
         Về danh sách

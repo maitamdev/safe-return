@@ -109,7 +109,7 @@ export default function ArbitrationPage() {
             </span>
             <h1 className="mt-5 text-3xl font-bold tracking-tight sm:text-4xl">Trung tâm phân xử</h1>
             <p className="mt-3 max-w-2xl text-sm leading-7 text-white/72">
-              Mỗi trọng tài ký một phiếu riêng trên Solana. Chỉ khi hai trong ba ví đồng thuận, giao dịch mới có thể trả thưởng hoặc từ chối claim.
+              Mỗi trọng tài ký một phiếu riêng trên Solana. Chỉ khi hai trong ba ví đồng thuận, giao dịch mới có thể trả thưởng hoặc từ chối hồ sơ.
             </p>
           </div>
           <div className="grid grid-cols-2 gap-3 text-center">
@@ -122,7 +122,7 @@ export default function ArbitrationPage() {
       {!address ? (
         <section className="app-card mt-7 p-6">
           <h2 className="font-bold">Kết nối ví trọng tài</h2>
-          <p className="mb-4 mt-2 text-sm leading-6 text-ink-soft">Hệ thống chỉ trả về các vụ mà địa chỉ ví hiện tại nằm trong panel on-chain.</p>
+          <p className="mb-4 mt-2 text-sm leading-6 text-ink-soft">Hệ thống chỉ hiển thị các vụ mà địa chỉ ví hiện tại nằm trong hội đồng phân xử trên mạng.</p>
           <ConnectWalletButton size="md" />
         </section>
       ) : null}
@@ -146,7 +146,7 @@ export default function ArbitrationPage() {
             <div className="app-card p-9 text-center">
               <ShieldCheck size={36} className="mx-auto text-forest" weight="duotone" />
               <h3 className="mt-4 font-bold">Không có vụ nào chờ ví này</h3>
-              <p className="mt-2 text-sm text-ink-soft">Đây là dữ liệu thật theo panel và trạng thái claim trên Devnet.</p>
+              <p className="mt-2 text-sm text-ink-soft">Đây là dữ liệu thật theo hội đồng và trạng thái hồ sơ trên mạng thử nghiệm.</p>
             </div>
           ) : null}
         </div>
@@ -202,9 +202,9 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
       <div className="grid lg:grid-cols-[300px_1fr]">
         <div className="border-b border-line bg-bg-deep lg:border-b-0 lg:border-r">
           {arbitrationCase.imageUrl ? (
-            <Image unoptimized src={arbitrationCase.imageUrl} alt="Ảnh bằng chứng riêng tư của claim" width={720} height={720} className="aspect-square h-full min-h-64 w-full object-cover" />
+            <Image unoptimized src={arbitrationCase.imageUrl} alt="Ảnh bằng chứng riêng tư của hồ sơ" width={720} height={720} className="aspect-square h-full min-h-64 w-full object-cover" />
           ) : (
-            <div className="grid min-h-64 place-items-center p-6 text-center text-sm text-ink-muted"><div><Scales size={34} className="mx-auto text-forest" /><p className="mt-3">Claim không gửi ảnh. Chỉ đánh giá từ mô tả văn bản.</p></div></div>
+            <div className="grid min-h-64 place-items-center p-6 text-center text-sm text-ink-muted"><div><Scales size={34} className="mx-auto text-forest" /><p className="mt-3">Hồ sơ không có ảnh. Chỉ đánh giá từ mô tả văn bản.</p></div></div>
           )}
         </div>
         <div className="p-5 sm:p-7">
@@ -240,7 +240,7 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
                     <Evidence label="Thời gian hẹn" value={formatCaseDate(arbitrationCase.handover.scheduledAt)} />
                     <Evidence label="Địa điểm hẹn riêng tư" value={arbitrationCase.handover.meetingLocation} />
                     <Evidence label="Trạng thái lịch" value={arbitrationCase.handover.status === "accepted" ? "Hai bên đã xác nhận" : arbitrationCase.handover.status === "cancelled" ? "Đã hủy" : "Chờ xác nhận"} />
-                    <Evidence label="Xác nhận giao đồ" value={arbitrationCase.handover.finderDeliveredAt ? `Finder xác nhận lúc ${formatCaseDate(arbitrationCase.handover.finderDeliveredAt)}` : "Chưa có"} />
+                    <Evidence label="Xác nhận giao đồ" value={arbitrationCase.handover.finderDeliveredAt ? `Người tìm thấy xác nhận lúc ${formatCaseDate(arbitrationCase.handover.finderDeliveredAt)}` : "Chưa có"} />
                   </dl>
                 ) : <p className="text-xs text-ink-muted">Hai bên chưa tạo lịch giao đồ.</p>}
                 {arbitrationCase.messages.length > 0 ? (
@@ -261,25 +261,25 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
           {isQuorum && arbitrationCase.panel && quorumCase ? (
             <div className="mt-5 rounded-xl border border-emerald-200 bg-emerald-50/70 p-4">
               <div className="flex items-center justify-between gap-3"><p className="text-sm font-bold text-emerald-950">Tiến độ biểu quyết</p><a href={explorerAddressUrl(quorumCase.address)} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-800 hover:underline">Mở case <ArrowSquareOut size={13} /></a></div>
-              <div className="mt-4 grid grid-cols-2 gap-3"><VoteMetric label="Trả thưởng" value={quorumCase.releaseVotes} /><VoteMetric label="Từ chối claim" value={quorumCase.rejectVotes} /></div>
+              <div className="mt-4 grid grid-cols-2 gap-3"><VoteMetric label="Trả thưởng" value={quorumCase.releaseVotes} /><VoteMetric label="Từ chối hồ sơ" value={quorumCase.rejectVotes} /></div>
               <div className="mt-4 grid grid-cols-3 gap-2">{arbitrationCase.panel.arbiters.map((arbiter, index) => <div key={arbiter} className={`rounded-lg border px-2 py-2 text-center font-mono text-[10px] ${arbiter === viewer ? "border-forest bg-bg-elevated text-forest" : "border-emerald-200 text-emerald-900"}`}>#{index + 1} {arbiter.slice(0, 4)}...{arbiter.slice(-4)}</div>)}</div>
-              {myVote ? <p className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-emerald-800"><CheckCircle size={16} weight="fill" /> Bạn đã bỏ phiếu {myVote.releaseToFinder ? "trả thưởng" : "từ chối claim"}</p> : null}
+              {myVote ? <p className="mt-4 inline-flex items-center gap-2 text-xs font-bold text-emerald-800"><CheckCircle size={16} weight="fill" /> Bạn đã bỏ phiếu {myVote.releaseToFinder ? "trả thưởng" : "từ chối hồ sơ"}</p> : null}
             </div>
           ) : null}
 
           <div className="mt-6 border-t border-line pt-5">
             {isQuorum && decision === 0 && !myVote ? (
-              <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => voteArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, true))} className="app-button-primary"><CheckCircle size={17} /> Phiếu trả FIND</button><button type="button" disabled={locked} onClick={() => void run(() => voteArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, false))} className="app-button-secondary">Phiếu từ chối claim</button></div>
+              <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => voteArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, true))} className="app-button-primary"><CheckCircle size={17} /> Phiếu trả FIND</button><button type="button" disabled={locked} onClick={() => void run(() => voteArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, false))} className="app-button-secondary">Phiếu từ chối hồ sơ</button></div>
             ) : null}
             {isQuorum && decision !== 0 && !quorumCase?.finalized ? (
-              <button type="button" disabled={locked} onClick={() => void run(() => finalizeArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, decision === 1))} className="app-button-primary w-full"><Gavel size={17} /> Thi hành quyết định {decision === 1 ? "trả thưởng" : "từ chối claim"}</button>
+              <button type="button" disabled={locked} onClick={() => void run(() => finalizeArbitration(arbitrationCase.bountyId, arbitrationCase.finderWallet, decision === 1))} className="app-button-primary w-full"><Gavel size={17} /> Thi hành quyết định {decision === 1 ? "trả thưởng" : "từ chối hồ sơ"}</button>
             ) : null}
             {!isQuorum ? (
-              <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, true, arbitrationCase.finderWallet))} className="app-button-primary">Trả FIND cho finder</button><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, false, arbitrationCase.finderWallet))} className="app-button-secondary">Từ chối claim</button></div>
+              <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, true, arbitrationCase.finderWallet))} className="app-button-primary">Trả FIND cho người tìm thấy</button><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, false, arbitrationCase.finderWallet))} className="app-button-secondary">Từ chối hồ sơ</button></div>
             ) : null}
             {error ? <p className="alert-box-danger mt-4 rounded-xl p-3 text-xs leading-5" role="alert">{error}</p> : null}
           </div>
-          <Link href={`/bounties/${arbitrationCase.bountyId}`} className="mt-5 inline-flex items-center gap-1.5 text-xs font-bold text-forest hover:underline">Mở hồ sơ bounty <ArrowSquareOut size={13} /></Link>
+          <Link href={`/bounties/${arbitrationCase.bountyId}`} className="mt-5 inline-flex items-center gap-1.5 text-xs font-bold text-forest hover:underline">Mở tin thất lạc <ArrowSquareOut size={13} /></Link>
         </div>
       </div>
     </article>

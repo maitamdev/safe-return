@@ -178,7 +178,7 @@ function appPlan(): PlannedStep[] {
       target: "wallet",
       title: "Kết nối ví giao dịch",
       description:
-        "Kết nối Phantom (Devnet) để khóa thưởng, gửi bằng chứng on-chain hoặc nhận FIND. Luôn đọc kỹ nội dung giao dịch trước khi xác nhận — không chia sẻ seed phrase với bất kỳ ai.",
+        "Kết nối Phantom (Devnet) để khóa thưởng, ghi nhận bằng chứng trên mạng hoặc nhận FIND. Luôn đọc kỹ nội dung giao dịch trước khi xác nhận — không chia sẻ cụm từ khôi phục ví với bất kỳ ai.",
       side: "bottom",
       align: "end",
     },
@@ -194,7 +194,7 @@ function appPlan(): PlannedStep[] {
       target: "bounty-list",
       title: "Quy trình trao trả an toàn",
       description:
-        "Chủ đồ: đăng tin → xem bằng chứng → hẹn gặp nơi công cộng → nhận đúng đồ → trả thưởng. Người tìm thấy: gửi bằng chứng → trao đổi → giao đồ → nhận thưởng. Nên xác nhận đã nhận đồ trước khi giải ngân; trả sớm chỉ khi bạn chủ động chấp nhận rủi ro.",
+        "Chủ đồ: đăng tin → xem bằng chứng → hẹn gặp nơi công cộng → nhận đúng đồ → trả thưởng. Người tìm thấy: gửi bằng chứng → trao đổi → giao đồ → nhận thưởng. Nên xác nhận đã nhận đồ trước khi trả thưởng; trả sớm chỉ khi bạn chủ động chấp nhận rủi ro.",
       side: "top",
       align: "center",
     },

@@ -387,7 +387,7 @@ export function ClaimWorkflowPanel({
               <p className="text-sm font-bold">Chủ đồ đã yêu cầu từ chối bằng chứng</p>
               <p className="mt-1 text-xs leading-5">
                 Người tìm thấy có thể mở tranh chấp trước {formatDeadline(disputeDeadline)}.
-                Sau thời điểm đó, bất kỳ bên nào cũng có thể hoàn tất việc từ chối trên Devnet.
+                Sau thời điểm đó, bất kỳ bên nào cũng có thể hoàn tất việc từ chối trên mạng thử nghiệm.
               </p>
               <div className="mt-3 flex flex-wrap gap-2">
                 {workflow.role === "finder" && !rejectionExpired ? (
@@ -404,7 +404,7 @@ export function ClaimWorkflowPanel({
             <div className="alert-box-danger mt-4 rounded-xl p-4">
               <p className="text-sm font-bold">Phần thưởng đang được khóa để phân xử</p>
               <p className="mt-1 text-xs leading-5">
-                Hạn xử lý: {formatDeadline(resolutionDeadline)}. Nếu hội đồng không đưa ra quyết định đúng hạn, claim được từ chối và tin được mở lại.
+                Hạn xử lý: {formatDeadline(resolutionDeadline)}. Nếu hội đồng không đưa ra quyết định đúng hạn, hồ sơ bị từ chối và tin tiếp tục nhận hồ sơ khác.
               </p>
               {resolutionExpired ? (
                 <button type="button" disabled={locked} onClick={onTimeoutDispute} className="app-button-secondary mt-3 min-h-10 py-2 text-xs"><Clock size={16} aria-hidden /> Kết thúc tranh chấp quá hạn</button>
@@ -489,7 +489,7 @@ function confirmTitle(action: Exclude<ConfirmAction, null>, rewardUi: number) {
 }
 
 function confirmCopy(action: Exclude<ConfirmAction, null>) {
-  if (action === "reward") return "Ví Phantom sẽ hỏi chữ ký để chuyển thưởng từ két khóa sang ví người tìm thấy. Sau khi ký không hoàn lại được. Chỉ làm khi bạn đã tin đúng đồ (tốt nhất là đã nhận tay).";
+  if (action === "reward") return "Ví Phantom sẽ hỏi chữ ký để chuyển phần thưởng đang tạm giữ sang ví người tìm thấy. Sau khi ký không hoàn lại được. Chỉ làm khi bạn đã tin đúng đồ (tốt nhất là đã nhận tay).";
   if (action === "reject") return "Bằng chứng này sẽ đóng. Tin của bạn vẫn nhận bằng chứng từ người khác.";
   return "Chỉ dùng khi hai bên không thể tự thống nhất. Trọng tài sẽ được quyền xem bằng chứng riêng tư.";
 }

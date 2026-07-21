@@ -53,7 +53,7 @@ export default function BrowseBountiesPage() {
             Tìm theo tên đồ hoặc địa điểm. Mở từng tin để xem thông tin, bằng chứng và phần thưởng.
           </p>
         </div>
-        <Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} weight="bold" />Đăng tin mất đồ</Link>
+        <Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} weight="bold" />Đăng tin thất lạc</Link>
       </div>
 
       <div className="mt-7">
@@ -134,7 +134,7 @@ export default function BrowseBountiesPage() {
           {hasActiveFilters ? (
             <button type="button" onClick={resetFilters} className="app-button-secondary mt-5"><X size={17} />Xóa bộ lọc</button>
           ) : (
-            <Link href="/bounties/create" className="app-button-primary mt-5"><Plus size={17} />Đăng tin mất đồ</Link>
+            <Link href="/bounties/create" className="app-button-primary mt-5"><Plus size={17} />Đăng tin thất lạc</Link>
           )}
         </div>
       )}

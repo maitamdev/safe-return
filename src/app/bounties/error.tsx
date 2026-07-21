@@ -22,7 +22,7 @@ export default function BountiesError({
       </span>
       <h1 className="mt-5 text-2xl font-bold">Chưa tải được dữ liệu</h1>
       <p className="mt-3 text-sm leading-6 text-ink-soft">
-        Kết nối Supabase hoặc Solana Devnet có thể đang gián đoạn. Giao dịch đã xác nhận trên chuỗi không bị mất.
+        Kết nối dữ liệu hoặc mạng thử nghiệm có thể đang gián đoạn. Giao dịch đã xác nhận trên mạng không bị mất.
       </p>
       {error.digest && <p className="mt-3 font-mono text-xs text-ink-muted">Mã lỗi: {error.digest}</p>}
       <div className="mt-6 flex flex-wrap justify-center gap-3">

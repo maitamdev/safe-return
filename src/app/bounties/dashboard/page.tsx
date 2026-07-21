@@ -27,31 +27,31 @@ export default function DashboardPage() {
       <div className="flex flex-col justify-between gap-5 sm:flex-row sm:items-end">
         <div>
           <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Hoạt động của tôi</h1>
-          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Quản lý tin do ví hiện tại tạo và theo dõi các claim đã gửi.</p>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-ink-soft">Quản lý tin do ví hiện tại tạo và theo dõi hồ sơ tìm thấy bạn đã gửi.</p>
         </div>
-        <div className="flex flex-wrap gap-2"><Link href="/bounties/tags" className="app-button-secondary shrink-0"><QrCode size={17} />SafeTag QR</Link><Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} />Tạo tin mới</Link></div>
+        <div className="flex flex-wrap gap-2"><Link href="/bounties/tags" className="app-button-secondary shrink-0"><QrCode size={17} />SafeTag QR</Link><Link href="/bounties/create" className="app-button-primary shrink-0"><Plus size={17} />Đăng tin mới</Link></div>
       </div>
 
-      {!connected && <div className="app-card mt-8 p-6"><h2 className="text-lg font-bold">Kết nối ví để xem dữ liệu cá nhân</h2><p className="mt-2 mb-4 text-sm text-ink-soft">Tài khoản email xác thực người dùng. Địa chỉ Phantom xác định bounty và claim on-chain.</p><ConnectWalletButton size="md" /></div>}
+      {!connected && <div className="app-card mt-8 p-6"><h2 className="text-lg font-bold">Kết nối ví để xem dữ liệu cá nhân</h2><p className="mt-2 mb-4 text-sm text-ink-soft">Tài khoản email xác thực người dùng. Địa chỉ Phantom gắn với tin và hồ sơ trên mạng.</p><ConnectWalletButton size="md" /></div>}
 
       {connected && (
         <>
           <dl className="mt-8 grid gap-4 sm:grid-cols-3">
             <Stat label="Tin đã tạo" value={loadingBounties ? "Đang tải" : String(owned.length)} />
             <Stat label={`Tổng thưởng đã đặt (${FIND_SYMBOL})`} value={loadingBounties ? "Đang tải" : totalRewards.toLocaleString("vi-VN")} />
-            <Stat label="Claim đã gửi" value={loadingBounties ? "Đang tải" : String(claimed.length)} />
+            <Stat label="Hồ sơ đã gửi" value={loadingBounties ? "Đang tải" : String(claimed.length)} />
           </dl>
 
-          {lastTxUrl && <a href={lastTxUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-forest hover:underline">Giao dịch gần nhất: {txState} {lastIx ? `(${lastIx})` : ""}<ArrowSquareOut size={15} /></a>}
+          {lastTxUrl && <a href={lastTxUrl} target="_blank" rel="noreferrer" className="mt-4 inline-flex items-center gap-2 text-sm font-semibold text-forest hover:underline">Giao dịch gần nhất: {txState === "confirmed" ? "thành công" : txState === "pending" ? "đang xử lý" : txState}{lastIx ? ` · ${lastIx}` : ""}<ArrowSquareOut size={15} /></a>}
 
           <section className="mt-10">
             <h2 className="text-xl font-bold">Tin do tôi tạo</h2>
-            {owned.length > 0 ? <div className="mt-4 grid gap-3">{owned.map((bounty) => <BountyRow key={bounty.id} bounty={bounty} />)}</div> : <Empty text="Ví này chưa tạo bounty nào." action="Tạo tin đầu tiên" href="/bounties/create" />}
+            {owned.length > 0 ? <div className="mt-4 grid gap-3">{owned.map((bounty) => <BountyRow key={bounty.id} bounty={bounty} />)}</div> : <Empty text="Ví này chưa đăng tin nào." action="Đăng tin đầu tiên" href="/bounties/create" />}
           </section>
 
           <section className="mt-10 border-t border-line pt-8">
-            <h2 className="text-xl font-bold">Claim tôi đã gửi</h2>
-            {claimed.length > 0 ? <div className="mt-4 grid gap-3">{claimed.map((bounty) => <BountyRow key={bounty.id} bounty={bounty} />)}</div> : <Empty text="Ví này chưa gửi claim nào." action="Xem tin đang mở" href="/bounties" />}
+            <h2 className="text-xl font-bold">Hồ sơ tìm thấy tôi đã gửi</h2>
+            {claimed.length > 0 ? <div className="mt-4 grid gap-3">{claimed.map((bounty) => <BountyRow key={bounty.id} bounty={bounty} />)}</div> : <Empty text="Ví này chưa gửi hồ sơ tìm thấy nào." action="Xem tin đang mở" href="/bounties" />}
           </section>
         </>
       )}

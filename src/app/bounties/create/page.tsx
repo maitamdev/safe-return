@@ -65,11 +65,11 @@ export default function CreateBountyPage() {
   const submit = async () => {
     setError(null);
     if (!connected) {
-      setError("Hãy kết nối Phantom ở mạng Devnet trước khi ký.");
+      setError("Hãy kết nối ví Phantom và chọn mạng thử nghiệm (Devnet) trước khi ký.");
       return;
     }
     if (!findMint) {
-      setError("Ứng dụng chưa cấu hình mint FIND Devnet.");
+      setError("Ứng dụng chưa sẵn sàng cấp token FIND trên mạng thử nghiệm. Vui lòng liên hệ quản trị.");
       return;
     }
     setBusy(true);
@@ -129,8 +129,8 @@ export default function CreateBountyPage() {
 
         {step === 2 && (
           <div className="space-y-5">
-            <Field label={`Phần thưởng (${FIND_SYMBOL})`} hint="FIND là token thử trên Devnet, không phải tiền thật. Dùng để minh họa khóa thưởng."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Bạn ký một lần trên Phantom: đăng tin và khóa thưởng. Tiền chỉ ra khi bạn chấp nhận bằng chứng đúng. SOL Devnet chỉ trả phí mạng.</p></div></div>
+            <Field label={`Phần thưởng (${FIND_SYMBOL})`} hint="FIND là token thử nghiệm, không phải tiền thật. Dùng để minh họa khóa thưởng."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Bạn ký một lần trên Phantom: đăng tin và khóa thưởng. Tiền chỉ ra khi bạn chấp nhận bằng chứng đúng. SOL trên mạng thử nghiệm chỉ dùng trả phí mạng.</p></div></div>
           </div>
         )}
 
@@ -138,9 +138,9 @@ export default function CreateBountyPage() {
           <div>
             <h2 className="text-xl font-bold">Kiểm tra trước khi ký</h2>
             <dl className="mt-5 grid gap-4 sm:grid-cols-2">
-              <Summary label="Đồ vật" value={title} /><Summary label="Loại" value={category} /><Summary label="Khu vực" value={location} /><Summary label="Nhận thông tin trong" value={`${days} ngày sau khi đăng`} /><Summary label="Phần thưởng" value={`${rewardUi} ${FIND_SYMBOL}`} /><Summary label="Ví" value={connected ? "Đã kết nối Devnet" : "Chưa kết nối"} />
+              <Summary label="Đồ vật" value={title} /><Summary label="Loại" value={category} /><Summary label="Khu vực" value={location} /><Summary label="Nhận thông tin trong" value={`${days} ngày sau khi đăng`} /><Summary label="Phần thưởng" value={`${rewardUi} ${FIND_SYMBOL}`} /><Summary label="Ví" value={connected ? "Đã kết nối mạng thử nghiệm" : "Chưa kết nối"} />
             </dl>
-            {!connected && <div className="alert-box-warn mt-6 rounded-xl p-4"><p className="mb-3 text-sm">Kết nối ví để ký một giao dịch Devnet.</p><ConnectWalletButton size="md" /></div>}
+            {!connected && <div className="alert-box-warn mt-6 rounded-xl p-4"><p className="mb-3 text-sm">Kết nối ví để ký giao dịch trên mạng thử nghiệm.</p><ConnectWalletButton size="md" /></div>}
           </div>
         )}
 
@@ -148,7 +148,7 @@ export default function CreateBountyPage() {
 
         <div className="mt-7 flex items-center justify-between gap-3 border-t border-line pt-5">
           <button type="button" disabled={step === 0 || busy} onClick={() => { setError(null); setStep((current) => Math.max(0, current - 1)); }} className="app-button-secondary">Quay lại</button>
-          {step < 3 ? <button type="button" onClick={next} className="app-button-primary">Tiếp tục</button> : <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary">{busy ? "Đang chờ Phantom" : <><Check size={17} weight="bold" />Đăng tin và khóa thưởng</>}</button>}
+          {step < 3 ? <button type="button" onClick={next} className="app-button-primary">Tiếp tục</button> : <button type="button" disabled={busy || txState === "pending" || !connected} onClick={() => void submit()} className="app-button-primary">{busy ? "Đang chờ xác nhận trên Phantom" : <><Check size={17} weight="bold" />Đăng tin và khóa thưởng</>}</button>}
         </div>
       </div>
     </div>

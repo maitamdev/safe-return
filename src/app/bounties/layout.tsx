@@ -15,7 +15,7 @@ const WalletProviders = dynamic(
 function Loading() {
   return (
     <div className="flex min-h-[100dvh] items-center justify-center bg-bg px-4 text-center text-sm text-ink-soft">
-      Đang khởi tạo kết nối ví Devnet…
+      Đang khởi tạo kết nối ví trên mạng thử nghiệm…
     </div>
   );
 }

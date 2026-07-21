@@ -173,7 +173,7 @@ export function ConnectWalletButton({
           </button>
           {!serviceReady && (
             <p role="status" className={`${floatingHint} ${compact ? "" : "text-amber-800"}`}>
-              Quản trị viên cần hoàn tất secret key và migration Supabase.
+              Hệ thống chưa sẵn sàng. Vui lòng thử lại sau hoặc liên hệ quản trị viên.
             </p>
           )}
           {hint && (

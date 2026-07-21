@@ -23,7 +23,7 @@ export default function GlobalError({
         </span>
         <h1 className="mt-5 text-2xl font-bold">Đã xảy ra lỗi</h1>
         <p className="mt-3 text-sm leading-6 text-ink-soft">
-          Ứng dụng gặp sự cố tạm thời. Giao dịch đã xác nhận trên Solana Devnet không bị ảnh hưởng.
+          Ứng dụng gặp sự cố tạm thời. Giao dịch đã xác nhận trên mạng không bị ảnh hưởng.
         </p>
         {error.digest && (
           <p className="mt-3 font-mono text-xs text-ink-muted">Mã lỗi: {error.digest}</p>

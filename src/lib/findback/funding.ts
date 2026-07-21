@@ -29,9 +29,9 @@ export function formatFundingSuccess(
     ? result.find.note
     : noMint
       ? balance !== undefined
-        ? `Ví đã có ${formatTokenAmount(balance)} ${symbol} Devnet, không cấp thêm.`
-        : `Ví đã có đủ ${symbol} Devnet, không cấp thêm.`
-      : `Đã cấp thêm ${formatTokenAmount(amount)} ${symbol} Devnet${
+        ? `Ví đã có ${formatTokenAmount(balance)} ${symbol} thử nghiệm, không cấp thêm.`
+        : `Ví đã có đủ ${symbol} thử nghiệm, không cấp thêm.`
+      : `Đã cấp thêm ${formatTokenAmount(amount)} ${symbol} thử nghiệm${
           balance !== undefined
             ? `. Số dư hiện tại là ${formatTokenAmount(balance)} ${symbol}`
             : ""
