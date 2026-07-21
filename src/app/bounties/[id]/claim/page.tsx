@@ -27,10 +27,20 @@ export default function SubmitClaimPage() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<AiClaimReport | null>(null);
   const [submitted, setSubmitted] = useState(false);
-  // Keep last known meta so background bounty polls never unmount the form mid-typing.
-  const metaRef = useRef(meta);
-  if (meta) metaRef.current = meta;
-  const stableMeta = meta ?? metaRef.current;
+  // Keep last known meta for *this* bounty id only, so background polls never
+  // unmount the form mid-typing — but never reuse another bounty's cache.
+  const metaRef = useRef(meta && meta.id === id ? meta : undefined);
+  if (meta && meta.id === id) {
+    metaRef.current = meta;
+  } else if (metaRef.current?.id !== id) {
+    metaRef.current = undefined;
+  }
+  const stableMeta =
+    meta && meta.id === id
+      ? meta
+      : metaRef.current?.id === id
+        ? metaRef.current
+        : undefined;
 
   if (loadingBounties && !stableMeta) {
     return <div className="app-card mx-auto max-w-2xl p-6 text-sm text-ink-soft">Đang tải dữ liệu từ Supabase...</div>;
