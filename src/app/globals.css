@@ -35,43 +35,6 @@
   --danger-text: #be123c;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --page: #0c1411;
-    --surface: #121c18;
-    --surface-raised: #18241f;
-    --surface-soft: #1e2d27;
-    --text: #e8f0ec;
-    --text-muted: #9aada4;
-    --text-subtle: #7f948a;
-    --line: #24352e;
-    --line-strong: #355045;
-    --accent: #1fad6c;
-    --accent-strong: #28c47c;
-    --accent-soft: #143528;
-    --focus: #34d399;
-    --mint: #1a4a34;
-    --mint-soft: #143528;
-    --gold: #f0b429;
-    --gold-soft: #3a2e12;
-    --coral: #f07178;
-    --input-bg: #0f1915;
-    --button-secondary-bg: #15221c;
-    --skeleton: #24352e;
-    --selection-bg: #1a4a34;
-    --selection-fg: #d1fae5;
-    --shadow-card: 0 14px 42px rgb(0 0 0 / 0.35);
-    --shadow-primary: 0 8px 20px rgb(31 173 108 / 0.22);
-    --shadow-primary-hover: 0 10px 24px rgb(31 173 108 / 0.3);
-    --wallet-overlay: rgb(4 10 8 / 0.72);
-    --devnet-border: #854d0e;
-    --devnet-bg: #422006;
-    --devnet-text: #fde68a;
-    --danger-soft: #3f1219;
-    --danger-text: #fda4af;
-  }
-}
-
 @theme inline {
   --color-bg: var(--page);
   --color-bg-elevated: var(--surface);
@@ -99,7 +62,7 @@
 
 html {
   scroll-behavior: smooth;
-  color-scheme: light dark;
+  color-scheme: light;
 }
 
 body {

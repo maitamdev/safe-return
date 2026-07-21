@@ -29,11 +29,9 @@ Summary of quality work applied in this session. Not a formal release.
 
 ## Product / UX
 
-- OS dark mode via CSS semantic tokens (`prefers-color-scheme`).
 - Semantic alert/status classes (`alert-box-*`, `status-pill-*`, `badge-devnet`).
 - Global `error.tsx`, `global-error.tsx`, `loading.tsx`.
 - Skip-to-content link; robots.txt + sitemap.
-- PWA manifest colors aligned with dark theme.
 
 ## Security
 
