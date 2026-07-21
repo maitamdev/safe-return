@@ -1,0 +1,114 @@
+/* SafeReturn theme overrides for driver.js */
+
+.driver-popover.sr-driver-theme {
+  background: #ffffff !important;
+  color: #13201c;
+  border: 1px solid #dde3e0;
+  border-radius: 16px;
+  box-shadow: 0 22px 60px rgb(27 55 43 / 0.18);
+  max-width: min(22rem, calc(100vw - 2rem));
+  padding: 1rem 1rem 0.85rem;
+  font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+.driver-overlay {
+  background: rgb(16 37 29 / 0.58) !important;
+}
+
+.driver-popover * {
+  font-family: inherit;
+}
+
+.driver-popover-title {
+  font-size: 1.05rem;
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  color: #13201c;
+  line-height: 1.3;
+}
+
+.driver-popover-description {
+  margin-top: 0.4rem;
+  font-size: 0.875rem;
+  line-height: 1.55;
+  color: #5d6d67;
+}
+
+.driver-popover-progress-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #08784a;
+}
+
+.driver-popover-navigation-btns {
+  gap: 0.5rem;
+}
+
+.driver-popover-prev-btn,
+.driver-popover-next-btn {
+  border-radius: 12px !important;
+  text-shadow: none !important;
+  font-size: 0.8125rem !important;
+  font-weight: 700 !important;
+  padding: 0.55rem 0.9rem !important;
+  border: 1px solid #dde3e0 !important;
+  background: #ffffff !important;
+  color: #13201c !important;
+  transition: background 0.15s ease, border-color 0.15s ease, transform 0.12s ease;
+}
+
+.driver-popover-prev-btn:hover,
+.driver-popover-next-btn:hover {
+  background: #f6f8f7 !important;
+  border-color: #bcc9c2 !important;
+}
+
+.driver-popover-next-btn {
+  background: #08784a !important;
+  border-color: #08784a !important;
+  color: #ffffff !important;
+}
+
+.driver-popover-next-btn:hover {
+  background: #06613d !important;
+  border-color: #06613d !important;
+}
+
+.driver-popover-close-btn {
+  color: #5d6d67 !important;
+  width: 2rem !important;
+  height: 2rem !important;
+}
+
+.driver-popover-close-btn:hover {
+  color: #13201c !important;
+}
+
+.driver-popover-arrow-side-left.driver-popover-arrow,
+.driver-popover-arrow-side-right.driver-popover-arrow,
+.driver-popover-arrow-side-top.driver-popover-arrow,
+.driver-popover-arrow-side-bottom.driver-popover-arrow {
+  border-color: #ffffff;
+}
+
+/* Highlight stage */
+.driver-active-element,
+[data-driver-active-element="true"] {
+  border-radius: 14px;
+}
+
+.sr-tour-list {
+  margin: 0.35rem 0 0;
+  padding-left: 1.1rem;
+  display: grid;
+  gap: 0.4rem;
+}
+
+.sr-tour-list li {
+  line-height: 1.45;
+}
+
+.sr-tour-list b {
+  color: #13201c;
+  font-weight: 700;
+}

@@ -104,11 +104,11 @@ export default function BrowseBountiesPage() {
       )}
 
       {loadingBounties ? (
-        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Đang tải danh sách">
+        <div data-tour="bounty-list" className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3" aria-label="Đang tải danh sách">
           {[0, 1, 2].map((item) => <div key={item} className="app-card overflow-hidden"><div className="skeleton aspect-[16/9] rounded-none" /><div className="space-y-3 p-5"><div className="skeleton h-5 w-2/3" /><div className="skeleton h-4 w-full" /><div className="skeleton h-4 w-1/2" /></div></div>)}
         </div>
       ) : filtered.length > 0 ? (
-        <div className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
+        <div data-tour="bounty-list" className="mt-8 grid gap-5 md:grid-cols-2 xl:grid-cols-3">
           {filtered.map((bounty) => {
             const claims = bounty.claims?.length ? bounty.claims : bounty.claim ? [bounty.claim] : [];
             const hasDispute = claims.some((claim) => claim.status?.replaceAll("_", "").toLowerCase() === "disputed");
@@ -123,7 +123,7 @@ export default function BrowseBountiesPage() {
           })}
         </div>
       ) : (
-        <div className="app-card mt-6 flex flex-col items-center px-5 py-12 text-center sm:py-14">
+        <div data-tour="bounty-list" className="app-card mt-6 flex flex-col items-center px-5 py-12 text-center sm:py-14">
           <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-bg-deep text-forest"><Tray size={30} /></span>
           <h2 className="mt-4 text-lg font-bold">{hasActiveFilters ? "Không tìm thấy tin phù hợp" : "Chưa có tin thất lạc nào"}</h2>
           <p className="mt-2 max-w-md text-sm leading-6 text-ink-soft">

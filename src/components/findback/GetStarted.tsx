@@ -58,7 +58,7 @@ export function GetStarted() {
   };
 
   return (
-    <section className="app-card overflow-hidden" aria-labelledby="wallet-setup-title">
+    <section className="app-card overflow-hidden" data-tour="wallet-setup" aria-labelledby="wallet-setup-title">
       <div className="flex flex-col gap-4 px-4 py-4 sm:px-5 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex min-w-0 items-start gap-3">
           <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-bg-deep text-forest">

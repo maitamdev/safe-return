@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import { Be_Vietnam_Pro, JetBrains_Mono } from "next/font/google";
 import { Navbar } from "@/components/layout/Navbar";
-import { FirstVisitGuide } from "@/components/onboarding/FirstVisitGuide";
+import { ProductTour } from "@/components/onboarding/ProductTour";
 import { AuthProvider } from "@/lib/auth/AuthProvider";
 import "./globals.css";
+import "@/components/onboarding/product-tour.css";
 
 const sans = Be_Vietnam_Pro({
   variable: "--font-sans",
@@ -71,7 +72,7 @@ export default function RootLayout({
           <div id="main-content" className="flex min-h-0 flex-1 flex-col">
             {children}
           </div>
-          <FirstVisitGuide />
+          <ProductTour />
         </AuthProvider>
       </body>
     </html>

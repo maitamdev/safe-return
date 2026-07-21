@@ -63,7 +63,7 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
     <div className="min-h-[100dvh] bg-bg text-ink">
       <header className="sticky top-0 z-40 border-b border-line bg-bg-elevated/94 backdrop-blur-xl">
         <div className="mx-auto flex h-[4.5rem] max-w-[1440px] items-center gap-4 px-4 sm:px-6 lg:px-8">
-          <Link href="/bounties" className="flex shrink-0 items-center gap-2.5">
+          <Link href="/bounties" data-tour="brand" className="flex shrink-0 items-center gap-2.5">
             <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-forest font-bold text-white">SR</span>
             <div className="hidden sm:block">
               <p className="text-sm font-bold leading-none text-forest">SafeReturn</p>
@@ -74,8 +74,22 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
           <nav className="mx-auto hidden shrink-0 items-center gap-0.5 xl:flex" aria-label="Điều hướng chính">
             {visibleNav.map((item) => {
               const active = item.href === "/bounties" ? pathname === item.href : item.href !== "/" && pathname.startsWith(item.href);
+              const tourId =
+                item.href === "/bounties"
+                  ? "nav-list"
+                  : item.href === "/bounties/create"
+                    ? "nav-create"
+                    : item.href === "/bounties/dashboard"
+                      ? "nav-mine"
+                      : undefined;
               return (
-                <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition xl:gap-2 xl:px-3", active ? "bg-mint-soft text-forest" : "text-ink-soft hover:bg-bg-deep hover:text-ink")}>
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  data-tour={tourId}
+                  aria-current={active ? "page" : undefined}
+                  className={cn("flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-xl px-2.5 py-2 text-sm font-semibold transition xl:gap-2 xl:px-3", active ? "bg-mint-soft text-forest" : "text-ink-soft hover:bg-bg-deep hover:text-ink")}
+                >
                   <item.icon size={16} weight={active ? "fill" : "regular"} />
                   {item.label}
                 </Link>
@@ -83,7 +97,7 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
             })}
           </nav>
 
-          <div className="ml-auto flex shrink-0 items-center gap-2">
+          <div className="ml-auto flex shrink-0 items-center gap-2" data-tour="wallet">
             <div className="hidden shrink-0 items-center gap-2 2xl:flex">
               <NetworkBadge showBalance={false} />
               <TokenBalances />
@@ -114,7 +128,26 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
       <nav className={`fixed inset-x-0 bottom-0 z-30 grid ${canArbitrate ? "grid-cols-5" : "grid-cols-4"} border-t border-line bg-bg-elevated/98 px-1 py-1.5 shadow-[0_-8px_30px_rgba(28,52,41,0.08)] backdrop-blur-lg xl:hidden`} aria-label="Điều hướng di động">
         {visibleNav.map((item) => {
           const active = item.href === "/bounties" ? pathname === item.href : item.href === "/" ? pathname === "/" : pathname.startsWith(item.href);
-          return <Link key={item.href} href={item.href} aria-current={active ? "page" : undefined} className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold", active ? "bg-mint-soft text-forest" : "text-ink-muted")}><item.icon size={20} weight={active ? "fill" : "regular"} />{item.label}</Link>;
+          const tourId =
+            item.href === "/bounties"
+              ? "nav-list"
+              : item.href === "/bounties/create"
+                ? "nav-create"
+                : item.href === "/bounties/dashboard"
+                  ? "nav-mine"
+                  : undefined;
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              data-tour={tourId}
+              aria-current={active ? "page" : undefined}
+              className={cn("flex min-h-12 flex-col items-center justify-center gap-1 rounded-xl text-[11px] font-semibold", active ? "bg-mint-soft text-forest" : "text-ink-muted")}
+            >
+              <item.icon size={20} weight={active ? "fill" : "regular"} />
+              {item.label}
+            </Link>
+          );
         })}
       </nav>
     </div>
