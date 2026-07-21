@@ -25,18 +25,19 @@ export function Navbar() {
   return (
     <header className="fixed inset-x-0 top-0 z-40 border-b border-line bg-bg-elevated/92 backdrop-blur-xl">
       <nav className="mx-auto flex h-[4.5rem] max-w-[1440px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
-        <Link href="/" className="flex items-center gap-2.5" aria-label="SafeReturn trang chủ">
+        <Link href="/" data-tour="landing-brand" className="flex items-center gap-2.5" aria-label="SafeReturn trang chủ">
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-forest text-white">
             <ShieldCheck size={20} weight="fill" />
           </span>
           <span className="text-lg font-bold tracking-[-0.03em] text-forest">SafeReturn</span>
         </Link>
 
-        <div className="hidden items-center gap-1 md:flex">
+        <div className="hidden items-center gap-1 md:flex" data-tour="landing-nav">
           {links.map((link) => (
             <Link
               key={link.href}
               href={link.href}
+              data-tour={link.href === "/#how" ? "landing-how-link" : link.href === "/bounties" ? "landing-bounties-link" : undefined}
               className="rounded-lg px-3 py-2 text-sm font-semibold text-ink-soft transition hover:bg-bg-deep hover:text-forest"
             >
               {link.label}
@@ -44,7 +45,7 @@ export function Navbar() {
           ))}
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2" data-tour="landing-auth">
           <span className="badge-devnet hidden items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold lg:inline-flex">
             <Flask size={16} weight="duotone" /> Solana Devnet
           </span>

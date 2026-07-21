@@ -57,7 +57,7 @@ export function LandingPage() {
           <p className="mt-5 max-w-lg text-base leading-7 text-ink-soft sm:text-lg">
             Đăng tin, xác minh bằng chứng và trao thưởng minh bạch bằng giao dịch có thể kiểm tra.
           </p>
-          <div className="mt-8 flex flex-wrap gap-3">
+          <div className="mt-8 flex flex-wrap gap-3" data-tour="landing-cta">
             <Link href="/bounties" className="app-button-primary px-5">
               <MagnifyingGlass size={18} weight="bold" />
               Xem tin thất lạc
@@ -106,7 +106,7 @@ export function LandingPage() {
         </div>
       </section>
 
-      <section id="how" className="py-20 sm:py-24">
+      <section id="how" className="py-20 sm:py-24" data-tour="landing-how">
         <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
           <div className="max-w-2xl">
             <h2 className="font-display text-3xl font-bold tracking-tight sm:text-4xl">Một quy trình dễ hiểu</h2>
