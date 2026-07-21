@@ -70,6 +70,7 @@ export function ClaimWorkflowPanel({
   const [meetingLocation, setMeetingLocation] = useState("");
   const [note, setNote] = useState("");
   const [confirmAction, setConfirmAction] = useState<ConfirmAction>(null);
+  const [acceptRisk, setAcceptRisk] = useState(false);
   const [now, setNow] = useState(() => Date.now());
 
   const load = useCallback(async () => {
@@ -193,8 +194,9 @@ export function ClaimWorkflowPanel({
   );
   const chainActive = chainActiveStatus(bountyStatus);
   const claimPayable = isPayableClaimStatus(chainStatus, workflow?.status);
-  // Owner can pay while escrow open and claim not terminal/dispute.
-  const canReward = Boolean(
+  const itemReceived = Boolean(handover?.finderDeliveredAt);
+  // Preferred: pay after finder marked delivery. Early pay needs explicit risk accept.
+  const canRewardBase = Boolean(
     workflow?.role === "owner" &&
       chainActive &&
       claimPayable &&
@@ -202,6 +204,9 @@ export function ClaimWorkflowPanel({
       canMutateWorkflow(workflow.status) &&
       !handover?.ownerReceivedAt,
   );
+  const canRewardSafe = canRewardBase && itemReceived;
+  const canRewardEarly = canRewardBase && !itemReceived;
+  const canReward = canRewardSafe || (canRewardEarly && acceptRisk);
   const active = Boolean(workflow && canMutateWorkflow(workflow.status) && chainActive);
   const canChat = Boolean(
     workflow && canSendWorkflowMessage(workflow.status) && chainActive,
@@ -245,8 +250,8 @@ export function ClaimWorkflowPanel({
           <section className="mt-5" aria-labelledby={`handover-${claimId}`}>
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
-                <h3 id={`handover-${claimId}`} className="text-sm font-bold">Hẹn giao đồ an toàn</h3>
-                <p className="mt-1 text-xs leading-5 text-ink-muted">Lịch hẹn chỉ hiển thị cho hai bên.</p>
+                <h3 id={`handover-${claimId}`} className="text-sm font-bold">Hẹn gặp giao đồ</h3>
+                <p className="mt-1 text-xs leading-5 text-ink-muted">Chỉ bạn và chủ đồ / người tìm thấy nhìn thấy lịch này. Nên gặp nơi công cộng có camera.</p>
               </div>
               {active && (!handover || handover.status === "cancelled") && !showProposal ? (
                 <button type="button" disabled={locked} onClick={() => setShowProposal(true)} className="app-button-secondary min-h-10 py-2 text-xs">
@@ -303,12 +308,74 @@ export function ClaimWorkflowPanel({
             </div>
           </details>
 
-          {(active || canReward) ? <div className="mt-5 grid gap-2 sm:grid-cols-2">
-            {workflow.role === "owner" && !hasAiReport && chainActive && claimPayable ? <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full"><Robot size={17} aria-hidden /> Kiểm tra bằng AI</button> : null}
-            {workflow.role === "owner" && ["awaiting_review", "more_info_requested"].includes(workflow.status) ? <button type="button" disabled={locked} onClick={() => void mutate({ action: "request_info" })} className="app-button-secondary w-full"><ChatCircleText size={17} aria-hidden /> Yêu cầu bổ sung</button> : null}
-            {canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reward")} className="app-button-primary w-full sm:col-span-2"><CheckCircle size={18} weight="fill" aria-hidden /> Chấp nhận và trả {rewardUi} FIND</button> : null}
-            {workflow.role === "owner" && canReward ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
-          </div> : null}
+          {workflow.role === "owner" && chainActive && claimPayable ? (
+            <section className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50/80 p-4" aria-label="Việc cần làm của chủ đồ">
+              <p className="text-sm font-bold text-emerald-950">Việc cần làm (chủ đồ)</p>
+              <ol className="mt-3 space-y-2 text-xs leading-5 text-emerald-950/90">
+                <li className="flex gap-2"><span className="font-bold">1.</span><span>Đối chiếu bằng chứng (ảnh, mô tả, đặc điểm chỉ bạn biết).</span></li>
+                <li className="flex gap-2"><span className="font-bold">2.</span><span>Nhắn tin / hẹn gặp nơi công cộng để nhận đồ (khuyến nghị).</span></li>
+                <li className="flex gap-2"><span className="font-bold">3.</span><span>Khi đã nhận đúng đồ → trả {rewardUi} FIND. Tiền chỉ chuyển sau khi bạn ký.</span></li>
+              </ol>
+              <div className="mt-4 grid gap-2 sm:grid-cols-2">
+                {!hasAiReport ? (
+                  <button type="button" disabled={locked} onClick={onReview} className="app-button-secondary w-full">
+                    <Robot size={17} aria-hidden /> Hỗ trợ đối chiếu AI
+                  </button>
+                ) : null}
+                {["awaiting_review", "more_info_requested"].includes(workflow.status) ? (
+                  <button type="button" disabled={locked} onClick={() => void mutate({ action: "request_info" })} className="app-button-secondary w-full">
+                    <ChatCircleText size={17} aria-hidden /> Yêu cầu thêm thông tin
+                  </button>
+                ) : null}
+                {canRewardSafe ? (
+                  <button type="button" disabled={locked} onClick={() => { setAcceptRisk(false); setConfirmAction("reward"); }} className="app-button-primary w-full sm:col-span-2">
+                    <CheckCircle size={18} weight="fill" aria-hidden /> Đã nhận đúng đồ — trả {rewardUi} FIND
+                  </button>
+                ) : null}
+                {canRewardEarly ? (
+                  <div className="sm:col-span-2 rounded-xl border border-amber-200 bg-amber-50 p-3">
+                    <p className="text-xs font-bold text-amber-950">Chưa xác nhận giao đồ</p>
+                    <p className="mt-1 text-[11px] leading-5 text-amber-900/90">
+                      Nên hẹn gặp và nhận đồ trước khi trả thưởng. Nếu bạn tin bằng chứng và muốn trả sớm, hãy xác nhận rủi ro bên dưới.
+                    </p>
+                    <label className="mt-3 flex cursor-pointer items-start gap-2 text-xs leading-5 text-amber-950">
+                      <input
+                        type="checkbox"
+                        className="mt-0.5"
+                        checked={acceptRisk}
+                        onChange={(e) => setAcceptRisk(e.target.checked)}
+                      />
+                      <span>
+                        Tôi hiểu rủi ro: trả thưởng trước khi nhận đồ, không hoàn lại được sau khi ký.
+                      </span>
+                    </label>
+                    <button
+                      type="button"
+                      disabled={locked || !acceptRisk}
+                      onClick={() => setConfirmAction("reward")}
+                      className="app-button-primary mt-3 w-full disabled:opacity-50"
+                    >
+                      <CheckCircle size={18} weight="fill" aria-hidden /> Trả sớm {rewardUi} FIND
+                    </button>
+                  </div>
+                ) : null}
+                <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800 sm:col-span-2">
+                  <XCircle size={17} aria-hidden /> Không đúng đồ — từ chối
+                </button>
+              </div>
+            </section>
+          ) : null}
+          {workflow.role === "finder" && active ? (
+            <section className="mt-5 rounded-2xl border border-line bg-bg-deep p-4" aria-label="Việc cần làm của người tìm thấy">
+              <p className="text-sm font-bold text-ink">Việc cần làm (người tìm thấy)</p>
+              <ol className="mt-3 space-y-2 text-xs leading-5 text-ink-soft">
+                <li className="flex gap-2"><span className="font-bold text-ink">1.</span><span>Chờ chủ đồ xem bằng chứng — có thể được hỏi thêm.</span></li>
+                <li className="flex gap-2"><span className="font-bold text-ink">2.</span><span>Nhắn tin / đồng ý lịch hẹn nơi công cộng.</span></li>
+                <li className="flex gap-2"><span className="font-bold text-ink">3.</span><span>Sau khi giao đồ, bấm &quot;Tôi đã giao đồ&quot;. Chủ đồ sẽ trả thưởng.</span></li>
+              </ol>
+              <p className="mt-3 text-[11px] leading-5 text-ink-muted">Bạn không thể tự chuyển tiền. Chỉ chủ đồ ký trả thưởng.</p>
+            </section>
+          ) : null}
 
           {active && ["handover_scheduled", "finder_delivered", "handover_proposed"].includes(workflow.status) ? <details className="alert-box-warn mt-3 rounded-xl">
             <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất? (phương án cuối)</span></summary>
@@ -351,7 +418,34 @@ export function ClaimWorkflowPanel({
         <div className="mt-4 rounded-xl border border-line-strong bg-bg-deep p-4" role="alertdialog" aria-labelledby={`confirm-${claimId}`}>
           <p id={`confirm-${claimId}`} className="text-sm font-bold">{confirmTitle(confirmAction, rewardUi)}</p>
           <p className="mt-1 text-xs leading-5 text-ink-soft">{confirmCopy(confirmAction)}</p>
-          <div className="mt-4 flex flex-wrap gap-2"><button type="button" disabled={locked} onClick={() => { const action = confirmAction; setConfirmAction(null); if (action === "reward") onAccept(); else if (action === "reject") onReject(); else onDispute(); }} className={confirmAction === "reward" ? "app-button-primary min-h-10 py-2 text-xs" : "app-button-secondary min-h-10 py-2 text-xs"}>Xác nhận</button><button type="button" disabled={locked} onClick={() => setConfirmAction(null)} className="app-button-secondary min-h-10 py-2 text-xs">Quay lại</button></div>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => {
+                const action = confirmAction;
+                setConfirmAction(null);
+                setAcceptRisk(false);
+                if (action === "reward") onAccept();
+                else if (action === "reject") onReject();
+                else onDispute();
+              }}
+              className={confirmAction === "reward" ? "app-button-primary min-h-10 py-2 text-xs" : "app-button-secondary min-h-10 py-2 text-xs"}
+            >
+              Xác nhận
+            </button>
+            <button
+              type="button"
+              disabled={locked}
+              onClick={() => {
+                setConfirmAction(null);
+                setAcceptRisk(false);
+              }}
+              className="app-button-secondary min-h-10 py-2 text-xs"
+            >
+              Quay lại
+            </button>
+          </div>
         </div>
       ) : null}
     </div>
@@ -359,16 +453,16 @@ export function ClaimWorkflowPanel({
 }
 
 function nextStepCopy(workflow: ClaimWorkflow) {
-  if (workflow.status === "settled") return "FIND đã được chuyển từ escrow và bằng chứng hoàn trả đã được ghi trên Solana.";
-  if (workflow.status === "rejected") return "Tin vẫn tiếp tục nhận bằng chứng khác cho đến khi hết hạn.";
-  if (workflow.status === "rejection_pending") return "Phần thưởng vẫn được khóa trong thời hạn để người tìm thấy phản hồi hoặc mở tranh chấp.";
-  if (workflow.status === "disputed") return "Hai bên chờ trọng tài được phân công đưa ra quyết định.";
-  if (workflow.status === "finder_delivered") return workflow.role === "owner" ? "Kiểm tra đồ trực tiếp, sau đó xác nhận nhận đồ để trả thưởng." : "Chờ chủ đồ kiểm tra và ký giao dịch trả thưởng.";
-  if (workflow.status === "handover_scheduled") return "Gặp tại nơi công cộng và chỉ xác nhận sau khi việc giao đồ thật sự diễn ra.";
-  if (workflow.status === "handover_proposed") return workflow.handover?.proposedByMe ? "Bên còn lại chưa xác nhận đề xuất." : "Kiểm tra thời gian, địa điểm rồi xác nhận hoặc trao đổi lại.";
-  if (workflow.status === "awaiting_review") return workflow.role === "owner" ? "Bạn có thể chat, hẹn giao đồ, hoặc bấm trả FIND ngay nếu đã tin bằng chứng." : "Chờ chủ đồ kiểm tra bằng chứng và quyết định trả thưởng.";
-  if (workflow.status === "more_info_requested") return workflow.role === "finder" ? "Chủ đồ cần thêm thông tin. Hãy trả lời trong trao đổi riêng." : "Đang chờ người tìm thấy bổ sung thông tin.";
-  return workflow.role === "owner" ? "Bấm nút xanh bên dưới để trả FIND cho người tìm thấy (chat/hẹn giao chỉ là tùy chọn)." : "Chờ chủ đồ kiểm tra và ký giao dịch trả thưởng.";
+  if (workflow.status === "settled") return "Đã trả thưởng. Giao dịch đã ghi trên mạng thử nghiệm Solana.";
+  if (workflow.status === "rejected") return "Bằng chứng này không được chấp nhận. Tin vẫn nhận bằng chứng khác đến hết hạn.";
+  if (workflow.status === "rejection_pending") return "Chủ đồ muốn từ chối. Bạn còn thời gian nhắn tin hoặc mở tranh chấp nếu không đồng ý.";
+  if (workflow.status === "disputed") return "Đang chờ người phân xử xem xét. Phần thưởng vẫn bị khóa.";
+  if (workflow.status === "finder_delivered") return workflow.role === "owner" ? "Người tìm thấy đã xác nhận giao đồ. Kiểm tra món đồ rồi trả thưởng." : "Đã báo giao đồ. Chờ chủ đồ kiểm tra và trả thưởng.";
+  if (workflow.status === "handover_scheduled") return "Hẹn gặp nơi công cộng. Chỉ xác nhận giao/nhận sau khi đã trao đồ thật.";
+  if (workflow.status === "handover_proposed") return workflow.handover?.proposedByMe ? "Đang chờ bên kia xác nhận lịch hẹn." : "Xem lịch hẹn rồi xác nhận hoặc đề xuất lại.";
+  if (workflow.status === "awaiting_review") return workflow.role === "owner" ? "Đối chiếu bằng chứng → nhắn tin/hẹn gặp → nhận đồ rồi trả thưởng." : "Chờ chủ đồ xem bằng chứng. Hãy trả lời nếu được hỏi thêm.";
+  if (workflow.status === "more_info_requested") return workflow.role === "finder" ? "Chủ đồ cần thêm thông tin — trả lời trong tin nhắn riêng." : "Đang chờ người tìm thấy bổ sung thông tin.";
+  return workflow.role === "owner" ? "Đối chiếu → hẹn giao → nhận đồ → trả thưởng." : "Chờ chủ đồ phản hồi và hẹn giao đồ.";
 }
 
 function formatDeadline(value?: number | null) {
@@ -389,14 +483,14 @@ function chainActiveStatus(bountyStatus: string) {
 }
 
 function confirmTitle(action: Exclude<ConfirmAction, null>, rewardUi: number) {
-  if (action === "reward") return `Xác nhận trả ${rewardUi} FIND cho người tìm thấy?`;
+  if (action === "reward") return `Trả ${rewardUi} FIND cho người tìm thấy?`;
   if (action === "reject") return "Từ chối bằng chứng này?";
-  return "Chuyển yêu cầu sang phân xử?";
+  return "Mở tranh chấp?";
 }
 
 function confirmCopy(action: Exclude<ConfirmAction, null>) {
-  if (action === "reward") return "Phantom sẽ yêu cầu một chữ ký để chuyển FIND từ vault bounty sang ví người tìm thấy. Sau khi xác nhận, không hoàn tác được.";
-  if (action === "reject") return "Claim này sẽ bị đóng nhưng tin vẫn tiếp tục nhận bằng chứng từ người khác.";
+  if (action === "reward") return "Ví Phantom sẽ hỏi chữ ký để chuyển thưởng từ két khóa sang ví người tìm thấy. Sau khi ký không hoàn lại được. Chỉ làm khi bạn đã tin đúng đồ (tốt nhất là đã nhận tay).";
+  if (action === "reject") return "Bằng chứng này sẽ đóng. Tin của bạn vẫn nhận bằng chứng từ người khác.";
   return "Chỉ dùng khi hai bên không thể tự thống nhất. Trọng tài sẽ được quyền xem bằng chứng riêng tư.";
 }
 

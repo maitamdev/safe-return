@@ -260,7 +260,7 @@ export default function BountyDetailPage() {
               }
             />
             <ChainRow
-              label="Program"
+              label="Hợp đồng"
               value={
                 <a
                   href={explorerAddressUrl(programId)}
@@ -274,7 +274,7 @@ export default function BountyDetailPage() {
             />
             {onchain && (
               <ChainRow
-                label="Bounty PDA"
+                label="Mã tin (on-chain)"
                 value={
                   <a
                     href={explorerAddressUrl(onchain.address)}
@@ -320,7 +320,7 @@ export default function BountyDetailPage() {
                 onClick={() => void run(() => fund(id))}
                 className="app-button-primary w-full"
               >
-                Khóa phần thưởng vào escrow
+                Khóa phần thưởng
               </button>
             )}
             {isOwner && onchain?.status === "Draft" && (
@@ -359,7 +359,7 @@ export default function BountyDetailPage() {
             onchain?.status === "Funded" &&
             nowUnix <= onchain.deadline ? (
               <p className="rounded-xl border border-line bg-bg-deep px-3 py-2 text-xs leading-5 text-ink-muted">
-                Escrow chỉ được hoàn sau ngày hết hạn và khi không còn bằng chứng đang xử lý.
+                Phần thưởng khóa trong két. Chỉ hoàn lại sau ngày hết hạn và khi không còn bằng chứng đang xử lý.
               </p>
             ) : null}
           </div>
@@ -370,7 +370,7 @@ export default function BountyDetailPage() {
           ["Draft", "Funded"].includes(onchain.status) ? (
             <details className="mt-3 rounded-xl border border-line bg-bg-deep">
               <summary className="cursor-pointer list-none px-3 py-2 text-xs font-bold text-ink-soft">
-                Nâng cao: hội đồng phân xử 2/3 (không bắt buộc)
+                Tùy chọn nâng cao: hội đồng 3 người khi tranh chấp
               </summary>
               <div className="border-t border-line p-3">
                 <p className="mb-3 text-[11px] leading-5 text-ink-muted">
@@ -422,14 +422,14 @@ export default function BountyDetailPage() {
         <section className="mt-8 flex flex-col gap-4 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 sm:flex-row sm:items-center sm:justify-between" aria-labelledby="owner-next-action">
           <div>
             <h2 id="owner-next-action" className="text-base font-bold text-emerald-950">
-              Bạn có {activeClaims.length} bằng chứng cần xử lý
+              Có {activeClaims.length} người gửi bằng chứng — cần bạn xử lý
             </h2>
             <p className="mt-1 text-sm leading-6 text-emerald-800">
-              Cuộn xuống từng claim và bấm <strong>Chấp nhận và trả FIND</strong> — Phantom sẽ ký chuyển thưởng từ vault.
-              Chat/hẹn giao chỉ tùy chọn.
+              Cách làm an toàn: xem bằng chứng → nhắn tin/hẹn gặp nơi công cộng → nhận đúng đồ → trả thưởng.
+              Chỉ trả trước khi nhận đồ nếu bạn chấp nhận rủi ro.
             </p>
           </div>
-          <a href="#claims-title" className="app-button-primary shrink-0">Trả thưởng ngay</a>
+          <a href="#claims-title" className="app-button-primary shrink-0">Xem bằng chứng</a>
         </section>
       ) : null}
 
@@ -496,12 +496,10 @@ function ClaimsSection({
     <section className="mt-10" aria-labelledby="claims-title">
       <div className="max-w-2xl">
         <h2 id="claims-title" className="text-2xl font-bold tracking-tight">
-          Bằng chứng từ người tìm thấy
+          Người tìm thấy đã gửi bằng chứng
         </h2>
         <p className="mt-2 text-sm leading-6 text-ink-soft">
-          Mỗi người gửi có một Claim PDA độc lập. Nội dung chi tiết chỉ mở cho
-          chủ tin, người gửi và trọng tài được phân công.
-        </p>
+          Mỗi người gửi một hồ sơ riêng. Ảnh, địa điểm và tin nhắn chỉ bạn, người gửi và (nếu có) người phân xử được xem.</p>
       </div>
       <div className="mt-5 grid gap-5">
         {claims.map((claim) => {
@@ -609,32 +607,12 @@ function ClaimsSection({
                 !["Released", "Refunded", "Cancelled", "Canceled", "Disputed"].includes(
                   bountyStatus,
                 ) ? (
-                  <div className="mt-5 rounded-2xl border-2 border-forest/30 bg-emerald-50 p-4">
-                    <p className="text-sm font-bold text-emerald-950">
-                      Trả thưởng on-chain (chỉ chủ tin)
+                  <div className="mt-5 rounded-2xl border border-line bg-bg-deep p-4">
+                    <p className="text-sm font-bold text-ink">Quyết định của chủ đồ</p>
+                    <p className="mt-1 text-xs leading-5 text-ink-soft">
+                      Dùng khung bên dưới để chat, hẹn gặp và trả thưởng an toàn.
+                      Chỉ ký trả thưởng khi đã tin đúng đồ (tốt nhất sau khi nhận tay).
                     </p>
-                    <p className="mt-1 text-xs leading-5 text-emerald-900/80">
-                      Chỉ ví chủ bounty mới ký được. Chuyển {rewardUi} FIND từ vault sang ví
-                      người gửi claim trên Solana Devnet.
-                    </p>
-                    <div className="mt-3 flex flex-wrap gap-2">
-                      <button
-                        type="button"
-                        disabled={busy || !claim.finderWallet}
-                        onClick={() => onAccept(claim)}
-                        className="app-button-primary min-h-11"
-                      >
-                        Chấp nhận và trả {rewardUi} FIND
-                      </button>
-                      <button
-                        type="button"
-                        disabled={busy || !claim.finderWallet}
-                        onClick={() => onReject(claim)}
-                        className="app-button-secondary min-h-11 text-rose-800"
-                      >
-                        Từ chối bằng chứng
-                      </button>
-                    </div>
                   </div>
                 ) : null}
                 {claim.id ? (

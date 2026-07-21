@@ -77,15 +77,15 @@ export function canSendWorkflowMessage(status: ClaimWorkflowStatus) {
 
 export function workflowStatusLabel(status: ClaimWorkflowStatus) {
   const labels: Record<ClaimWorkflowStatus, string> = {
-    awaiting_review: "Chờ chủ đồ kiểm tra",
-    more_info_requested: "Cần bổ sung thông tin",
+    awaiting_review: "Chờ chủ đồ xem bằng chứng",
+    more_info_requested: "Cần thêm thông tin",
     handover_proposed: "Đang chờ xác nhận lịch hẹn",
-    handover_scheduled: "Đã thống nhất lịch giao đồ",
-    finder_delivered: "Người tìm thấy đã xác nhận giao",
-    settled: "Đã nhận đồ và trả thưởng",
-    rejected: "Bằng chứng đã bị từ chối",
-    rejection_pending: "Đang trong thời hạn phản hồi",
-    disputed: "Đang được phân xử",
+    handover_scheduled: "Đã chốt lịch giao đồ",
+    finder_delivered: "Đã giao đồ — chờ trả thưởng",
+    settled: "Đã trả thưởng",
+    rejected: "Đã từ chối",
+    rejection_pending: "Chờ phản hồi từ chối",
+    disputed: "Đang tranh chấp",
   };
   return labels[status];
 }

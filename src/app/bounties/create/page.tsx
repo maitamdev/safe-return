@@ -89,8 +89,11 @@ export default function CreateBountyPage() {
     <div className="mx-auto max-w-3xl">
       <Link href="/bounties" className="inline-flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-forest"><ArrowLeft size={16} />Danh sách tin</Link>
       <div className="mt-6">
-        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Tạo tin mất đồ</h1>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-soft">Thông tin mô tả được lưu trong Supabase. Smart contract chỉ lưu hash, số thưởng, thời hạn và trạng thái giao dịch.</p>
+        <h1 className="text-3xl font-bold tracking-tight sm:text-4xl">Đăng tin mất đồ</h1>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-ink-soft">
+          Mô tả vừa đủ để người khác nhận ra. Giữ riêng một đặc điểm bí mật (số máy, chữ khắc…) để đối chiếu khi có người gửi bằng chứng.
+          Phần thưởng sẽ bị khóa đến khi bạn chấp nhận.
+        </p>
       </div>
 
       <ol className="mt-8 grid grid-cols-4 gap-2" aria-label="Tiến độ tạo tin">
@@ -107,8 +110,8 @@ export default function CreateBountyPage() {
           <div className="space-y-5">
             <Field label="Tên đồ vật" hint="Tên ngắn và dễ nhận biết."><input className="app-input" value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ví dụ: Laptop Dell XPS màu bạc" maxLength={120} /></Field>
             <Field label="Loại đồ"><select className="app-input" value={category} onChange={(event) => setCategory(event.target.value)}>{["Điện tử", "Laptop", "Điện thoại", "Ví và túi", "Giấy tờ", "Chìa khóa", "Khác"].map((item) => <option key={item}>{item}</option>)}</select></Field>
-            <Field label="Mô tả nhận dạng" hint="Nêu màu sắc, thương hiệu, vết xước hoặc đặc điểm riêng. Không ghi thông tin bí mật dùng để xác minh."><textarea className="app-input min-h-32 resize-y" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả những đặc điểm người tìm có thể nhìn thấy" maxLength={1800} /></Field>
-            <Field label="Ảnh tham chiếu" hint="Không bắt buộc. Ảnh được lưu off-chain và không công khai trên blockchain.">
+            <Field label="Mô tả nhận dạng" hint="Viết màu, thương hiệu, vết xước… Đừng ghi SĐT hay mật khẩu. Giữ một chi tiết bí mật ngoài tin để hỏi người tìm thấy."><textarea className="app-input min-h-32 resize-y" value={description} onChange={(event) => setDescription(event.target.value)} placeholder="Mô tả những gì người nhặt đồ có thể nhìn thấy" maxLength={1800} /></Field>
+            <Field label="Ảnh tham chiếu" hint="Nên có. Ảnh chỉ lưu riêng tư, không đưa nguyên ảnh lên blockchain.">
               <span className="flex min-h-28 cursor-pointer flex-col items-center justify-center rounded-xl border border-dashed border-line-strong bg-bg-deep p-4 text-center hover:border-forest">
                 <ImageSquare size={26} className="text-forest" /><span className="mt-2 text-sm font-semibold">{imageBusy ? "Đang tối ưu ảnh" : "Chọn ảnh, tối đa 10 MB"}</span><input type="file" accept="image/*" disabled={imageBusy} className="sr-only" onChange={(event) => void onFile(event.target.files?.[0] ?? null)} />
               </span>
@@ -126,8 +129,8 @@ export default function CreateBountyPage() {
 
         {step === 2 && (
           <div className="space-y-5">
-            <Field label={`Phần thưởng bằng ${FIND_SYMBOL}`} hint="FIND là SPL token thử nghiệm trên Devnet, chỉ dùng trong smart contract và không có giá trị tiền tệ."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
-            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Phantom chỉ yêu cầu ký một lần. Giao dịch sẽ đồng thời đăng tin và khóa FIND trong vault. SOL Devnet chỉ dùng để trả phí mạng.</p></div></div>
+            <Field label={`Phần thưởng (${FIND_SYMBOL})`} hint="FIND là token thử trên Devnet, không phải tiền thật. Dùng để minh họa khóa thưởng."><input type="number" min={0.01} step={0.01} className="app-input max-w-48" value={rewardUi} onChange={(event) => setRewardUi(Number(event.target.value))} /></Field>
+            <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-4 text-sm leading-6 text-emerald-900"><div className="flex items-start gap-3"><LockKey size={20} className="mt-0.5 shrink-0" /><p>Bạn ký một lần trên Phantom: đăng tin và khóa thưởng. Tiền chỉ ra khi bạn chấp nhận bằng chứng đúng. SOL Devnet chỉ trả phí mạng.</p></div></div>
           </div>
         )}
 

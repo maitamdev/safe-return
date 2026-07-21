@@ -17,59 +17,59 @@ import {
   X,
 } from "@phosphor-icons/react";
 
-const STORAGE_KEY = "safereturn:first-visit-guide:v1";
+const STORAGE_KEY = "safereturn:first-visit-guide:v2";
 
 const guideSteps = [
   {
     label: "Làm quen",
     icon: ShieldCheck,
-    title: "Chào mừng bạn đến SafeReturn",
+    title: "SafeReturn giúp tìm đồ thất lạc",
     description:
-      "Nơi đăng tin thất lạc, gửi bằng chứng và trao thưởng bằng giao dịch có thể kiểm tra.",
-    note: "SafeReturn chỉ chạy trên Solana Devnet. SOL và FIND ở đây là tài sản thử nghiệm, không có giá trị tiền thật.",
+      "Đăng tin khi mất đồ, gửi bằng chứng khi nhặt được, trao thưởng minh bạch trên mạng thử nghiệm.",
+    note: "Đang chạy Solana Devnet — SOL/FIND chỉ để thử, không phải tiền thật. Đừng gửi tài sản mainnet.",
     items: [
-      "Không gửi SOL mainnet hoặc tài sản có giá trị vào ứng dụng.",
-      "Thông tin nhạy cảm trong bằng chứng không được đưa lên blockchain.",
-      "Mọi lệnh trao thưởng đều cần người dùng kiểm tra và ký.",
+      "Hai vai trò: chủ đồ (đăng tin + trả thưởng) và người tìm thấy (gửi bằng chứng).",
+      "Ảnh và địa điểm nhạy cảm chỉ hai bên xem; mạng chỉ lưu mã băm.",
+      "Tiền thưởng khóa trong két — chỉ chuyển khi chủ đồ ký chấp nhận.",
     ],
   },
   {
     label: "Chuẩn bị",
     icon: Wallet,
-    title: "Tạo tài khoản và kết nối ví",
+    title: "Đăng nhập và mở ví",
     description:
-      "Tài khoản lưu dữ liệu ứng dụng. Ví Phantom dùng để xác nhận các giao dịch Devnet.",
-    note: "Bạn chỉ kết nối ví của chính mình. Ví hệ thống của SafeReturn không được chia sẻ cho người dùng.",
+      "Email để vào app. Ví Phantom (Devnet) để khóa thưởng hoặc gửi bằng chứng.",
+    note: "Chỉ dùng ví của bạn. Không chia sẻ seed phrase cho ai.",
     items: [
-      "Tạo tài khoản hoặc đăng nhập bằng email.",
-      "Cài Phantom, chuyển sang Devnet rồi kết nối với SafeReturn.",
-      "Bấm Chuẩn bị ví Devnet để nhận SOL phí mạng và FIND thử nghiệm.",
+      "Đăng ký / đăng nhập bằng email.",
+      "Cài Phantom → bật Testnet/Devnet → kết nối SafeReturn.",
+      "Bấm chuẩn bị ví để nhận SOL (phí) và FIND (thưởng thử).",
     ],
   },
   {
     label: "Mất đồ",
     icon: Package,
-    title: "Khi bạn làm mất một món đồ",
+    title: "Bạn là chủ đồ",
     description:
-      "Đăng mô tả vừa đủ để cộng đồng nhận biết, nhưng giữ lại một đặc điểm bí mật để đối chiếu.",
-    note: "Phần thưởng FIND được khóa trong escrow và chỉ giải ngân sau khi bạn chấp nhận bằng chứng.",
+      "Đăng tin → nhận bằng chứng → hẹn gặp nơi công cộng → nhận đúng đồ → trả thưởng.",
+    note: "Nên nhận đồ trước khi trả. Trả sớm chỉ khi bạn chấp nhận rủi ro (có ô xác nhận).",
     items: [
-      "Đăng khu vực, thời gian, ảnh và mức thưởng FIND.",
-      "Xem từng yêu cầu nhận đồ cùng báo cáo đối chiếu.",
-      "Chỉ chấp nhận khi đặc điểm bí mật và bằng chứng trùng khớp.",
+      "Tạo tin: mô tả, ảnh, khu vực, mức thưởng FIND.",
+      "Xem từng hồ sơ, nhắn tin, hẹn giao an toàn.",
+      "Đúng đồ thì ký trả thưởng; sai thì từ chối.",
     ],
   },
   {
     label: "Tìm thấy",
     icon: MagnifyingGlass,
-    title: "Khi bạn tìm thấy một món đồ",
+    title: "Bạn nhặt được đồ",
     description:
-      "Tìm tin phù hợp rồi gửi bằng chứng riêng tư. Chủ đồ vẫn là người quyết định cuối cùng.",
-    note: "AI chỉ nêu điểm trùng khớp, mâu thuẫn và dấu hiệu rủi ro. AI không thể tự chuyển phần thưởng.",
+      "Tìm tin khớp → gửi bằng chứng riêng tư → chờ chủ đồ → giao đồ → nhận thưởng.",
+    note: "AI chỉ hỗ trợ đối chiếu. Bạn không tự rút thưởng — chủ đồ mới ký được.",
     items: [
-      "Tìm tin theo tên đồ vật, khu vực hoặc danh mục.",
-      "Mô tả đặc điểm chỉ người đang giữ món đồ mới biết.",
-      "Theo dõi kết quả và kiểm tra giao dịch trên Solana Explorer.",
+      "Mô tả thật đặc điểm món đồ đang giữ.",
+      "Không đòi OTP hay khóa ví trong chat.",
+      "Gặp nơi công cộng; sau khi giao, bấm đã giao đồ.",
     ],
   },
 ] as const;
