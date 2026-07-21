@@ -40,9 +40,7 @@ export function NetworkBadge({ showBalance = true }: { showBalance?: boolean }) 
     <div className="inline-flex items-center gap-1.5">
       <span
         className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1 text-[10px] font-bold ${
-          isDevnet
-            ? "border-amber-200 bg-amber-50 text-amber-800"
-            : "border-emerald-200 bg-emerald-50 text-emerald-800"
+          isDevnet ? "badge-devnet border-transparent" : "status-pill-ok"
         }`}
         title={isDevnet ? "Mạng test, SOL miễn phí" : "Mainnet thật"}
       >

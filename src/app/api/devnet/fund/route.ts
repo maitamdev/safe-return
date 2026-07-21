@@ -1,15 +1,16 @@
-import { clusterApiUrl, Connection, PublicKey } from "@solana/web3.js";
+import { PublicKey } from "@solana/web3.js";
 import { getMint, getOrCreateAssociatedTokenAccount, mintTo } from "@solana/spl-token";
 import { FIND_MINT } from "@/lib/findback/config";
 import {
   ApiError,
   apiErrorResponse,
-  enforceRateLimit,
+  enforceApiRateLimit,
   requireApiUser,
   requireSameOrigin,
 } from "@/lib/server/api-security";
 import { loadServerKeypair } from "@/lib/server/solana-signer";
 import { createAdminClient } from "@/lib/supabase/admin";
+import { getConnection } from "@/lib/findback/program";
 import { withRpcReadRetry } from "@/lib/solana/rpc-read";
 
 export const runtime = "nodejs";
@@ -40,12 +41,15 @@ export async function POST(req: Request) {
   try {
     requireSameOrigin(req);
     const user = await requireApiUser();
-    enforceRateLimit(`devnet-faucet:${user.id}`, { limit: 3, windowMs: 60 * 60_000 });
+    const admin = createAdminClient();
+    await enforceApiRateLimit(
+      `devnet-faucet:${user.id}`,
+      { limit: 3, windowMs: 60 * 60_000 },
+      admin,
+    );
     const body = (await req.json()) as { address?: string };
     const recipient = new PublicKey(body.address?.trim() || "");
     const address = recipient.toBase58();
-
-    const admin = createAdminClient();
     const { data: profile, error: profileError } = await admin
       .from("profiles")
       .select("wallet_pubkey,wallet_verified_at")
@@ -56,8 +60,7 @@ export async function POST(req: Request) {
       throw new ApiError(403, "Chỉ có thể cấp token cho ví đã xác minh của bạn.");
     }
 
-    const rpc = process.env.NEXT_PUBLIC_SOLANA_RPC || clusterApiUrl("devnet");
-    const connection = new Connection(rpc, "confirmed");
+    const connection = getConnection();
     const beforeSol = await withRpcReadRetry(() => connection.getBalance(recipient));
     const solClaim = beforeSol < 0.05 * 1e9 ? await claimDevnetSol(address) : null;
 

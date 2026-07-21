@@ -12,7 +12,7 @@ import {
 } from "@solana/wallet-adapter-react";
 import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { Buffer } from "buffer";
-import { SOLANA_RPC } from "@/lib/findback/config";
+import { SOLANA_RPC, SOLANA_RPC_ENDPOINTS } from "@/lib/findback/config";
 
 import "@solana/wallet-adapter-react-ui/styles.css";
 
@@ -29,7 +29,9 @@ function ensureBrowserPolyfills() {
 ensureBrowserPolyfills();
 
 export function WalletProviders({ children }: { children: ReactNode }) {
-  const endpoint = useMemo(() => SOLANA_RPC, []);
+  // Primary RPC first; wallet-adapter uses a single endpoint — failover is
+  // handled in getConnection/withConnectionFailover for app reads/writes.
+  const endpoint = useMemo(() => SOLANA_RPC_ENDPOINTS[0] || SOLANA_RPC, []);
   // Modern wallets such as Phantom are discovered through Wallet Standard.
   // Passing a legacy Phantom adapter as well registers it twice and floods the console.
   const wallets = useMemo(() => [], []);

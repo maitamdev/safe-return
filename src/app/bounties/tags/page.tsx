@@ -100,7 +100,7 @@ export default function SafeTagsPage() {
 
         <div>
           <div className="flex items-end justify-between gap-4"><div><h2 className="text-xl font-bold">SafeTag của bạn</h2><p className="mt-1 text-sm text-ink-soft">{tags.length} mã, {unread} lời nhắn chưa đọc</p></div><button type="button" onClick={() => void load()} disabled={loading} className="text-xs font-bold text-forest hover:underline">{loading ? "Đang tải" : "Làm mới"}</button></div>
-          {error ? <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{error}</p> : null}
+          {error ? <p className="alert-box-danger mt-4 rounded-xl p-4 text-sm" role="alert">{error}</p> : null}
           {loading && tags.length === 0 ? <div className="app-card mt-5 p-6"><div className="skeleton h-64 w-full" /></div> : null}
           {!loading && tags.length === 0 ? <div className="app-card mt-5 p-8 text-center"><ShieldCheck size={34} className="mx-auto text-forest" /><h3 className="mt-4 font-bold">Chưa có SafeTag</h3><p className="mt-2 text-sm text-ink-soft">Tạo mã đầu tiên ở biểu mẫu bên trái.</p></div> : null}
           <div className="mt-5 grid gap-5">{tags.map((safeTag) => <TagCard key={safeTag.id} safeTag={safeTag} busy={busy} update={update} />)}</div>

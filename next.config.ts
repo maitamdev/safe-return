@@ -21,6 +21,17 @@ const contentSecurityPolicy = `
 const nextConfig: NextConfig = {
   // Next 16 defaults to Turbopack; keep empty so webpack polyfills below still apply with `next dev --webpack`.
   turbopack: {},
+  poweredByHeader: false,
+  compress: true,
+  experimental: {
+    optimizePackageImports: [
+      "@phosphor-icons/react",
+      "@solana/web3.js",
+      "@solana/spl-token",
+      "@solana/wallet-adapter-react",
+      "@solana/wallet-adapter-react-ui",
+    ],
+  },
   async headers() {
     return [
       {

@@ -13,8 +13,8 @@ export function UserMenu({ dark = false }: { dark?: boolean }) {
         href="/login"
         className={
           dark
-            ? "rounded-full border border-amber-500/40 bg-amber-500/10 px-3 py-1.5 text-xs font-semibold text-amber-100"
-            : "rounded-full border border-amber-200 bg-amber-50 px-3 py-1.5 text-xs font-semibold text-amber-900"
+            ? "badge-devnet rounded-full border-transparent px-3 py-1.5 text-xs font-semibold"
+            : "badge-devnet rounded-full px-3 py-1.5 text-xs font-semibold"
         }
       >
         Thiết lập

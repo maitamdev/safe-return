@@ -207,10 +207,10 @@ export function ClaimWorkflowPanel({
 
   const statusTone = useMemo(() => {
     if (!workflow) return "border-line bg-bg-deep text-ink-soft";
-    if (workflow.status === "settled") return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    if (workflow.status === "disputed" || workflow.status === "rejected") return "border-rose-200 bg-rose-50 text-rose-800";
-    if (["handover_scheduled", "finder_delivered"].includes(workflow.status)) return "border-emerald-200 bg-emerald-50 text-emerald-800";
-    return "border-amber-200 bg-amber-50 text-amber-900";
+    if (workflow.status === "settled") return "status-pill-ok";
+    if (workflow.status === "disputed" || workflow.status === "rejected") return "status-pill-danger";
+    if (["handover_scheduled", "finder_delivered"].includes(workflow.status)) return "status-pill-ok";
+    return "status-pill-warn";
   }, [workflow]);
 
   if (loading) {
@@ -231,7 +231,7 @@ export function ClaimWorkflowPanel({
         </div>
       ) : null}
 
-      {error ? <p className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-900" role="alert">{error}</p> : null}
+      {error ? <p className="alert-box-danger mt-3 rounded-xl p-3 text-xs leading-5" role="alert">{error}</p> : null}
 
       {workflow ? (
         <>
@@ -303,13 +303,13 @@ export function ClaimWorkflowPanel({
             {workflow.role === "owner" && chainActive && !handover?.finderDeliveredAt ? <button type="button" disabled={locked} onClick={() => setConfirmAction("reject")} className="app-button-secondary w-full text-rose-800"><XCircle size={17} aria-hidden /> Từ chối bằng chứng</button> : null}
           </div> : null}
 
-          {active ? <details className="mt-3 rounded-xl border border-amber-200 bg-amber-50/70">
-            <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold text-amber-900"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất?</span></summary>
-            <div className="border-t border-amber-200 p-4"><p className="text-xs leading-5 text-amber-900">Chỉ mở tranh chấp khi hai bên bất đồng về việc giao đồ hoặc trả thưởng. Phần thưởng sẽ tiếp tục bị khóa để trọng tài xem xét.</p><button type="button" disabled={locked || !chainActive} onClick={() => setConfirmAction("dispute")} className="app-button-secondary mt-3 min-h-10 border-amber-300 py-2 text-xs text-amber-950"><Gavel size={16} aria-hidden /> Mở tranh chấp</button></div>
+          {active ? <details className="alert-box-warn mt-3 rounded-xl">
+            <summary className="cursor-pointer list-none px-4 py-3 text-xs font-bold"><span className="inline-flex items-center gap-2"><ShieldWarning size={17} aria-hidden />Không thể thống nhất?</span></summary>
+            <div className="border-t border-current/15 p-4"><p className="text-xs leading-5">Chỉ mở tranh chấp khi hai bên bất đồng về việc giao đồ hoặc trả thưởng. Phần thưởng sẽ tiếp tục bị khóa để trọng tài xem xét.</p><button type="button" disabled={locked || !chainActive} onClick={() => setConfirmAction("dispute")} className="app-button-secondary mt-3 min-h-10 py-2 text-xs"><Gavel size={16} aria-hidden /> Mở tranh chấp</button></div>
           </details> : null}
 
           {workflow.status === "rejection_pending" ? (
-            <div className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-4 text-amber-950">
+            <div className="alert-box-warn mt-4 rounded-xl p-4">
               <p className="text-sm font-bold">Chủ đồ đã yêu cầu từ chối bằng chứng</p>
               <p className="mt-1 text-xs leading-5">
                 Người tìm thấy có thể mở tranh chấp trước {formatDeadline(disputeDeadline)}.
@@ -327,7 +327,7 @@ export function ClaimWorkflowPanel({
           ) : null}
 
           {workflow.status === "disputed" ? (
-            <div className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-4 text-rose-950">
+            <div className="alert-box-danger mt-4 rounded-xl p-4">
               <p className="text-sm font-bold">Phần thưởng đang được khóa để phân xử</p>
               <p className="mt-1 text-xs leading-5">
                 Hạn xử lý: {formatDeadline(resolutionDeadline)}. Nếu hội đồng không đưa ra quyết định đúng hạn, claim được từ chối và tin được mở lại.

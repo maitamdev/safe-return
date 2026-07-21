@@ -39,14 +39,19 @@ Runner chặn connection string không thuộc project được cấu hình, kh�
 ## Kiểm thử và release gate
 
 ```bash
+npm run idl:check
 npm run lint
 npm run typecheck
 npm test
 npm run build
+# hoặc gộp: npm run check
+# E2E (cần build trước): npm run test:e2e  |  gộp: npm run check:full
 cargo test -p findback
 npm run findback:smoke
 npm run release:check
 ```
+
+`target/idl/findback.json` là hợp đồng client đã review — không xóa. CI và `npm run idl:check` sẽ fail nếu thiếu hoặc lệch program id.
 
 `findback:smoke` tạo giao dịch thật trên Devnet với lượng FIND thử nghiệm rất nhỏ. Nó xác minh tương thích v1, ba claim v2 độc lập, AI provenance, từ chối mismatch, hội đồng 2/3, giải ngân đúng một lần, attestation, reputation và vault trở về 0.
 
@@ -74,11 +79,17 @@ Thứ tự release bắt buộc:
 - `supabase/migrations`: nâng cấp protocol v2, SafeTag và sponsored transactions.
 - `scripts/check-release-readiness.mjs`: release gate không làm lộ secret.
 - `scripts/smoke-findback.mjs`: bằng chứng tích hợp end-to-end trên Devnet.
+- `e2e/`: Playwright smoke (landing, login, robots/sitemap/manifest).
+- `src/lib/solana/rpc-endpoints.ts`: primary RPC + failover list.
 
 Program Devnet: `3hLzzJDHvbuKFPKweKEJ3ZAQEijoLLejkvi9ZPmByWna`
 
 FIND mint Devnet: `9F6hBVk5V6HgdcRCsgApoGLU2n68qTYjHKESBoCKRmCy`
 
 Không dùng keypair chứa tài sản Mainnet. Không commit `.env.local`, database URI, service-role key hoặc keypair JSON.
+
+## Bảo mật
+
+Xem `SECURITY.md` (trust boundary, reporting, quy tắc vận hành Devnet).
 
 MIT License — xem `LICENSE`.

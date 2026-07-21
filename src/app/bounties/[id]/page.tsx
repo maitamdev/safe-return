@@ -295,7 +295,7 @@ export default function BountyDetailPage() {
             ) : null}
           </dl>
           {chainError && (
-            <p className="mt-4 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">
+            <p className="alert-box-warn mt-4 rounded-xl p-3 text-xs leading-5">
               {chainError}
             </p>
           )}
@@ -438,7 +438,7 @@ export default function BountyDetailPage() {
       )}
       {error && (
         <p
-          className="mt-6 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900"
+          className="alert-box-danger mt-6 rounded-xl p-4 text-sm"
           role="alert"
         >
           {error}
@@ -603,7 +603,7 @@ function ClaimsSection({
                     onTimeoutDispute={() => onTimeoutDispute(claim)}
                   />
                 ) : (
-                  <p className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-3 text-xs leading-5 text-amber-900">Bằng chứng cũ chưa có mã riêng nên chưa thể mở trao đổi realtime.</p>
+                  <p className="alert-box-warn mt-5 rounded-xl p-3 text-xs leading-5">Bằng chứng cũ chưa có mã riêng nên chưa thể mở trao đổi realtime.</p>
                 )}
               </div>
             </article>

@@ -154,7 +154,7 @@ export default function PublicSafeTagPage() {
                   </div>
                 </div>
                 <input className="hidden" tabIndex={-1} autoComplete="off" value={website} onChange={(event) => setWebsite(event.target.value)} name="website" aria-hidden />
-                {submitError ? <p className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{submitError}</p> : null}
+                {submitError ? <p className="alert-box-danger mt-5 rounded-xl p-3 text-sm" role="alert">{submitError}</p> : null}
                 <button type="submit" disabled={submitting} className="app-button-primary mt-6 w-full sm:w-auto">
                   {submitting ? "Đang gửi" : "Gửi lời nhắn an toàn"} <PaperPlaneTilt size={17} weight="fill" aria-hidden />
                 </button>

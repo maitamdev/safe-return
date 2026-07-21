@@ -90,7 +90,7 @@ export function LandingPage() {
                 <CheckCircle size={22} weight="fill" className="ml-auto text-forest" />
               </div>
             </div>
-            <div className="flex items-center justify-between rounded-xl border border-amber-200 bg-amber-50/95 px-4 py-3 text-xs font-semibold text-amber-900 backdrop-blur-md">
+            <div className="badge-devnet flex items-center justify-between rounded-xl px-4 py-3 text-xs font-semibold backdrop-blur-md">
               <span>Solana Devnet</span>
               <span>Không dùng tiền thật</span>
             </div>

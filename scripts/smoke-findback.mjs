@@ -519,7 +519,7 @@ await send(
       "submit_claim_v2",
       [
         { pubkey: finderA.publicKey, isSigner: true, isWritable: true },
-        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: false },
+        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: true },
         { pubkey: claimA, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
@@ -535,7 +535,7 @@ await send(
       "submit_claim_v2",
       [
         { pubkey: finderB.publicKey, isSigner: true, isWritable: true },
-        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: false },
+        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: true },
         { pubkey: claimB, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],
@@ -551,7 +551,7 @@ await send(
       "submit_claim_v2",
       [
         { pubkey: finderC.publicKey, isSigner: true, isWritable: true },
-        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: false },
+        { pubkey: bountyPda(v2Id), isSigner: false, isWritable: true },
         { pubkey: claimC, isSigner: false, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       ],

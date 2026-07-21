@@ -48,12 +48,12 @@ function LoginForm() {
       <h1 className="mt-6 text-3xl font-bold tracking-tight">Đăng nhập</h1>
       <p className="mt-2 text-sm leading-6 text-ink-soft">Tài khoản email bảo vệ dữ liệu ứng dụng. Phantom chỉ được kết nối sau khi vào app để ký giao dịch Devnet.</p>
 
-      {!configured && <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-900"><p className="font-bold">Thiếu cấu hình Supabase</p><p className="mt-1 leading-6">Thêm biến môi trường theo <Link href="/setup" className="underline">hướng dẫn thiết lập</Link>.</p></div>}
+      {!configured && <div className="alert-box-warn mt-5 rounded-xl p-4 text-sm"><p className="font-bold">Thiếu cấu hình Supabase</p><p className="mt-1 leading-6">Thêm biến môi trường theo <Link href="/setup" className="underline">hướng dẫn thiết lập</Link>.</p></div>}
 
       <form onSubmit={(event) => void submit(event)} className="app-card mt-6 space-y-5 p-5 sm:p-6">
         <label className="block"><span className="text-sm font-bold">Email</span><input type="email" required autoComplete="email" value={email} onChange={(event) => setEmail(event.target.value)} className="app-input mt-2" placeholder="ban@example.com" /></label>
         <label className="block"><span className="text-sm font-bold">Mật khẩu</span><input type="password" required minLength={6} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} className="app-input mt-2" /></label>
-        {error && <p className="rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
+        {error && <p className="alert-box-danger rounded-xl p-3 text-sm" role="alert">{error}</p>}
         <button type="submit" disabled={busy || loading || !configured} className="app-button-primary w-full">{busy && <CircleNotch size={17} className="animate-spin" />}{busy ? "Đang đăng nhập" : "Đăng nhập"}</button>
       </form>
       <p className="mt-6 text-center text-sm text-ink-soft">Chưa có tài khoản? <Link href="/signup" className="font-bold text-forest hover:underline">Đăng ký</Link></p>

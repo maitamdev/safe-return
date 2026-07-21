@@ -1,3 +1,5 @@
+import { resolveSolanaRpcEndpoints } from "./rpc-endpoints";
+
 export const SOLANA_RPC_BUSY_MESSAGE =
   "Solana Devnet đang giới hạn truy cập. SafeReturn sẽ tự thử lại; vui lòng chờ vài giây.";
 
@@ -8,7 +10,9 @@ export function isSolanaRateLimitError(error: unknown) {
       : error && typeof error === "object" && "message" in error
         ? String(error.message)
         : String(error);
-  return /\b429\b|too many requests|rate.?limit/i.test(message);
+  return /\b429\b|too many requests|rate.?limit|fetch failed|network|ECONNRESET|ETIMEDOUT|503|502|504/i.test(
+    message,
+  );
 }
 
 export async function withRpcReadRetry<T>(
@@ -38,5 +42,38 @@ export async function withRpcReadRetry<T>(
     }
   }
 
+  throw new Error(SOLANA_RPC_BUSY_MESSAGE);
+}
+
+/**
+ * Run a Connection-bound read against each configured RPC until one succeeds.
+ * Used for critical reads when the primary endpoint is rate-limited.
+ */
+export async function withRpcEndpointFailover<T>(
+  run: (endpoint: string) => Promise<T>,
+  options: {
+    endpoints?: string[];
+    attemptsPerEndpoint?: number;
+  } = {},
+): Promise<T> {
+  const endpoints = options.endpoints ?? resolveSolanaRpcEndpoints();
+  const attemptsPerEndpoint = options.attemptsPerEndpoint ?? 2;
+  let lastError: unknown;
+
+  for (const endpoint of endpoints) {
+    try {
+      return await withRpcReadRetry(() => run(endpoint), {
+        attempts: attemptsPerEndpoint,
+        baseDelayMs: 400,
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isSolanaRateLimitError(error) && !(error instanceof Error && error.message === SOLANA_RPC_BUSY_MESSAGE)) {
+        throw error;
+      }
+    }
+  }
+
+  if (lastError instanceof Error) throw lastError;
   throw new Error(SOLANA_RPC_BUSY_MESSAGE);
 }

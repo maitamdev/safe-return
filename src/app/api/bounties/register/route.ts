@@ -9,7 +9,7 @@ import type { BountyMeta } from "@/lib/findback/store";
 import {
   ApiError,
   apiErrorResponse,
-  enforceRateLimit,
+  enforceApiRateLimit,
   requireApiUser,
   requireSameOrigin,
 } from "@/lib/server/api-security";
@@ -24,7 +24,12 @@ export async function POST(req: Request) {
   try {
     requireSameOrigin(req);
     const user = await requireApiUser();
-    enforceRateLimit(`bounty-register:${user.id}`, { limit: 12, windowMs: 60_000 });
+    const admin = createAdminClient();
+    await enforceApiRateLimit(
+      `bounty-register:${user.id}`,
+      { limit: 12, windowMs: 60_000 },
+      admin,
+    );
     const body = (await req.json()) as { bounty?: BountyMeta };
     const bounty = body.bounty;
     if (!bounty?.id || !bounty.title?.trim() || !bounty.metadataHashHex) {
@@ -36,8 +41,6 @@ export async function POST(req: Request) {
     if ((bounty.imageDataUrl?.length || 0) > MAX_IMAGE) {
       throw new ApiError(400, "Ảnh tham chiếu quá lớn.");
     }
-
-    const admin = createAdminClient();
     const [{ data: profile, error: profileError }, { data: existing, error: existingError }] =
       await Promise.all([
         admin

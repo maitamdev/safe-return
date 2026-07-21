@@ -45,7 +45,7 @@ export function Navbar() {
         </div>
 
         <div className="flex items-center gap-2">
-          <span className="hidden items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800 lg:inline-flex">
+          <span className="badge-devnet hidden items-center gap-2 rounded-xl px-3 py-2 text-xs font-bold lg:inline-flex">
             <Flask size={16} weight="duotone" /> Solana Devnet
           </span>
           <Link href="/login" className="hidden px-3 py-2 text-sm font-semibold text-ink-soft hover:text-forest sm:block">

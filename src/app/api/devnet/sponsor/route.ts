@@ -13,7 +13,7 @@ import { PROTOCOL_V2_ENABLED, toAtomic } from "@/lib/findback/config";
 import {
   ApiError,
   apiErrorResponse,
-  enforceRateLimit,
+  enforceApiRateLimit,
   requireApiUser,
   requireSameOrigin,
 } from "@/lib/server/api-security";
@@ -40,7 +40,12 @@ export async function POST(req: Request) {
     requireSameOrigin(req);
     requireSponsorEnabled();
     const user = await requireApiUser();
-    enforceRateLimit(`sponsor-prepare:${user.id}`, { limit: 12, windowMs: 60_000 });
+    const admin = createAdminClient();
+    await enforceApiRateLimit(
+      `sponsor-prepare:${user.id}`,
+      { limit: 12, windowMs: 60_000 },
+      admin,
+    );
     const body = (await req.json()) as SponsorBody;
     if (!body.action || !(["create_bounty", "fund_bounty", "submit_claim_v2"] as string[]).includes(body.action)) {
       throw new ApiError(400, "Thao tác tài trợ không hợp lệ.");
@@ -56,7 +61,6 @@ export async function POST(req: Request) {
       throw new ApiError(400, "Địa chỉ ví không hợp lệ.");
     }
 
-    const admin = createAdminClient();
     const { data: profile, error: profileError } = await admin
       .from("profiles")
       .select("wallet_pubkey,wallet_verified_at")
@@ -249,8 +253,19 @@ function hex32(value: string | undefined, label: string) {
   return Uint8Array.from(Buffer.from(value, "hex"));
 }
 
+function isSponsorRuntimeEnabled() {
+  if (!PROTOCOL_V2_ENABLED) return false;
+  if (process.env.SPONSORED_FEES_ENABLED === "0" || process.env.SPONSORED_FEES_ENABLED === "false") {
+    return false;
+  }
+  // Explicit on, or auto-on when a Devnet sponsor keypair is configured.
+  if (process.env.SPONSORED_FEES_ENABLED === "1") return true;
+  const key = process.env.SPONSOR_KEYPAIR_JSON?.trim();
+  return Boolean(key && key !== "CHANGE_ME");
+}
+
 function requireSponsorEnabled() {
-  if (!PROTOCOL_V2_ENABLED || process.env.SPONSORED_FEES_ENABLED !== "1") {
+  if (!isSponsorRuntimeEnabled()) {
     throw new ApiError(503, "Tài trợ phí Devnet chưa được bật trên bản triển khai này.");
   }
 }

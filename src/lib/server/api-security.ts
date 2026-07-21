@@ -77,6 +77,26 @@ export async function enforceDistributedRateLimit(
   }
 }
 
+/**
+ * In-memory gate first (fast, per-instance), then Postgres when available
+ * (cross-instance). Falls back silently if the RPC is not migrated yet.
+ */
+export async function enforceApiRateLimit(
+  key: string,
+  options: { limit: number; windowMs: number },
+  admin?: ReturnType<typeof createAdminClient> | null,
+) {
+  enforceRateLimit(key, options);
+  if (!admin) return;
+  try {
+    await enforceDistributedRateLimit(admin, key, options);
+  } catch (error) {
+    if (error instanceof ApiError) throw error;
+    // Migration missing or DB blip — keep serving behind the local limiter.
+    console.warn("[SafeReturn] distributed rate limit unavailable", error);
+  }
+}
+
 export class ApiError extends Error {
   constructor(
     public readonly status: number,

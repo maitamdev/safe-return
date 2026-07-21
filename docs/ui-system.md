@@ -21,7 +21,9 @@ state inspectable for experienced users.
 - Cards use 16px radii, controls use 12px radii and small status labels use 8px
   radii. Interactive controls never wrap on desktop.
 - Light and dark palettes follow the operating-system preference through CSS
-  semantic tokens. Information hierarchy must remain the same in both modes.
+  semantic tokens (`prefers-color-scheme` in `src/app/globals.css`). Prefer
+  semantic classes (`alert-box-*`, `status-pill-*`, `badge-devnet`) over
+  hard-coded Tailwind amber/rose utilities so hierarchy stays identical in both modes.
 - Desktop navigation is one line and at most 72px high. Network balances move
   out of the header below desktop widths to prevent crowding.
 - Empty, loading, error and pending-signature states are required for every

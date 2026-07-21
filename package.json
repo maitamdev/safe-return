@@ -9,7 +9,10 @@
     "lint": "eslint",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "test:e2e": "playwright test",
+    "idl:check": "node scripts/check-idl.mjs",
+    "check": "npm run idl:check && npm run lint && npm run typecheck && npm test && npm run build",
+    "check:full": "npm run check && npm run test:e2e",
     "test:watch": "vitest",
     "solana:fund": "node scripts/fund-devnet-sol.mjs",
     "solana:balance": "solana balance",
@@ -41,6 +44,7 @@
     "tweetnacl": "^1.0.3"
   },
   "devDependencies": {
+    "@playwright/test": "^1.61.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/qrcode": "^1.5.6",

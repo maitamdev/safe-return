@@ -27,7 +27,7 @@ import type { StoredMedia } from "@/lib/media/types";
 import {
   ApiError,
   apiErrorResponse,
-  enforceRateLimit,
+  enforceApiRateLimit,
   requireApiUser,
   requireSameOrigin,
 } from "@/lib/server/api-security";
@@ -48,14 +48,17 @@ export async function POST(req: Request) {
   try {
     requireSameOrigin(req);
     const user = await requireApiUser();
-    enforceRateLimit(`ai-review:${user.id}`, { limit: 8, windowMs: 10 * 60_000 });
+    const admin = createAdminClient();
+    await enforceApiRateLimit(
+      `ai-review:${user.id}`,
+      { limit: 8, windowMs: 10 * 60_000 },
+      admin,
+    );
 
     const body = (await req.json()) as { bountyId?: string; claimId?: string };
     const bountyId = body.bountyId?.trim() || "";
     const claimId = body.claimId?.trim() || "";
     if (!bountyId) throw new ApiError(400, "Thiếu mã bounty.");
-
-    const admin = createAdminClient();
     const [{ data: profile, error: profileError }, { data: listing, error: listingError }] =
       await Promise.all([
         admin

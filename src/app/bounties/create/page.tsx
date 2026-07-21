@@ -137,11 +137,11 @@ export default function CreateBountyPage() {
             <dl className="mt-5 grid gap-4 sm:grid-cols-2">
               <Summary label="Đồ vật" value={title} /><Summary label="Loại" value={category} /><Summary label="Khu vực" value={location} /><Summary label="Nhận thông tin trong" value={`${days} ngày sau khi đăng`} /><Summary label="Phần thưởng" value={`${rewardUi} ${FIND_SYMBOL}`} /><Summary label="Ví" value={connected ? "Đã kết nối Devnet" : "Chưa kết nối"} />
             </dl>
-            {!connected && <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 p-4"><p className="mb-3 text-sm text-amber-900">Kết nối ví để ký một giao dịch Devnet.</p><ConnectWalletButton size="md" /></div>}
+            {!connected && <div className="alert-box-warn mt-6 rounded-xl p-4"><p className="mb-3 text-sm">Kết nối ví để ký một giao dịch Devnet.</p><ConnectWalletButton size="md" /></div>}
           </div>
         )}
 
-        {error && <p className="mt-5 rounded-xl border border-rose-200 bg-rose-50 p-3 text-sm text-rose-900" role="alert">{error}</p>}
+        {error && <p className="alert-box-danger mt-5 rounded-xl p-3 text-sm" role="alert">{error}</p>}
 
         <div className="mt-7 flex items-center justify-between gap-3 border-t border-line pt-5">
           <button type="button" disabled={step === 0 || busy} onClick={() => { setError(null); setStep((current) => Math.max(0, current - 1)); }} className="app-button-secondary">Quay lại</button>

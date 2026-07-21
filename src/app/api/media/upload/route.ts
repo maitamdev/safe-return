@@ -3,7 +3,7 @@ import type { MediaPurpose } from "@/lib/media/types";
 import {
   ApiError,
   apiErrorResponse,
-  enforceRateLimit,
+  enforceApiRateLimit,
   requireApiUser,
   requireSameOrigin,
 } from "@/lib/server/api-security";
@@ -16,7 +16,12 @@ export async function POST(req: Request) {
   try {
     requireSameOrigin(req);
     const user = await requireApiUser();
-    enforceRateLimit(`media-upload:${user.id}`, { limit: 10, windowMs: 10 * 60_000 });
+    const admin = createAdminClient();
+    await enforceApiRateLimit(
+      `media-upload:${user.id}`,
+      { limit: 10, windowMs: 10 * 60_000 },
+      admin,
+    );
     const body = (await req.json()) as {
       purpose?: MediaPurpose;
       bountyId?: string;
@@ -30,8 +35,6 @@ export async function POST(req: Request) {
     if (!bountyId || bountyId.length > 32 || !body.dataUrl) {
       throw new ApiError(400, "Thiếu mã bounty hoặc dữ liệu ảnh.");
     }
-
-    const admin = createAdminClient();
     const { data: profile, error: profileError } = await admin
       .from("profiles")
       .select("wallet_pubkey,wallet_verified_at")

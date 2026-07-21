@@ -268,9 +268,9 @@ export function FirstVisitGuide() {
                 </p>
               </div>
 
-              <div className="mt-6 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3.5 text-sm leading-6 text-amber-950">
+              <div className="alert-box-warn mt-6 rounded-xl px-4 py-3.5 text-sm leading-6">
                 <div className="flex items-start gap-3">
-                  {stepIndex === 0 ? <Flask size={20} className="mt-0.5 shrink-0 text-amber-700" weight="duotone" /> : <Coins size={20} className="mt-0.5 shrink-0 text-amber-700" weight="duotone" />}
+                  {stepIndex === 0 ? <Flask size={20} className="mt-0.5 shrink-0" weight="duotone" /> : <Coins size={20} className="mt-0.5 shrink-0" weight="duotone" />}
                   <p>{step.note}</p>
                 </div>
               </div>

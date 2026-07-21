@@ -1,9 +1,14 @@
 /** SafeReturn — Solana Devnet config */
 
+import { primarySolanaRpc, resolveSolanaRpcEndpoints } from "@/lib/solana/rpc-endpoints";
+
 export const SOLANA_CLUSTER = "devnet" as const;
 
-export const SOLANA_RPC =
-  process.env.NEXT_PUBLIC_SOLANA_RPC || "https://api.devnet.solana.com";
+/** Primary Devnet RPC (dedicated provider preferred via NEXT_PUBLIC_SOLANA_RPC). */
+export const SOLANA_RPC = primarySolanaRpc();
+
+/** Full failover list used by Connection pooling. */
+export const SOLANA_RPC_ENDPOINTS = resolveSolanaRpcEndpoints();
 
 /** SafeReturn program (technical Anchor artifact name: findback). */
 export const FINDBACK_PROGRAM_ID =
@@ -32,10 +37,18 @@ export const SOLANA_LIVE =
   process.env.NEXT_PUBLIC_SOLANA_LIVE !== "0" &&
   process.env.NEXT_PUBLIC_SOLANA_LIVE !== "false";
 
-/** Enabled only after the v2 program upgrade and Supabase migration are live. */
+/**
+ * Protocol v2 (multi-claim + arbitration panel).
+ * Enable with NEXT_PUBLIC_PROTOCOL_V2=1 after program + Supabase are aligned
+ * (`npm run release:check:v2`).
+ */
 export const PROTOCOL_V2_ENABLED = process.env.NEXT_PUBLIC_PROTOCOL_V2 === "1";
 
-/** Client opt-in; the server independently enforces SPONSORED_FEES_ENABLED. */
+/**
+ * Client opt-in for fee sponsorship. Requires explicit NEXT_PUBLIC_SPONSORED_FEES=1
+ * so demos without a sponsor keypair still use self-pay. The API enables when
+ * SPONSOR_KEYPAIR_JSON is present (or SPONSORED_FEES_ENABLED=1).
+ */
 export const SPONSORED_FEES_ENABLED =
   PROTOCOL_V2_ENABLED && process.env.NEXT_PUBLIC_SPONSORED_FEES === "1";
 

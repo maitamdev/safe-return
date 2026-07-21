@@ -7,6 +7,11 @@ overflow-checks = true
 opt-level = "z"
 lto = "fat"
 codegen-units = 1
+strip = "symbols"
+panic = "abort"
+debug = false
+debug-assertions = false
+incremental = false
 
 [profile.release.build-override]
 opt-level = 3

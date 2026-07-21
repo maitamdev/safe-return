@@ -17,7 +17,7 @@ export default function BountiesError({
 
   return (
     <div className="app-card mx-auto max-w-xl p-7 text-center sm:p-10" role="alert">
-      <span className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-rose-50 text-rose-700">
+      <span className="alert-danger mx-auto flex h-14 w-14 items-center justify-center rounded-2xl">
         <WarningCircle size={30} weight="duotone" />
       </span>
       <h1 className="mt-5 text-2xl font-bold">Chưa tải được dữ liệu</h1>

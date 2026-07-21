@@ -5,6 +5,7 @@ vi.mock("server-only", () => ({}));
 import {
   ApiError,
   apiErrorResponse,
+  enforceApiRateLimit,
   enforceRateLimit,
   requireSameOrigin,
 } from "./api-security";
@@ -40,6 +41,16 @@ describe("API security boundaries", () => {
     expect(() => enforceRateLimit(key, { limit: 2, windowMs: 60_000 })).toThrowError(
       expect.objectContaining({ status: 429 }),
     );
+  });
+
+  it("layered limiter still blocks after local quota is exhausted", async () => {
+    const key = `layered-security-${Date.now()}`;
+    await expect(
+      enforceApiRateLimit(key, { limit: 1, windowMs: 60_000 }, null),
+    ).resolves.toBeUndefined();
+    await expect(
+      enforceApiRateLimit(key, { limit: 1, windowMs: 60_000 }, null),
+    ).rejects.toMatchObject({ status: 429 });
   });
 
   it("keeps unexpected internal errors out of API responses", async () => {

@@ -102,9 +102,9 @@ export function FindBackShell({ children }: { children: React.ReactNode }) {
       </header>
 
       {(error || txState === "pending" || (txState === "confirmed" && lastTxUrl)) && (
-        <div className={cn("border-b", error ? "border-rose-200 bg-rose-50" : txState === "confirmed" ? "border-emerald-200 bg-emerald-50" : "border-line bg-bg-elevated")} role={error ? "alert" : "status"}>
+        <div className={cn("border-b", error ? "alert-box-danger border-b" : txState === "confirmed" ? "alert-box-ok border-b" : "border-line bg-bg-elevated")} role={error ? "alert" : "status"}>
           <div className="mx-auto flex max-w-7xl items-start gap-2 px-4 py-3 text-sm sm:px-6 lg:px-8">
-            {error ? <><WarningCircle size={18} className="mt-0.5 shrink-0 text-rose-700" /><span className="min-w-0 flex-1 text-rose-900">{error}</span><button type="button" onClick={clearError} className="rounded-lg p-1 text-rose-700 hover:bg-rose-100" aria-label="Đóng thông báo"><X size={16} /></button></> : txState === "pending" ? <><span className="mt-1 h-2 w-2 animate-pulse rounded-full bg-forest" /><span className="text-ink">Đang gửi {transactionLabel(lastIx)}. Kiểm tra cửa sổ Phantom để ký.</span></> : txState === "confirmed" && lastTxUrl ? <a href={lastTxUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-semibold text-forest hover:underline"><CheckCircle size={17} weight="fill" />Giao dịch thành công. Mở Solana Explorer</a> : null}
+            {error ? <><WarningCircle size={18} className="mt-0.5 shrink-0" /><span className="min-w-0 flex-1">{error}</span><button type="button" onClick={clearError} className="rounded-lg p-1 opacity-80 hover:opacity-100" aria-label="Đóng thông báo"><X size={16} /></button></> : txState === "pending" ? <><span className="mt-1 h-2 w-2 animate-pulse rounded-full bg-forest" /><span className="text-ink">Đang gửi {transactionLabel(lastIx)}. Kiểm tra cửa sổ Phantom để ký.</span></> : txState === "confirmed" && lastTxUrl ? <a href={lastTxUrl} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 font-semibold text-forest hover:underline"><CheckCircle size={17} weight="fill" />Giao dịch thành công. Mở Solana Explorer</a> : null}
           </div>
         </div>
       )}

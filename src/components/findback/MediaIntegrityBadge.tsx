@@ -64,7 +64,7 @@ export function MediaIntegrityBadge({
 
   if (state === "failed") {
     return (
-      <div className="inline-flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-800" title={verification?.error} role="alert">
+      <div className="alert-box-danger inline-flex items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold" title={verification?.error} role="alert">
         <WarningCircle size={16} weight="fill" aria-hidden />
         Không xác minh được ảnh
       </div>
@@ -72,10 +72,10 @@ export function MediaIntegrityBadge({
   }
 
   return (
-    <div className="inline-flex max-w-full items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800" title={`SHA-256 ${verification?.sha256}`}>
+    <div className="alert-box-ok inline-flex max-w-full items-center gap-2 rounded-xl px-3 py-2 text-xs font-semibold" title={`SHA-256 ${verification?.sha256}`}>
       <CheckCircle size={16} weight="fill" aria-hidden />
       <span>Ảnh khớp Solana Devnet</span>
-      <span className="font-mono text-[10px] text-emerald-700">
+      <span className="font-mono text-[10px] opacity-80">
         {verification?.sha256.slice(0, 8)}…{verification?.sha256.slice(-6)}
       </span>
     </div>

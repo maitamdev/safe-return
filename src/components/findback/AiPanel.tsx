@@ -33,7 +33,7 @@ type VerificationResult = {
 
 export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAccept, onReject, onDispute, busy, canDecide, titleId = "review-title" }: { report: AiClaimReport; provenance?: AiProvenance; bountyId?: string; finderWallet?: string; onAccept?: () => void; onReject?: () => void; onDispute?: () => void; busy?: boolean; canDecide?: boolean; titleId?: string }) {
   const Icon = report.decision === "ACCEPT" ? CheckCircle : report.decision === "REJECT" ? XCircle : Warning;
-  const tone = report.decision === "ACCEPT" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : report.decision === "REJECT" ? "border-rose-200 bg-rose-50 text-rose-800" : "border-amber-200 bg-amber-50 text-amber-800";
+  const tone = report.decision === "ACCEPT" ? "status-pill-ok" : report.decision === "REJECT" ? "status-pill-danger" : "status-pill-warn";
   const [verificationResult, setVerificationResult] = useState<VerificationResult | null>(null);
   const inputHash = provenance?.inputHash?.toLowerCase();
   const reportHash = provenance?.reportHash?.toLowerCase();
@@ -161,7 +161,7 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
             Ba hash dưới đây khóa đúng dữ liệu đầu vào, báo cáo đầu ra và model đã dùng. AI không có quyền tự chuyển phần thưởng.
           </p>
           {verification === "mismatch" ? (
-            <p className="mt-3 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs font-semibold text-rose-900" role="alert">
+            <p className="alert-box-danger mt-3 rounded-lg p-3 text-xs font-semibold" role="alert">
               Báo cáo hoặc model hiện tại không khớp commitment trên Claim PDA. Không nên dùng kết quả này để quyết định.
             </p>
           ) : verification === "legacy" ? (
@@ -186,7 +186,7 @@ export function AiReviewPanel({ report, provenance, bountyId, finderWallet, onAc
       )}
 
       {report.evidence_quality && (
-        <div className="mt-5 rounded-xl border border-amber-200 bg-amber-50 p-4 text-sm text-amber-950">
+        <div className="alert-box-warn mt-5 rounded-xl p-4 text-sm">
           <p className="font-bold">Mức bằng chứng: {evidenceQualityCopy[report.evidence_quality]}</p>
           {report.evidence_notes && report.evidence_notes.length > 0 && (
             <ul className="mt-2 space-y-1 leading-6">

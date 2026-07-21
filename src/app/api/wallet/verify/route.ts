@@ -7,7 +7,7 @@ import { createAdminClient } from "@/lib/supabase/admin";
 import {
   ApiError,
   apiErrorResponse,
-  enforceRateLimit,
+  enforceApiRateLimit,
   requireApiUser,
   requireSameOrigin,
 } from "@/lib/server/api-security";
@@ -18,7 +18,12 @@ export async function POST(req: Request) {
   try {
     requireSameOrigin(req);
     const user = await requireApiUser();
-    enforceRateLimit(`wallet-verify:${user.id}`, { limit: 10, windowMs: 60_000 });
+    const admin = createAdminClient();
+    await enforceApiRateLimit(
+      `wallet-verify:${user.id}`,
+      { limit: 10, windowMs: 60_000 },
+      admin,
+    );
     const body = (await req.json()) as {
       address?: string;
       message?: string;
@@ -29,8 +34,6 @@ export async function POST(req: Request) {
     if (!message.includes(`Wallet: ${publicKey.toBase58()}`) || !message.includes(`Account: ${user.id}`)) {
       throw new ApiError(400, "Nội dung xác minh không hợp lệ.");
     }
-
-    const admin = createAdminClient();
     const { data: profile, error: readError } = await admin
       .from("profiles")
       .select("wallet_nonce_hash,wallet_nonce_expires_at")

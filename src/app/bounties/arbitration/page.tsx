@@ -127,7 +127,7 @@ export default function ArbitrationPage() {
         </section>
       ) : null}
 
-      {error ? <p className="mt-7 rounded-xl border border-rose-200 bg-rose-50 p-4 text-sm text-rose-900" role="alert">{error}</p> : null}
+      {error ? <p className="alert-box-danger mt-7 rounded-xl p-4 text-sm" role="alert">{error}</p> : null}
 
       <section className="mt-8" aria-labelledby="queue-title">
         <div className="flex items-end justify-between gap-4">
@@ -277,7 +277,7 @@ function CaseCard({ arbitrationCase, viewer, reload }: { arbitrationCase: Arbitr
             {!isQuorum ? (
               <div className="grid gap-2 sm:grid-cols-2"><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, true, arbitrationCase.finderWallet))} className="app-button-primary">Trả FIND cho finder</button><button type="button" disabled={locked} onClick={() => void run(() => resolveDispute(arbitrationCase.bountyId, false, arbitrationCase.finderWallet))} className="app-button-secondary">Từ chối claim</button></div>
             ) : null}
-            {error ? <p className="mt-4 rounded-xl border border-rose-200 bg-rose-50 p-3 text-xs leading-5 text-rose-900" role="alert">{error}</p> : null}
+            {error ? <p className="alert-box-danger mt-4 rounded-xl p-3 text-xs leading-5" role="alert">{error}</p> : null}
           </div>
           <Link href={`/bounties/${arbitrationCase.bountyId}`} className="mt-5 inline-flex items-center gap-1.5 text-xs font-bold text-forest hover:underline">Mở hồ sơ bounty <ArrowSquareOut size={13} /></Link>
         </div>
