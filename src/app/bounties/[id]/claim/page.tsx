@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useParams } from "next/navigation";
@@ -27,12 +27,16 @@ export default function SubmitClaimPage() {
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<AiClaimReport | null>(null);
   const [submitted, setSubmitted] = useState(false);
+  // Keep last known meta so background bounty polls never unmount the form mid-typing.
+  const metaRef = useRef(meta);
+  if (meta) metaRef.current = meta;
+  const stableMeta = meta ?? metaRef.current;
 
-  if (loadingBounties) {
+  if (loadingBounties && !stableMeta) {
     return <div className="app-card mx-auto max-w-2xl p-6 text-sm text-ink-soft">Đang tải dữ liệu từ Supabase...</div>;
   }
 
-  if (!meta) {
+  if (!stableMeta) {
     return <EmptyMessage id={id} />;
   }
 
@@ -96,7 +100,7 @@ export default function SubmitClaimPage() {
     <div className="mx-auto max-w-2xl">
       <Link href={`/bounties/${id}`} className="inline-flex items-center gap-2 text-sm font-semibold text-ink-soft hover:text-forest"><ArrowLeft size={16} />Chi tiết tin</Link>
       <h1 className="mt-6 text-3xl font-bold tracking-tight">Gửi bằng chứng tìm thấy</h1>
-      <p className="mt-2 text-lg font-semibold text-forest">{meta.title}</p>
+      <p className="mt-2 text-lg font-semibold text-forest">{stableMeta.title}</p>
       <div className="alert-box-warn mt-5 flex items-start gap-3 rounded-xl p-4 text-sm leading-6">
         <ShieldWarning size={21} className="mt-0.5 shrink-0" />
         <p>Không đăng số điện thoại, email, số giấy tờ hoặc chi tiết bí mật. Nội dung, địa điểm, thời gian và ảnh chỉ mở cho bạn, chủ tin và trọng tài được phân công; blockchain chỉ nhận hash bằng chứng.</p>

@@ -83,6 +83,7 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const bountiesRef = useRef<BountyMeta[]>([]);
   const lastReconcileAtRef = useRef(0);
   const [loadingBounties, setLoadingBounties] = useState(true);
+  const hasLoadedBountiesRef = useRef(false);
   const [lastTx, setLastTx] = useState<string | null>(null);
   const [lastTxUrl, setLastTxUrl] = useState<string | null>(null);
   const [lastIx, setLastIx] = useState<string | null>(null);
@@ -131,10 +132,14 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     if (!user) {
       replaceBounties([]);
+      hasLoadedBountiesRef.current = false;
       setLoadingBounties(false);
       return;
     }
-    setLoadingBounties(true);
+    // Only show full-page loading on the first fetch. Background polls must stay
+    // silent or claim/create forms unmount and wipe in-progress input.
+    const showLoading = !hasLoadedBountiesRef.current;
+    if (showLoading) setLoadingBounties(true);
     try {
       await flushPendingSyncs();
       if (Date.now() - lastReconcileAtRef.current >= 60_000) {
@@ -145,11 +150,12 @@ export function FindBackProvider({ children }: { children: ReactNode }) {
         }).catch(() => null);
       }
       replaceBounties(await fetchBountiesFromSupabase());
+      hasLoadedBountiesRef.current = true;
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause);
       setError(`Không tải được dữ liệu thật từ Supabase: ${message}`);
     } finally {
-      setLoadingBounties(false);
+      if (showLoading) setLoadingBounties(false);
     }
   }, [replaceBounties, user]);
 
